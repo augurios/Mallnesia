@@ -36,14 +36,15 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 |---|---|
 | Keep | Sanity system and effects, audio pipeline (`audio.js`), input and mobile controls (`input.js`), HUD, quality presets, shaders and fade transitions, lint and profiling setup |
 | Adapt | `world.js` → parking-garage chunk generator. `entity.js` → the shadow, the girl in white, the watchers. `levels.js` → mall areas plus the garage as its own level |
-| Add | Hand-built mall from GLB, mesh collision, physics drag-to-open doors and drawers, hiding spots, inventory, readable notes, flashlight with limited batteries, security camera room, save/load |
+| Add | Hand-built mall from GLB, mesh collision, self-moving doors (driven by the mall), physics props for night-noise events, hiding spots, readable notes, flashlight with limited batteries, security camera room, save/load |
 
 ## Game mechanics
 
 - **No combat.** Threats are avoided, hidden from, or endured. Never add weapons the player can use.
 - **Sanity:** drained by darkness, apparitions, and the watchers. Low sanity increases hallucinations and makes the mall shift more (e.g., more wrong-floor elevator results).
 - **Light:** a flashlight with limited batteries (equivalent of Amnesia's lantern oil).
-- **Interaction:** physics doors and drawers dragged with the mouse (touch drag on mobile), hiding spots (including abandoned cars), inventory, readable notes.
+- **Doors:** the player never opens or closes doors. The mall does, on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive.
+- **Interaction:** limited to hiding spots (including abandoned cars), readable notes, and security-room monitors. **No inventory and no item pickup.**
 - **Security room:** monitors the player can use to scout other areas; the shadow can appear on the feeds.
 
 ## Areas and the procedural garage
@@ -65,7 +66,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 ## Current priority: vertical slice
 
 1. Replace the procedural world with one hand-built test room loaded from GLB, with working collision.
-2. Physics door interaction.
+2. Self-moving doors: doors open, close, and slam on their own, triggered by script (and later by sanity).
 3. The food court as the first real area (night noises: physics events that trigger when the player isn't looking).
 4. Wrong-floor elevator → procedural parking garage with the recurring van.
 
@@ -85,7 +86,7 @@ Some legends are tied to real tragedies and real people. When writing notes, dia
 ## Language
 
 - In-world text (signs, labels such as "Salida", "Nivel", "Parqueo") is in **Costa Rican Spanish**, matching the real mall.
-- UI and notes language (Spanish, English, or both): undecided. Keep strings in one place so localization stays easy.
+- UI and notes language: **Costa Rican Spanish**. Keep strings in one place so localization stays easy.
 
 ## Web performance rules
 
