@@ -41,7 +41,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 |---|---|
 | Keep | Sanity system and effects, audio pipeline (`audio.js`), input and mobile controls (`input.js`), HUD, quality presets, shaders and fade transitions, lint and profiling setup |
 | Adapt | `world.js` → parking-garage chunk generator. `entity.js` → the shadow, the girl in white, the watchers. `levels.js` → mall areas plus the garage as its own level |
-| Add | Hand-built mall from GLB, mesh collision, self-moving doors (driven by the mall), physics props for night-noise events, hiding spots, readable notes, flashlight with limited batteries, security camera room, save/load |
+| Add | Hand-built mall from GLB, mesh collision, self-moving doors (driven by the mall), physics props for night-noise events, hiding spots, readable notes, flashlight with limited charge, stealth and detection (noise, light, line of sight), the guard NPC, security camera room, win and fail states, save/load |
 
 ## Game mechanics
 
@@ -51,7 +51,8 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **Locked zones:** no keys or access cards. The mall opens and locks sections on its own, tied to story beats.
 - **Doors:** the player never opens or closes doors. The mall does, on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive.
 - **Interaction:** limited to hiding spots (including abandoned cars), readable notes, and security-room monitors. **No inventory and no item pickup.**
-- **Security room:** monitors the player can use to scout other areas; the shadow can appear on the feeds.
+- **Security room:** monitors the player can use to scout other areas; the shadow can appear on the feeds. The player can also spot the guard here (see "The guard").
+- **Stealth:** the player survives by staying quiet, hidden, and out of sight. The flashlight must be off to avoid being noticed by a major threat. See "Failure".
 
 ## Areas and the procedural garage
 
@@ -65,15 +66,55 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 ## Threats
 
-- **The shadow:** appears on security camera feeds, approaches figures; radio voice warns to look behind. Later appears on the feed of the player's own room.
+- **The shadow:** appears on security camera feeds, approaches figures; radio voice warns to look behind. Later appears on the feed of the player's own room. **It is the only threat that can catch the player** (see "Failure").
 - **The girl in white:** brief, sparing apparitions in elevators, mirrors, bathroom corridors. Never chases.
 - **The watchers:** ordinary-looking people who never attack; they move closer when not observed, freeze when looked at directly, and drain sanity while watching.
+
+## Opening and the guard
+
+- **The guard is a real, ordinary mall worker.** He is not a ghost and not a manifestation of the mall. He is fictional (no real person); see the content guidelines.
+- **Opening:** when the game starts, the guard is the first thing the player sees. He tells the player the mall is already closed for the day and they have to leave. He disappears once he is out of the player's camera view. The player is then alone in the mall.
+- **Return:** he reappears later, once the player has done some scouting for an exit (the trigger is tied to exploration progress, not a timer).
+- **Rounds:** he walks a loose patrol between fixed checkpoints (e.g., food court, an atrium, the garage stairwell door). The mall reshuffles the order, so the route is never the same twice.
+- **Finding him is audio-first:** keys jingling, a radio crackling, footsteps, a flashlight beam far down a hall. Sound comes before sight.
+- **Scouting him:** the security room monitors show him on a feed. The player decides whether to go meet him.
+- **The mall interferes:** at low sanity the cues go quiet or point the wrong way. A watcher can pass for him on a camera feed, so the player has to check before trusting it.
+- **Pity rule:** if the player has been lost for several minutes, the cues get clearer, so a long search doesn't become frustrating.
+- **Meeting him** is the guard win condition (see "Winning").
+
+## Failure
+
+- **No combat and no health.** The player fails by being caught by the shadow. To avoid this, the player must stay quiet, hidden, and out of sight, with the flashlight off.
+- **The shadow is the only threat that can catch the player.** The girl in white never chases, and the watchers drain sanity but never catch the player.
+- **Being caught restarts the player at the last checkpoint.** Checkpoint placement and rules (automatic, at fixed points, tied to save/load) are not yet decided; propose options when building this.
+- **Other failure:** sanity running out in the garage wakes the player elsewhere in the mall (not a restart).
+
+## Winning
+
+There are two ways to win. Either one ends the game.
+
+### Finding the guard
+
+- He escorts the player out; the player just follows, with no puzzle.
+- It is the easier, social ending, and it depends on luck, timing, and good scouting.
+- **Ending tone:** the mall lets the player go.
+
+### Finding an elusive exit
+
+- **Each exit is seen first, then earned.** Following legend 2, the player sees it from afar (e.g., the main doors from an atrium railing, or a strip of daylight at the end of a service corridor). The obvious route to it always leads somewhere else.
+- **Each exit has a rule the player has to learn.** The rule is hinted at in the notes (legend 15) and in how the mall behaves. Starting ideas, none decided:
+  - **Main entrance:** reached only by the route that makes no sense (e.g., going up when the exit is below).
+  - **Garage:** reach the payphone, intercom, or attendant booth, then the ramp out.
+  - **Service corridor or dock door:** opens only after the mall has opened its sections in sequence.
+- **Exits fade as sanity drops,** so the player needs enough composure to find them.
+- **Count:** start with 3; any one wins. Build them in the order their areas get built, starting with the garage.
+- **Ending tone:** the player understood the mall and got out on their own.
 
 ## Current priority: vertical slice
 
 1. Replace the procedural world with one hand-built test room loaded from GLB, with working collision.
 2. Self-moving doors: doors open, close, and slam on their own, triggered by script (and later by sanity).
-3. The food court as the first real area (night noises: physics events that trigger when the player isn't looking).
+3. The food court as the first real area (night noises: physics events that trigger when the player isn't looking), starting with the guard's opening scene.
 4. Wrong-floor elevator → procedural parking garage with the recurring van.
 
 Work in small, testable steps. Augusto playtests; after each feature, tell him exactly what to try and what to look for, since feel and scares can only be judged by playing.
