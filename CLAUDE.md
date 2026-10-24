@@ -17,6 +17,11 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
 ## Key documents
 
 - `docs/El_Mall_Vivo_Design_Doc.pdf` — **legends reference.** 17 selected legends, each with what the legend says, the game mechanic it becomes, its area, and its priority (Vertical slice / Core / Later). This is the source of truth for game content. Read it before designing any area, threat, note, or mechanic.
+  - **Where they conflict, this file wins.** The PDF predates the decision to drop item pickup, inventory, and player-operated doors and drawers. Adapt these legend mechanics:
+    - Legend 8 (gym): physics props can still be pushed; the player just doesn't pick anything up.
+    - Legend 9 (gray corridors): no keys or access cards; the mall opens sections itself.
+    - Legend 16 (fifth floor): the weapons cache is a scene to look at, not an item to take.
+    - Legend 17 (laughing-drug photo): examined where it lies, not picked up. Not yet redesigned (Later).
 - `docs/base-project-claude.md` — the original CLAUDE.md from the base project (commands, code conventions, module notes). Keep following its technical conventions unless this file overrides them.
 
 ## Central premise
@@ -42,7 +47,8 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 - **No combat.** Threats are avoided, hidden from, or endured. Never add weapons the player can use.
 - **Sanity:** drained by darkness, apparitions, and the watchers. Low sanity increases hallucinations and makes the mall shift more (e.g., more wrong-floor elevator results).
-- **Light:** a flashlight with limited batteries (equivalent of Amnesia's lantern oil).
+- **Light:** a flashlight with limited charge (equivalent of Amnesia's lantern oil). Charge drains while it is on and recharges in lit areas or at fixed charging points. There are no battery pickups.
+- **Locked zones:** no keys or access cards. The mall opens and locks sections on its own, tied to story beats.
 - **Doors:** the player never opens or closes doors. The mall does, on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive.
 - **Interaction:** limited to hiding spots (including abandoned cars), readable notes, and security-room monitors. **No inventory and no item pickup.**
 - **Security room:** monitors the player can use to scout other areas; the shadow can appear on the feeds.
