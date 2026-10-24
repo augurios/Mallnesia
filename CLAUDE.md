@@ -30,14 +30,6 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **Base:** [dirien/backrooms](https://github.com/dirien/backrooms) — Three.js + Vite browser horror game. Chosen after testing three candidates for stability and code quality.
 - **Planned additions:** levels modeled in Blender and loaded as glTF/GLB; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
 
-### ⚠️ License status: PENDING
-
-The base project has **no license**. Permission was requested in https://github.com/dirien/backrooms/issues/31.
-
-- Until permission is granted or a license is added, treat the base project's code as **reference only**: do not copy its code into this repo. Write original implementations instead.
-- If Augusto confirms permission, update this section, keep their copyright notice, and credit the author in the README and in-game credits.
-- If there is no response after two to three weeks, the plan is an original build using the base project's architecture as a reference.
-
 ### Module plan (relative to the base project)
 
 | Action | Modules |
