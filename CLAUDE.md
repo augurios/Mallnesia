@@ -62,7 +62,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **It is where the player chooses a path:** an elevator, a corridor, stairs, or an open door. Each leads to a different area.
 - **The unreachable exit is seen from here** (legend 2): the main doors are visible from the railings, but the route down always leads somewhere else.
 - **Checkpoints:** the game auto-saves when the player enters or leaves the atrium (see "Save, load, and checkpoints").
-- **Open question:** how the atrium relates to the food court as the first area (does the player start in the food court and reach the atrium from there, or the reverse?). See "Open decisions".
+- **Start (decided):** the main building has 4 floors. The player starts on the **first floor at the main entrance, which is closed** when the game begins. The food court is in the southern part of the top 3 floors, and the player reaches it, and the atrium, from there.
 
 ### Other areas
 
@@ -72,7 +72,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
   - Starts looking normal; then level signs skip (P2, P3, P7, P-12) and "Salida" arrows point into walls.
   - A recurring generic minivan landmark signals the player is going in circles.
   - Goal: reach a payphone, intercom, or attendant booth before sanity runs out. Failure → wake up elsewhere in the mall.
-  - Contained, guided sequence, not endless wandering. Fixed vs. random seed: undecided, make it configurable.
+  - Contained, guided sequence, not endless wandering. Seed: **fixed by default**, with a config flag to randomize.
 
 ## Threats
 
@@ -84,9 +84,9 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 - **Auto-save checkpoint:** created whenever the player **enters or leaves the main atrium**. This is the "last checkpoint" the player returns to after being caught by the shadow.
 - **Manual save and load:** available from the **pause menu**.
-- **What a save stores** is not yet decided (player position, sanity, flashlight charge, which notes were read, guard and exit progress). Propose a minimal set when building it; keep it small and versioned so saves survive updates.
+- **What a save stores (decided):** player position and current area, which notes were read, and guard and exit progress. Sanity and flashlight charge are **not** saved (reset on load). Keep it small and versioned so saves survive updates.
 - **Storage:** browser local storage, since the game is free and web-only. Keep it working if storage is blocked.
-- **Open question:** whether manual saves are allowed anywhere or only in safe states (e.g., not while the shadow is hunting).
+- **Manual saves (decided):** allowed anywhere except while the shadow is hunting the player.
 
 ## Opening and the guard
 
