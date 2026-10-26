@@ -56,6 +56,16 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 ## Areas and the procedural garage
 
+### The main atrium (hub)
+
+- **The main atrium is a defining feature of the real mall** and the game's central hub. It is the **most static place in the game**: the rest of the mall shifts, but the atrium keeps its layout, so the player always has a place to orient themselves.
+- **It is where the player chooses a path:** an elevator, a corridor, stairs, or an open door. Each leads to a different area.
+- **The unreachable exit is seen from here** (legend 2): the main doors are visible from the railings, but the route down always leads somewhere else.
+- **Checkpoints:** the game auto-saves when the player enters or leaves the atrium (see "Save, load, and checkpoints").
+- **Open question:** how the atrium relates to the food court as the first area (does the player start in the food court and reach the atrium from there, or the reverse?). See "Open decisions".
+
+### Other areas
+
 - **Hand-built areas** carry the place's identity: food court (first area), abandoned gym, gray service corridors (shortcuts and stealth network), upper-floor offices with an empty pool, TV station offices, bathrooms and elevators, fifth floor, atriums.
 - **The parking garage** is procedural and treated as its own level, entered via the wrong-floor elevator or a stairwell door, with a fade transition. A seamless ramp connection is a later goal.
   - Built from a small chunk set: column bays, ramps, dead ends, stairwell doors, painted lines, fluorescent lights, parked cars.
@@ -69,6 +79,14 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **The shadow:** appears on security camera feeds, approaches figures; radio voice warns to look behind. Later appears on the feed of the player's own room. **It is the only threat that can catch the player** (see "Failure").
 - **The girl in white:** brief, sparing apparitions in elevators, mirrors, bathroom corridors. Never chases.
 - **The watchers:** ordinary-looking people who never attack; they move closer when not observed, freeze when looked at directly, and drain sanity while watching.
+
+## Save, load, and checkpoints
+
+- **Auto-save checkpoint:** created whenever the player **enters or leaves the main atrium**. This is the "last checkpoint" the player returns to after being caught by the shadow.
+- **Manual save and load:** available from the **pause menu**.
+- **What a save stores** is not yet decided (player position, sanity, flashlight charge, which notes were read, guard and exit progress). Propose a minimal set when building it; keep it small and versioned so saves survive updates.
+- **Storage:** browser local storage, since the game is free and web-only. Keep it working if storage is blocked.
+- **Open question:** whether manual saves are allowed anywhere or only in safe states (e.g., not while the shadow is hunting).
 
 ## Opening and the guard
 
@@ -86,7 +104,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 - **No combat and no health.** The player fails by being caught by the shadow. To avoid this, the player must stay quiet, hidden, and out of sight, with the flashlight off.
 - **The shadow is the only threat that can catch the player.** The girl in white never chases, and the watchers drain sanity but never catch the player.
-- **Being caught restarts the player at the last checkpoint.** Checkpoint placement and rules (automatic, at fixed points, tied to save/load) are not yet decided; propose options when building this.
+- **Being caught restarts the player at the last checkpoint** (see "Save, load, and checkpoints").
 - **Other failure:** sanity running out in the garage wakes the player elsewhere in the mall (not a restart).
 
 ## Winning
