@@ -62,7 +62,8 @@ Things that make the building recognizable and should survive into the level:
 - **Entrance** (confirmed): the main entrance is a retractable folding glass wall, with a street beyond. The glass doors seen in `entrance_from-inside` belong to a store beside it, not the entrance. Good for the "closed at start" entrance and the unreachable-exit view.
 - **Elevator bank** in a granite-clad wall with brass doors, near a dark wood kiosk.
 - **Island kiosks** (glass display cases) lining the halls, with some vacant units covered in plastic sheeting.
-- **Garage**: orange-banded columns, painted arrows, round convex mirrors on walls, curving lanes, an elevator lobby with checkerboard tile, a stairwell door.
+- **Garage layout (confirmed by Augusto):** the garage is a **spiral ramp**. Parking bays sit on the ramp itself: in the same view the near plane slopes up and the far plane slopes down, and because it spirals the tilt is barely noticeable. Photos `garage_spiral-ramp-parking-bay` and `garage_ramp-up-curving-lane` show this. This fits the "lost in the garage" idea well, since the player can't easily tell which way is up. Worth bringing into the procedural chunk design (curved lanes, gentle slope, bays on the slope).
+- **Garage details**: orange-banded columns, painted arrows, round convex mirrors on walls, curving lanes, an elevator lobby with checkerboard tile, a stairwell door.
 
 ## Rules of thumb for assets
 
