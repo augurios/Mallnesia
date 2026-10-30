@@ -8,6 +8,7 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
 
 - **Place:** Mall San Pedro, San Pedro, Montes de Oca, San José, Costa Rica. Opened in 1995; known for its confusing architecture, multi-level parking garage, food court, and the local legends compiled in the legends reference.
 - **Use:** the real mall is the reference for layout, architecture, materials, signage, and atmosphere. Reference photos are in `reference/photos/`; spatial accuracy to the real building matters for the hand-built areas.
+- **Era (decided):** the game is set in the **present day**, which is more canon and closer to the player. The mall's 90s bones stay, with decades of renovation on top. A mid-90s prequel is a possible later project. See `docs/art_style_reference.md`.
 - **In-game name:** a lightly fictionalized name that locals will recognize as Mall San Pedro (final name undecided). Do not use the real name in game content until Augusto decides otherwise, since the game links a real, operating business to crimes and hauntings.
 
 - **Release:** free, on the web (itch.io or similar).
