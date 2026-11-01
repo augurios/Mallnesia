@@ -121,7 +121,7 @@ There are two ways to win. Either one ends the game.
 
 ### Finding an elusive exit
 
-- **Each exit is seen first, then earned.** Following legend 2, the player sees it from afar (e.g., the main doors from an atrium railing, or a strip of daylight at the end of a service corridor). The obvious route to it always leads somewhere else.
+- **Each exit is seen first, then earned.** Following legend 2, the player sees it from afar (e.g., the main doors from an atrium railing, or a strip of street light at the end of a service corridor). The obvious route to it always leads somewhere else.
 - **Each exit has a rule the player has to learn.** The rule is hinted at in the notes (legend 15) and in how the mall behaves. Starting ideas, none decided:
   - **Main entrance:** reached only by the route that makes no sense (e.g., going up when the exit is below).
   - **Garage:** reach the payphone, intercom, or attendant booth, then the ramp out.
