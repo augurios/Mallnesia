@@ -17,7 +17,8 @@ Sources: `floor1_sketch_v2.jpg` (labeled sketch: meanings; v2 is v1 plus the pur
 - **There is one more door to the outside on floor 1**, besides the main entrance and the two parking-lot openings. It is marked in purple on the sketch: on the south-west side of the entrance lobby, in the diagonal outer wall just west of the small walk-in kiosk, facing out toward the lower-left side of the building (the street or lot side, not the garage).
 - **West side, east to west (real):** a hall next to the atriums, the W2 store blocks, another hall, the W1 store blocks, then the parking lot.
 - **South-west diagonal hall (real):** a hall with stores runs diagonally from the westernmost hall along the outline to the entrance lobby. **The purple exit is in the middle of it**, at the end of a short hall with stores on both sides.
-- **East hall (real):** the hallway right of the atriums is an ordinary hall with stores, similar to the west one (stores on its east side).
+- **North loop (real):** a wide hall goes north from the north hall between the top-left block and the big store, continues east behind the big store, then comes back down beside the NE block to the north hall.
+- **East hall (real):** the hallway right of the atriums is an ordinary hall with stores, similar to the west one (stores on its east side). It runs all the way south to the entrance lobby. A short hall branches east from it, with stores on both sides, to the south-east bathrooms.
 - **The secret hallway is invented, for flavor.** It runs from the south-east bathrooms to the north-east bathrooms, hidden behind the east stores. Game-owned, service-style route.
 - **The unlabeled rectangles:** the one inside the north block is a **big store**; the small one near the entrance is a **small walk-in kiosk**.
 - **The escalators (yellow, along the north edge of Atrium A) are an up and down pair**, side by side.

@@ -141,6 +141,33 @@
    "kind": "hall"
   },
   {
+   "id": "n_hall_up",
+   "label": "Wide hall north (between top-left block and big store)",
+   "x0": 50,
+   "x1": 66,
+   "y0": 167,
+   "y1": 190,
+   "kind": "hall"
+  },
+  {
+   "id": "n_hall_behind",
+   "label": "Hall behind the big store",
+   "x0": 50,
+   "x1": 92,
+   "y0": 183,
+   "y1": 190,
+   "kind": "hall"
+  },
+  {
+   "id": "n_hall_down",
+   "label": "Hall down beside the NE block",
+   "x0": 86,
+   "x1": 92,
+   "y0": 167,
+   "y1": 190,
+   "kind": "hall"
+  },
+  {
    "id": "b_elevators",
    "label": "Elevator pair (B, NE)",
    "x0": 80,
@@ -361,44 +388,53 @@
    "label": "East hall (stores, mirrors the west hall)",
    "x0": 93,
    "x1": 100,
-   "y0": 62,
+   "y0": 37,
    "y1": 150,
    "kind": "hall"
   },
   {
    "id": "east_stores",
-   "label": "East store block",
+   "label": "East store block (north of the short hall)",
    "x0": 100,
    "x1": 112.5,
-   "y0": 78,
+   "y0": 53,
    "y1": 146,
    "kind": "shop"
   },
   {
-   "id": "secret_hall_s",
-   "label": "Secret hallway (game), from SE bathrooms",
-   "x0": 108,
-   "x1": 115.5,
-   "y0": 66,
-   "y1": 69,
-   "kind": "secret"
+   "id": "east_stores_s",
+   "label": "East store (south of the short hall)",
+   "x0": 100,
+   "x1": 112.5,
+   "y0": 38,
+   "y1": 47,
+   "kind": "shop"
+  },
+  {
+   "id": "east_spur",
+   "label": "Short hall east to the SE bathrooms",
+   "x0": 100,
+   "x1": 112,
+   "y0": 47,
+   "y1": 53,
+   "kind": "hall"
   },
   {
    "id": "secret_hall",
    "label": "Secret hallway (game), runs north to NE bathrooms",
    "x0": 113,
    "x1": 115.5,
-   "y0": 66,
+   "y0": 56,
    "y1": 150,
    "kind": "secret"
   },
   {
    "id": "se_bath",
    "label": "Bathrooms (SE), past outline",
-   "x0": 100,
-   "x1": 108,
-   "y0": 62,
-   "y1": 76,
+   "x0": 112,
+   "x1": 122,
+   "y0": 44,
+   "y1": 56,
    "kind": "bath"
   }
  ],
