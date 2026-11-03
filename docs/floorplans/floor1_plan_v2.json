@@ -505,6 +505,33 @@
    "kind": "hall"
   },
   {
+   "id": "north_stores",
+   "label": "Store block along the outer (north) side of the hall behind the wide hall and big store",
+   "x0": 48,
+   "x1": 96,
+   "y0": 189,
+   "y1": 201,
+   "kind": "shop"
+  },
+  {
+   "id": "north_stores_w",
+   "label": "North stores, west end (wraps around the hall end)",
+   "x0": 36,
+   "x1": 48,
+   "y0": 183,
+   "y1": 201,
+   "kind": "shop"
+  },
+  {
+   "id": "north_stores_e",
+   "label": "North stores, east end (wraps around the hall end)",
+   "x0": 96,
+   "x1": 108,
+   "y0": 183,
+   "y1": 201,
+   "kind": "shop"
+  },
+  {
    "id": "n_hall_down",
    "label": "Hall down beside the NE block",
    "x0": 90,
