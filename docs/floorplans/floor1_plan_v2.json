@@ -57,7 +57,7 @@
    "label": "Entrance lobby",
    "points": [
     [
-     60,
+     57,
      1
     ],
     [
@@ -74,14 +74,14 @@
     ],
     [
      96,
-     29
+     18
     ],
     [
      96,
      36
     ],
     [
-     60,
+     57,
      36
     ]
    ],
@@ -385,10 +385,10 @@
   },
   {
    "id": "east_stores_s",
-   "label": "East store (south of the short hall)",
+   "label": "East store block: continues south along the lobby",
    "x0": 96,
    "x1": 108,
-   "y0": 36,
+   "y0": 18,
    "y1": 42,
    "kind": "shop"
   },
@@ -511,11 +511,20 @@
   },
   {
    "id": "walkin_kiosk",
-   "label": "Walk-in kiosk",
-   "x0": 63,
-   "x1": 72,
-   "y0": 18,
-   "y1": 24,
+   "label": "Walk-in kiosk (island in the lobby)",
+   "x0": 72,
+   "x1": 81,
+   "y0": 15,
+   "y1": 21,
+   "kind": "shop"
+  },
+  {
+   "id": "lobby_store_w",
+   "label": "West store block: the diagonal stores continue south along the lobby",
+   "x0": 48,
+   "x1": 57,
+   "y0": 1,
+   "y1": 33,
    "kind": "shop"
   }
  ],

@@ -101,6 +101,8 @@ Files: `floor1_plan_v2.png` and `floor1_plan_v2.json` (v1 is kept for comparison
 
 **v2 adjustments after review:** the east stores run all the way up to the north hall, and the NE bathrooms sit east of them (x 108 to 120) with their door on the north hall. W1 S now runs down to meet the south-west diagonal stores, and W2 S runs down to the diagonal hall, ending where the outer west hall meets it.
 
+**Lobby stores (v2):** they are not separate boxes. On the east side the east store block continues south along the lobby (down to y 18). On the west side the diagonal store block turns and runs all the way south along the lobby's west wall. The walk-in kiosk is an island in the middle of the lobby.
+
 ## Open questions
 
 1. **Scale.** Measured from the real building outline; see "Scale check". Decision needed on how to use it.
