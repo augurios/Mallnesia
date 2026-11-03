@@ -117,8 +117,8 @@ BALCONIES = [
 
 COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs": "#e0c8a0",
           "escalator": "#ffe680", "shop": "#dcdcdc", "bath": "#9be29b", "garage": "#c9c9d8",
-          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
-WALKABLE = {"void", "hall", "bath", "garage", "secret", "foodcourt", "balcony"}
+          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
+WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony"}
 
 
 def north_floor2(items):
@@ -147,6 +147,18 @@ def north_floor2(items):
     return out
 
 
+def north_cinema(items):
+    """Floors 3 and 4, north part (east of the top-left block up to the NE block): a cinema food station in the
+    middle with two wide cinemas on its sides, which also run behind it."""
+    drop = {"n_hall_up", "big_store", "n_hall_behind", "north_stores", "n_hall_down"}
+    out = [it for it in items if it[0] not in drop]
+    out.append(("cinema_lobby", "Cinema concourse (in front of the stores, the food station and the cinema entrances)", ("box", (48, 96, 165, 171)), "cinema_lobby"))
+    out.append(("cinema_food", "Cinema food stand (middle, wide counter faces the concourse)", ("box", (60, 84, 171, 189)), "kiosk"))
+    out.append(("cinema_1", "Cinema 1 (west of the food stand, and behind it)", ("poly", [(48, 171), (60, 171), (60, 189), (72, 189), (72, 201), (48, 201)]), "cinema"))
+    out.append(("cinema_2", "Cinema 2 (east of the food stand, and behind it)", ("poly", [(96, 171), (84, 171), (84, 189), (72, 189), (72, 201), (96, 201)]), "cinema"))
+    return out
+
+
 def floor_items(floor):
     """Boxes and polygons for one floor, as (id, label, shape, kind) with shape ('box', ...) or ('poly', ...)."""
     items = []
@@ -166,6 +178,8 @@ def floor_items(floor):
         items.append((i, l, ("box", (a, b, c, d)), k))
     if floor == 2:
         items = north_floor2(items)
+    if floor >= 3:
+        items = north_cinema(items)
     for i, l, p, k in POLYS:
         if i == "south_area" and floor > 1:
             l, k = "Food court (seating)", "foodcourt"
@@ -236,7 +250,7 @@ LABELS = {"atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cro
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
           "south_hall": "south hall", "south_shop_1": "shop", "south_shop_2": "shop", "south_shop_3": "shop",
           "east_hall": "east hall", "west_hall_inner": "west hall", "west_hall_outer": "west hall",
-          "hall_ew_garage": "garage hall", "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
+          "hall_ew_garage": "garage hall", "cinema_food": "cinema food",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
 VERTICAL = ("parking", "secret_hall", "east_hall", "west_hall_inner", "west_hall_outer", "west_2n", "west_2s")
 
 
@@ -306,6 +320,9 @@ def render(floor, items, doors):
             dr.text((px - 20, py - 4), "balcony", fill="black", font=f)
     dr.text(T(66, 28), "entrance lobby" if floor == 1 else "food court", fill="black", font=f)
     dr.text(T(6, 52), "diagonal hall + " + ("stores" if floor == 1 else "restaurants"), fill="black", font=fs)
+    if floor >= 3:
+        dr.text(T(55, 196), "cinema 1", fill="black", font=f)
+        dr.text(T(77, 196), "cinema 2", fill="black", font=f)
     for i, l, x, y in doors:
         px, py = T(x, y)
         purple = i in ("side_exit", "balcony_door_side")
@@ -323,6 +340,8 @@ def render(floor, items, doors):
 def build(floor):
     items = floor_items(floor)
     doors = DOORS_F1 if floor == 1 else DOORS_UP
+    if floor >= 3:
+        doors = doors + [("cinema_entrance_%d" % (n + 1), "Cinema %d entrance" % (n + 1), x, 171) for n, x in enumerate((57, 87))]
     if floor == 2:
         doors = doors + [("north_exit", "Possible exit at the north end of the narrow hall", 51, 201)]
     comps = check(items)

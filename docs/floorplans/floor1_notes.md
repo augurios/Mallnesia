@@ -149,3 +149,24 @@ New mechanic (Augusto): some elevators and stairs appear and disappear at fixed 
 - **Stairs, north end of W1 S** (x 15 to 24, y 105 to 111), reached from the garage hall.
 
 The sizes (6 m x 6 m elevators, 9 m x 6 m stairs, like the other stairs) and the exact spot along each edge are my choice. The plan shows where they can be; when they are present is a game-logic question, not decided.
+
+## Cinema (floors 3 and 4, north part)
+
+On floors 3 and 4 the north part, from the east side of the top-left block to the NE block, is a cinema (decided by Augusto). Floor 2 keeps its own north end and floor 1 the original layout. Reference photos of the real food stand: `reference/other photos/cinema-food-stand-*`.
+
+Left to right (x), behind a 6 m concourse:
+
+| x | What |
+|---|---|
+| 48 to 60 | **cinema 1**, replaces the store on that side (y 171 to 201) |
+| 60 to 84 | **cinema food stand**, 24 m wide (y 171 to 189) |
+| 84 to 96 | **cinema 2**, replaces the store on that side (y 171 to 201) |
+
+- **Cinemas** also run behind the stand (y 189 to 201, split at x 72). No stores are left on the sides.
+- **Entrances** (orange dots, y 171) are the doors in each cinema's south face, at x 57 and x 87, next to the stand.
+- **Concourse** (x 48 to 96, y 165 to 171): walkable strip along the north hall. It replaces the wide hall, the big store, the hall behind it and the hall beside the NE block.
+- The north wrap blocks (x 36 to 48 and x 96 to 108) stay as stores.
+
+From the photos (for the blockout, not in the plan): the stand is a long counter facing the concourse, with a back wall of menu screens, orange and blue finishes, queue posts in front, a ticket-kiosk station beside it, and a few steps up from the concourse floor. The stand is 24 m wide (Augusto: the real one is wider).
+
+My choices: the 24 m stand width, the 18 m depth, the door positions, the split between cinemas at x 72, and cinemas that are not connected to each other. Cinema interiors are not modeled.

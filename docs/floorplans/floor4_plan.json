@@ -4,6 +4,68 @@
  "grid_m": 3,
  "polygons": [
   {
+   "id": "cinema_1",
+   "label": "Cinema 1 (west of the food stand, and behind it)",
+   "points": [
+    [
+     48,
+     171
+    ],
+    [
+     60,
+     171
+    ],
+    [
+     60,
+     189
+    ],
+    [
+     72,
+     189
+    ],
+    [
+     72,
+     201
+    ],
+    [
+     48,
+     201
+    ]
+   ],
+   "kind": "cinema"
+  },
+  {
+   "id": "cinema_2",
+   "label": "Cinema 2 (east of the food stand, and behind it)",
+   "points": [
+    [
+     96,
+     171
+    ],
+    [
+     84,
+     171
+    ],
+    [
+     84,
+     189
+    ],
+    [
+     72,
+     189
+    ],
+    [
+     72,
+     201
+    ],
+    [
+     96,
+     201
+    ]
+   ],
+   "kind": "cinema"
+  },
+  {
    "id": "west_s",
    "label": "W1 stores south (runs down to the diagonal stores)",
    "points": [
@@ -518,42 +580,6 @@
    "kind": "stairs"
   },
   {
-   "id": "n_hall_up",
-   "label": "Wide hall north",
-   "x0": 48,
-   "x1": 66,
-   "y0": 165,
-   "y1": 189,
-   "kind": "hall"
-  },
-  {
-   "id": "big_store",
-   "label": "Big store",
-   "x0": 66,
-   "x1": 90,
-   "y0": 165,
-   "y1": 183,
-   "kind": "shop"
-  },
-  {
-   "id": "n_hall_behind",
-   "label": "Hall behind the big store",
-   "x0": 48,
-   "x1": 96,
-   "y0": 183,
-   "y1": 189,
-   "kind": "hall"
-  },
-  {
-   "id": "north_stores",
-   "label": "Store block along the outer (north) side of the hall behind the wide hall and big store",
-   "x0": 48,
-   "x1": 96,
-   "y0": 189,
-   "y1": 201,
-   "kind": "shop"
-  },
-  {
    "id": "north_stores_w",
    "label": "North stores, west end (wraps around the hall end)",
    "x0": 36,
@@ -570,15 +596,6 @@
    "y0": 183,
    "y1": 201,
    "kind": "shop"
-  },
-  {
-   "id": "n_hall_down",
-   "label": "Hall down beside the NE block",
-   "x0": 90,
-   "x1": 96,
-   "y0": 165,
-   "y1": 189,
-   "kind": "hall"
   },
   {
    "id": "ne_block",
@@ -615,6 +632,24 @@
    "y0": 1,
    "y1": 30,
    "kind": "restaurant"
+  },
+  {
+   "id": "cinema_lobby",
+   "label": "Cinema concourse (in front of the stores, the food station and the cinema entrances)",
+   "x0": 48,
+   "x1": 96,
+   "y0": 165,
+   "y1": 171,
+   "kind": "cinema_lobby"
+  },
+  {
+   "id": "cinema_food",
+   "label": "Cinema food stand (middle, wide counter faces the concourse)",
+   "x0": 60,
+   "x1": 84,
+   "y0": 171,
+   "y1": 189,
+   "kind": "kiosk"
   },
   {
    "id": "int_elevator_w2n",
@@ -662,6 +697,18 @@
    "label": "Garage connection 2",
    "x": 15,
    "y": 114
+  },
+  {
+   "id": "cinema_entrance_1",
+   "label": "Cinema 1 entrance",
+   "x": 57,
+   "y": 171
+  },
+  {
+   "id": "cinema_entrance_2",
+   "label": "Cinema 2 entrance",
+   "x": 87,
+   "y": 171
   }
  ]
 }
