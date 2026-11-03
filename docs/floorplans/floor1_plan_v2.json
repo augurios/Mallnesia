@@ -3,6 +3,56 @@
  "grid_m": 3,
  "polygons": [
   {
+   "id": "west_s",
+   "label": "W1 stores south (runs down to the diagonal stores)",
+   "points": [
+    [
+     15,
+     111
+    ],
+    [
+     27,
+     111
+    ],
+    [
+     27,
+     65
+    ],
+    [
+     21,
+     59
+    ],
+    [
+     15,
+     59
+    ]
+   ],
+   "kind": "shop"
+  },
+  {
+   "id": "west_2s",
+   "label": "W2 stores south (runs down to the diagonal hall)",
+   "points": [
+    [
+     33,
+     111
+    ],
+    [
+     45,
+     111
+    ],
+    [
+     45,
+     55
+    ],
+    [
+     33,
+     67
+    ]
+   ],
+   "kind": "shop"
+  },
+  {
    "id": "entrance_lobby",
    "label": "Entrance lobby",
    "points": [
@@ -271,15 +321,6 @@
    "kind": "shop"
   },
   {
-   "id": "west_s",
-   "label": "W1 stores south",
-   "x0": 15,
-   "x1": 27,
-   "y0": 78,
-   "y1": 111,
-   "kind": "shop"
-  },
-  {
    "id": "hall_ew_garage",
    "label": "East-west hall to the garage",
    "x0": 15,
@@ -307,15 +348,6 @@
    "kind": "shop"
   },
   {
-   "id": "west_2s",
-   "label": "W2 stores south",
-   "x0": 33,
-   "x1": 45,
-   "y0": 69,
-   "y1": 111,
-   "kind": "shop"
-  },
-  {
    "id": "west_hall_inner",
    "label": "West hall (next to the atriums)",
    "x0": 45,
@@ -339,7 +371,7 @@
    "x0": 96,
    "x1": 108,
    "y0": 48,
-   "y1": 147,
+   "y1": 159,
    "kind": "shop"
   },
   {
@@ -380,9 +412,9 @@
   },
   {
    "id": "ne_bath",
-   "label": "Bathrooms (NE)",
-   "x0": 96,
-   "x1": 111,
+   "label": "Bathrooms (NE), door on the north hall",
+   "x0": 108,
+   "x1": 120,
    "y0": 147,
    "y1": 159,
    "kind": "bath"

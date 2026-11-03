@@ -99,6 +99,8 @@ Files: `floor1_plan_v2.png` and `floor1_plan_v2.json` (v1 is kept for comparison
 - **Off-grid on purpose:** only the south-west diagonal hall. It is now exactly 45 degrees, no longer tied to the real outline (the outline is dropped from the picture). It starts at the bottom of the outer west hall, crosses the junction of the inner west hall and the south hall, and ends at the lobby's north-west corner. The stores sit on its south-west side, with the short hall to the purple exit in the middle.
 - **Not modeled yet:** doors into stores and bathrooms, wall thickness, and the stores' interiors.
 
+**v2 adjustments after review:** the east stores run all the way up to the north hall, and the NE bathrooms sit east of them (x 108 to 120) with their door on the north hall. W1 S now runs down to meet the south-west diagonal stores, and W2 S runs down to the diagonal hall, ending where the outer west hall meets it.
+
 ## Open questions
 
 1. **Scale.** Measured from the real building outline; see "Scale check". Decision needed on how to use it.
