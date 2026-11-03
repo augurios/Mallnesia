@@ -519,21 +519,12 @@
   },
   {
    "id": "n_hall_up",
-   "label": "Wide hall north",
+   "label": "Narrow hall north (6 m), runs to a possible exit at the north end",
    "x0": 48,
-   "x1": 66,
+   "x1": 54,
    "y0": 165,
-   "y1": 189,
+   "y1": 201,
    "kind": "hall"
-  },
-  {
-   "id": "big_store",
-   "label": "Big store",
-   "x0": 66,
-   "x1": 90,
-   "y0": 165,
-   "y1": 183,
-   "kind": "shop"
   },
   {
    "id": "n_hall_behind",
@@ -546,8 +537,8 @@
   },
   {
    "id": "north_stores",
-   "label": "Store block along the outer (north) side of the hall behind the wide hall and big store",
-   "x0": 48,
+   "label": "North stores (the narrow hall cuts through the west end)",
+   "x0": 54,
    "x1": 96,
    "y0": 189,
    "y1": 201,
@@ -615,6 +606,123 @@
    "y0": 1,
    "y1": 30,
    "kind": "restaurant"
+  },
+  {
+   "id": "shop_n1_a",
+   "label": "Shop 1A (floor 2, 6 m square, front row)",
+   "x0": 54,
+   "x1": 60,
+   "y0": 165,
+   "y1": 171,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n1_b",
+   "label": "Shop 1B (floor 2, 6 m square, back row)",
+   "x0": 54,
+   "x1": 60,
+   "y0": 174,
+   "y1": 180,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n2_a",
+   "label": "Shop 2A (floor 2, 6 m square, front row)",
+   "x0": 64,
+   "x1": 70,
+   "y0": 165,
+   "y1": 171,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n2_b",
+   "label": "Shop 2B (floor 2, 6 m square, back row)",
+   "x0": 64,
+   "x1": 70,
+   "y0": 174,
+   "y1": 180,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n3_a",
+   "label": "Shop 3A (floor 2, 6 m square, front row)",
+   "x0": 74,
+   "x1": 80,
+   "y0": 165,
+   "y1": 171,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n3_b",
+   "label": "Shop 3B (floor 2, 6 m square, back row)",
+   "x0": 74,
+   "x1": 80,
+   "y0": 174,
+   "y1": 180,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n4_a",
+   "label": "Shop 4A (floor 2, 6 m square, front row)",
+   "x0": 84,
+   "x1": 90,
+   "y0": 165,
+   "y1": 171,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_n4_b",
+   "label": "Shop 4B (floor 2, 6 m square, back row)",
+   "x0": 84,
+   "x1": 90,
+   "y0": 174,
+   "y1": 180,
+   "kind": "shop"
+  },
+  {
+   "id": "passage_n_60",
+   "label": "4 m passage between shop columns",
+   "x0": 60,
+   "x1": 64,
+   "y0": 165,
+   "y1": 183,
+   "kind": "hall"
+  },
+  {
+   "id": "passage_n_70",
+   "label": "4 m passage between shop columns",
+   "x0": 70,
+   "x1": 74,
+   "y0": 165,
+   "y1": 183,
+   "kind": "hall"
+  },
+  {
+   "id": "passage_n_80",
+   "label": "4 m passage between shop columns",
+   "x0": 80,
+   "x1": 84,
+   "y0": 165,
+   "y1": 183,
+   "kind": "hall"
+  },
+  {
+   "id": "gap_n",
+   "label": "3 m gap between the shop rows",
+   "x0": 54,
+   "x1": 90,
+   "y0": 171,
+   "y1": 174,
+   "kind": "hall"
+  },
+  {
+   "id": "strip_n",
+   "label": "3 m strip behind the back row (joins the hall behind)",
+   "x0": 54,
+   "x1": 90,
+   "y0": 180,
+   "y1": 183,
+   "kind": "hall"
   }
  ],
  "openings": [
@@ -635,6 +743,12 @@
    "label": "Garage connection 2",
    "x": 15,
    "y": 114
+  },
+  {
+   "id": "north_exit",
+   "label": "Possible exit at the north end of the narrow hall",
+   "x": 51,
+   "y": 201
   }
  ]
 }

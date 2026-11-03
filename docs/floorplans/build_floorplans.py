@@ -113,6 +113,32 @@ COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs":
 WALKABLE = {"void", "hall", "bath", "garage", "secret", "foodcourt", "balcony"}
 
 
+def north_floor2(items):
+    """Floor 2 north end: a narrow (6 m) hall runs all the way north to a possible exit, and four square shops
+    separated by passages replace the big store."""
+    out = []
+    for it in items:
+        i = it[0]
+        if i == "big_store":
+            continue
+        if i == "n_hall_up":
+            it = (i, "Narrow hall north (6 m), runs to a possible exit at the north end", ("box", (48, 54, 165, 201)), "hall")
+        elif i == "north_stores":
+            it = (i, "North stores (the narrow hall cuts through the west end)", ("box", (54, 96, 189, 201)), "shop")
+        out.append(it)
+    # two rows of 6 m x 6 m square shops on the 3 m grid, 3 m between the rows, 4 m passages between columns
+    # (4 x 6 + 3 x 4 = 36 m); the 3 m left behind the back row joins the hall behind
+    for n in range(4):
+        x0 = 54 + n * 10
+        out.append(("shop_n%d_a" % (n + 1), "Shop %dA (floor 2, 6 m square, front row)" % (n + 1), ("box", (x0, x0 + 6, 165, 171)), "shop"))
+        out.append(("shop_n%d_b" % (n + 1), "Shop %dB (floor 2, 6 m square, back row)" % (n + 1), ("box", (x0, x0 + 6, 174, 180)), "shop"))
+    for x0 in (60, 70, 80):
+        out.append(("passage_n_%d" % x0, "4 m passage between shop columns", ("box", (x0, x0 + 4, 165, 183)), "hall"))
+    out.append(("gap_n", "3 m gap between the shop rows", ("box", (54, 90, 171, 174)), "hall"))
+    out.append(("strip_n", "3 m strip behind the back row (joins the hall behind)", ("box", (54, 90, 180, 183)), "hall"))
+    return out
+
+
 def floor_items(floor):
     """Boxes and polygons for one floor, as (id, label, shape, kind) with shape ('box', ...) or ('poly', ...)."""
     items = []
@@ -130,6 +156,8 @@ def floor_items(floor):
             else:
                 l, k = "Candy / toy coin machines", "machines"
         items.append((i, l, ("box", (a, b, c, d)), k))
+    if floor == 2:
+        items = north_floor2(items)
     for i, l, p, k in POLYS:
         if i == "south_area" and floor > 1:
             l, k = "Food court (seating)", "foodcourt"
@@ -244,6 +272,8 @@ def render(floor, items, doors):
         txt = LABELS.get(i)
         if i in ("east_side_south", "west_side_south"):
             txt = "restaurants" if floor > 1 else "stores"
+        if floor == 2 and i == "n_hall_up":
+            txt = "narrow hall"
         if floor > 1 and i == "walkin_kiosk":
             txt = "stairs"
         if floor > 1 and i.startswith("south_shop_"):
@@ -283,6 +313,8 @@ def render(floor, items, doors):
 def build(floor):
     items = floor_items(floor)
     doors = DOORS_F1 if floor == 1 else DOORS_UP
+    if floor == 2:
+        doors = doors + [("north_exit", "Possible exit at the north end of the narrow hall", 51, 201)]
     comps = check(items)
     print("floor %d: walkable areas = %d (should be 1)" % (floor, comps))
     data = {
