@@ -85,6 +85,14 @@ POLYS = [
     ("sw_spur", "Short hall to the side door (between the two stores)", [UV(-13, 72), UV(-13, 92), UV(-5, 92), UV(-5, 72)], "hall"),
 ]
 
+# intermittent elevators and stairs (mechanic: the mall makes them appear and disappear), on every floor.
+# Drawn over the store blocks they sit in; not walkable (like other stairs and elevators).
+INTERMITTENT = [
+    ("int_elevator_w2n", "Intermittent elevator, NW corner of W2 N, reached from the outer west hall", 33, 39, 153, 159, "intermittent"),
+    ("int_elevator_w1n", "Intermittent elevator, south end of W1 N, reached from the garage hall", 21, 27, 117, 123, "intermittent"),
+    ("int_stairs_w1s", "Intermittent stairs, north end of W1 S, reached from the garage hall", 15, 24, 105, 111, "intermittent"),
+]
+
 # floor 1: street doors; floors 2 to 4: balcony doors
 DOORS_F1 = [
     ("main_entrance", "Main entrance (stairs up from street)", 88, 10),
@@ -109,7 +117,7 @@ BALCONIES = [
 
 COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs": "#e0c8a0",
           "escalator": "#ffe680", "shop": "#dcdcdc", "bath": "#9be29b", "garage": "#c9c9d8",
-          "secret": "#e3c9f0", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
+          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
 WALKABLE = {"void", "hall", "bath", "garage", "secret", "foodcourt", "balcony"}
 
 
@@ -175,6 +183,8 @@ def floor_items(floor):
             if i == "balcony_side":
                 continue
             items.append((i, l, ("poly", p), k))
+    for i, l, a, b, c, d, k in INTERMITTENT:
+        items.append((i, l, ("box", (a, b, c, d)), k))
     return items
 
 
@@ -226,7 +236,7 @@ LABELS = {"atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cro
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
           "south_hall": "south hall", "south_shop_1": "shop", "south_shop_2": "shop", "south_shop_3": "shop",
           "east_hall": "east hall", "west_hall_inner": "west hall", "west_hall_outer": "west hall",
-          "hall_ew_garage": "garage hall", "balcony_south": "balcony", "balcony_side": "balcony"}
+          "hall_ew_garage": "garage hall", "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
 VERTICAL = ("parking", "secret_hall", "east_hall", "west_hall_inner", "west_hall_outer", "west_2n", "west_2s")
 
 
