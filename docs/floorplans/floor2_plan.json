@@ -591,7 +591,7 @@
   },
   {
    "id": "walkin_kiosk",
-   "label": "Stairs between floors 2, 3 and 4 (replaces the kiosk)",
+   "label": "Stairs between floors 2 and 3 (replaces the kiosk)",
    "x0": 72,
    "x1": 81,
    "y0": 15,

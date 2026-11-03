@@ -1,9 +1,9 @@
-"""Builds the floor plans (floor1_plan.png/.json ... floor4_plan.png/.json) next to this script.
+"""Builds the floor plans (floor1_plan.png/.json ... floor3_plan.png/.json) next to this script.
 
 Run:  python3 build_floorplans.py      (needs Pillow)
 
-All four floors share one layout. Floor 1 has the entrance lobby at the south end;
-floors 2 to 4 replace it with a food court (restaurant windows instead of stores along
+All three floors share one layout. Floor 1 has the entrance lobby at the south end;
+floors 2 and 3 replace it with a food court (restaurant windows instead of stores along
 the sides, balconies instead of the main doors and street access).
 
 Meters, x east, y north, origin = south-west corner of the real building footprint
@@ -93,7 +93,7 @@ INTERMITTENT = [
     ("int_stairs_w1s", "Intermittent stairs, north end of W1 S, reached from the garage hall", 15, 24, 105, 111, "intermittent"),
 ]
 
-# floor 1: street doors; floors 2 to 4: balcony doors
+# floor 1: street doors; floors 2 and 3: balcony doors
 DOORS_F1 = [
     ("main_entrance", "Main entrance (stairs up from street)", 88, 10),
     ("side_exit", "Side exit (purple), end of the short hall") + UV(-9, 72),
@@ -106,7 +106,7 @@ DOORS_UP = [
     ("garage_open_2", "Garage connection 2", 15, 114),
 ]
 
-# balconies on floors 2 to 4: along the south and south-east outer wall of the food court,
+# balconies on floors 2 and 3: along the south and south-east outer wall of the food court,
 # and a small one at the end of the short hall
 BALCONIES = [
     ("balcony_south", "Balcony along the south and south-east wall",
@@ -148,7 +148,7 @@ def north_floor2(items):
 
 
 def north_cinema(items):
-    """Floors 3 and 4, north part (east of the top-left block up to the NE block): a cinema food station in the
+    """Floor 3, north part (east of the top-left block up to the NE block): a cinema food station in the
     middle with two wide cinemas on its sides, which also run behind it."""
     drop = {"n_hall_up", "big_store", "n_hall_behind", "north_stores", "n_hall_down"}
     out = [it for it in items if it[0] not in drop]
@@ -169,7 +169,7 @@ def floor_items(floor):
             if floor > 1:
                 l = l.replace("West block", "Restaurant windows (west)").replace("East block", "Restaurant windows (east)")
         if floor > 1 and i == "walkin_kiosk":
-            l, k = "Stairs between floors 2, 3 and 4 (replaces the kiosk)", "stairs"
+            l, k = "Stairs between floors 2 and 3 (replaces the kiosk)", "stairs"
         if floor > 1 and i.startswith("south_shop_"):
             if floor == 2:
                 l, k = "Kiosk", "kiosk"
@@ -178,7 +178,7 @@ def floor_items(floor):
         items.append((i, l, ("box", (a, b, c, d)), k))
     if floor == 2:
         items = north_floor2(items)
-    if floor >= 3:
+    if floor == 3:
         items = north_cinema(items)
     for i, l, p, k in POLYS:
         if i == "south_area" and floor > 1:
@@ -320,7 +320,7 @@ def render(floor, items, doors):
             dr.text((px - 20, py - 4), "balcony", fill="black", font=f)
     dr.text(T(66, 28), "entrance lobby" if floor == 1 else "food court", fill="black", font=f)
     dr.text(T(6, 52), "diagonal hall + " + ("stores" if floor == 1 else "restaurants"), fill="black", font=fs)
-    if floor >= 3:
+    if floor == 3:
         dr.text(T(55, 196), "cinema 1", fill="black", font=f)
         dr.text(T(77, 196), "cinema 2", fill="black", font=f)
     for i, l, x, y in doors:
@@ -340,7 +340,7 @@ def render(floor, items, doors):
 def build(floor):
     items = floor_items(floor)
     doors = DOORS_F1 if floor == 1 else DOORS_UP
-    if floor >= 3:
+    if floor == 3:
         doors = doors + [("cinema_entrance_%d" % (n + 1), "Cinema %d entrance" % (n + 1), x, 171) for n, x in enumerate((57, 87))]
     if floor == 2:
         doors = doors + [("north_exit", "Possible exit at the north end of the narrow hall", 51, 201)]
@@ -360,5 +360,5 @@ def build(floor):
 
 
 if __name__ == "__main__":
-    for n in (1, 2, 3, 4):
+    for n in (1, 2, 3):
         build(n)
