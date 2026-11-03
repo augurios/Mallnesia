@@ -1,0 +1,102 @@
+# Floor 1: reading of Augusto's sketch (DRAFT, to be confirmed)
+
+Sources: `floor1_sketch_v2.jpg` (labeled sketch: meanings; v2 is v1 plus the purple exit mark) and `floor1_sketch_v3.jpg` (geometry; fits the real outline better). This file is my reading of it; corrections go here.
+
+## Confirmed by Augusto
+
+- **North is the top of the page.** The entrance (diagonal wall, lower right) therefore faces south, as does the narrowing of the building.
+- **Atrium A is the south atrium, Atrium B the north atrium.** Atrium A holds the south stair-and-elevator tower, Atrium B the north tower.
+- **Scale (measured, see "Scale check" below):** the sketch has no single scale. The real building outline gives the overall size (about 141 m east-west by 189 m north-south at its widest, about 15,700 m² per level). The earlier provisional guess of 1 square = 3 m was far too small.
+- **The four long rectangles on the left are store blocks, with hallways between them.** They are not parking. The "parking lot" label marks the strip along the left edge, between the curved outer wall and the first store block.
+- **There are two openings from floor 1 to the parking lot:**
+  1. In front of the north-west bathrooms. This is the hall in the photo `hall_exit-to-garage` (restroom pictogram on the wall, garage beyond).
+  2. South of the north-west hall, past the north pair of store blocks (the two upper-left rectangles), at the gap between the north pair and the south pair. This is the east-west hall that runs from the parking lot on the left edge across to the cross-corridor between Atriums A and B.
+- **Both atriums have similar roofs** (octagonal steel truss, as in the photos).
+- **Atrium B is an open void on floor 1**, same as Atrium A (you see up through the floors above).
+- **The center curved stair (with the planter) is in Atrium B (north); it is the stair icon at the south-center of Atrium B.**
+- **There is one more door to the outside on floor 1**, besides the main entrance and the two parking-lot openings. It is marked in purple on the sketch: on the south-west side of the entrance lobby, in the diagonal outer wall just west of the small walk-in kiosk, facing out toward the lower-left side of the building (the street or lot side, not the garage).
+- **West side, east to west (real):** a hall next to the atriums, the W2 store blocks, another hall, the W1 store blocks, then the parking lot.
+- **South-west diagonal hall (real):** a hall with stores runs diagonally from the westernmost hall along the outline to the entrance lobby. **The purple exit is in the middle of it**, at the end of a short hall with stores on both sides.
+- **East hall (real):** the hallway right of the atriums is an ordinary hall with stores, similar to the west one (stores on its east side).
+- **The secret hallway is invented, for flavor.** It runs from the south-east bathrooms to the north-east bathrooms, hidden behind the east stores. Game-owned, service-style route.
+- **The unlabeled rectangles:** the one inside the north block is a **big store**; the small one near the entrance is a **small walk-in kiosk**.
+- **The escalators (yellow, along the north edge of Atrium A) are an up and down pair**, side by side.
+- **Floor 1 is partly below street level, especially the south-east part.** So the real outline (which is the street-level footprint seen from above) is **not** the boundary of floor 1: floor 1 can extend under the street and the plaza, which is why parts of the sketch fall outside the outline.
+- **The first (labeled) sketch, v2, has the more accurate distribution** of rooms and spaces. Use v2 for the layout. Sketch v3 is useful for the building's overall proportions and the atrium sizes, but not for where things sit on floor 1.
+- **Entrance:** from the street you go **up stairs** to floor 1 at the main entrance.
+- **The parking lot on the west is at the same level as floor 1** (the two openings lead straight onto it, no steps).
+- **Placement method (decided): anchor on the atriums.** Position the atriums from the upper floors, where the real outline fits, and lay floor 1 out around them from sketch v2.
+- **The street slopes, and at the entrance the street sits lower than the entrance** (hence the stairs up). Other parts of floor 1, especially the south-east, are below the street on their side. Because of this the real outline is only a scale reference for floor 1.
+- Colors: green = bathrooms, red = elevator pairs, yellow = automatic stairs (escalators). The arched icon with horizontal lines = regular stairs.
+
+## Layout as read from the sketch (grid squares, approximate)
+
+| Element | Where on the page | Notes |
+|---|---|---|
+| Main entrance | lower right, on a diagonal wall | one door gap on the diagonal; faces south-east |
+| Side exit (purple) | south-west of the entrance lobby, in the outer wall west of the walk-in kiosk | faces south-west; type still to confirm |
+| Atrium A (south) | center, lower half | open on its north side to the cross-corridor; elevator pair (red) at its south-east corner; regular stairs icon at its south-west corner |
+| Escalators (yellow) | along the north edge of Atrium A, between A and the cross-corridor | an up and down pair |
+| Cross-corridor | between Atrium A and Atrium B, runs east-west and continues west to the store blocks | |
+| Atrium B (north) | center, upper half | open void to the floors above (walled in plan, with openings where the sketch shows them); elevator pair (red) at its north-east corner; regular stairs icon at south-center and at north-west |
+| Store blocks | left, four long vertical blocks in two pairs (north pair, south pair) | hallways run between them and between the pairs |
+| Parking lot | left edge | rounded outer wall, with a diagonal at the lower left corner; two openings into the mall on this floor (see "Confirmed") |
+| Right-hand hallway ("secret hallway") | far right, runs almost the full height | bathrooms (green) at its north end and its south end; small rooms at the south end |
+| Bathrooms (green) | north-west, north-east (right hallway, top), south-east (right hallway, bottom) | three groups |
+| Regular stairs (icon) | north-west corner by the bathroom; Atrium B north-west; Atrium B south-center; Atrium A south-west | four icons plus the legend icon |
+| Big store | rectangle inside the north block | large store, not an open space |
+| Walk-in kiosk | small rectangle near the entrance, south | small walk-in kiosk |
+
+## Scale check (building outline)
+
+Method: I read the building's outline from OpenStreetMap (a volunteer-traced footprint, so accurate to a few meters, not survey grade) and converted it to meters. Data in `footprint_osm.json`, picture in `footprint_osm.png`. License: ODbL, © OpenStreetMap contributors; credit it if we ship anything derived from it.
+
+- **Overall size:** about 141 m east-west by 189 m north-south (bounding box), about 15,700 m² per level. The outline has the same character as the sketch: wide at the north, narrowing to a tip at the south-east where the entrance is, with a long diagonal on the west side.
+- **Orientation check:** in the outline the tip and the diagonal entrance wall face south-east, which matches "top of the page is north".
+- **The sketch is not to a single scale.** Measured against the outline, the sketch's overall extent (about 16 by 23 squares) gives about 8 m per square, but the entrance diagonal (about 6 by 5.5 squares for roughly 37 by 28 m) gives about 5 to 6 m per square. So different parts of the sketch are drawn at different sizes. Treat the sketch as the plan's topology (what connects to what) and the outline as its geometry.
+- **Caveat:** the outline is the whole building, including the garage, and I could not check which parts are floor 1 versus upper floors, nor see the roof. The 2D outline is the same on every level only if the building is a simple extrusion, which it probably is not.
+
+## Decision: how the scale is used
+
+**Augusto chose "outline as base map".** The real building outline is the base map. The sketch gives the layout (what connects to what); real-world sizes (from the outline, tile counts and door widths in the photos) give the geometry, so areas drawn too big on the sketch (the atriums, the entrance tip) get corrected.
+
+Superseded by the placement decision above (anchor on the atriums). Original idea: place the sketch's elements on `footprint_print.png` (an A4 printout of the outline with a 10 m grid, north up). Augusto can print it and draw over it, or send a photo of it; mark roughly where the main entrance, Atrium A, Atrium B, the two parking-lot openings, the secret hallway and the bathrooms sit. Rough is fine; I'll refine from the photos.
+
+## Fit to the real outline (draft, from sketches v2 and v3)
+
+Augusto sent a second sketch (`floor1_sketch_v3.jpg`, "Floor 1") that fits the real outline better, and asked to use it together with v2. v3 gives the geometry; v2 gives the meanings (colors, labels, exits). The two agree: Atrium B north with elevators at its north-east, the escalators at the north edge of Atrium A, elevators at its south-east, stairs at the south-west, the center curved stair at the south-center of B, bathrooms at the north-west, north-east and south-east.
+
+- **Method:** I matched five landmarks (the south tip, the east extreme, the north-west corner, the west extreme and the corner where the entrance diagonal meets the east wall) between sketch v3 and the footprint. Result: sketch v3 is almost a uniform scale, **about 8.1 sketch pixels per meter (displayed size), rotated about 1.5 degrees**, with landmark errors of 1.5 to 5 m. This is why v3 "fits better": its proportions are close to the real building, unlike v2.
+- **What matches well:** the south tip, the entrance diagonal, the east wall of the narrow part, and the long straight diagonal on the north-east side. See `floor1_fit_overlay.jpg` (red = real outline over the sketch).
+- **Superseded in part (see "Confirmed"):** floor 1 is partly below street level, so the outline cannot be used to clip or position floor 1. Use the outline for scale and for the upper floors; use sketch v2 for floor 1's layout. The fit below is a scale reference only.
+- **What does not match well:** the sketch's parking strip on the west and its rounded north-east corner extend beyond the real outline by roughly 10 to 20 m. The real outline's north edge also slopes, while the sketch's is flat. Elements near the edges therefore overshoot; `floor1_plan_draft.png` shows several boxes (south-east bathrooms, store blocks, the west store column) sitting outside the outline. Those need to be pulled in.
+- **Sizes this gives (before any correction):** Atrium B about 39 by 36 m; Atrium A about 40 by 58 m (including its stair and elevator bays); the long west store column about 11 by 105 m.
+- **Do not trust icon sizes.** The stair, elevator and escalator boxes are drawn much larger than the real things (a real elevator pair is a few meters wide). Use their positions only; their sizes come from the photos later.
+- Data: `floor1_elements_draft.json` (boxes in meters plus the fit parameters), `floor1_plan_draft.png` (picture).
+
+## Floor 1 plan, draft v1 (Augusto asked for this, not exact)
+
+Built by Augusto's instruction: **the satellite outline as the scale reference and sketch v2 as the general distribution**; v3 supplied the atrium sizes. Files: `floor1_plan_v1.png` (picture) and `floor1_plan_v1.json` (boxes and openings in meters, x east, y north, origin at the footprint's south-west bounding corner).
+
+- **Atrium B** about 39 by 36 m (x 51 to 90, y 122 to 158) and **Atrium A** about 40 by 59 m (x 52 to 92, y 52 to 111), with an 11 m cross-corridor between them.
+- **Entrance lobby** at the south tip (about 36 by 37 m, clipped to the outline's entrance diagonal), with the main entrance on the diagonal at about (88, 10), the walk-in kiosk on its west wall. The purple side exit is no longer on the lobby: it is at the end of a short hall off the south-west diagonal hall (see Confirmed).
+- **Parking lot** on the west, with the two openings at about (4, 163) (north-west hall, the one in the photo) and (4, 113) (the east-west hall between the north and south store pairs).
+- **Escalators** along the north edge of Atrium A; **elevator pairs** at the NE of B and the SE of A; **stairs** at the NW of B, SW of A and NW corner; **center curved stair** in B.
+- **East hall** (x 93 to 100, with a store block east of it) mirrors the west side. The **secret hallway** (about 2.5 m wide) runs behind those stores from the SE bathrooms (which sit past the outline, where floor 1 goes under the street) to the NE bathrooms.
+- **Things I changed from the sketches so they fit:** the north-east store block and the top-left block were pulled in from past the outline; the west store column was clipped at the south-west diagonal; icon boxes (stairs, elevators, escalators) are now plausible sizes instead of sketch sizes.
+- **Known weak spots:** the small shops south of Atrium A, the exact depth of the entrance lobby, the width of the secret hallway, and everything within about 10 m of the outline edges. Treat as a placeholder to walk through, not as measured fact.
+
+## Open questions
+
+1. **Scale.** Measured from the real building outline; see "Scale check". Decision needed on how to use it.
+2. ~~Where does floor 1 connect to the parking lot?~~ Answered: two openings (see "Confirmed").
+3. ~~"Secret hallway"~~ Answered: for game purposes; real vs invented does not matter.
+4. ~~Roof, center stair, Atrium B~~ Answered: similar roofs; center stair is the south-center icon in Atrium B; Atrium B is open.
+5. ~~The two unlabeled rectangles~~ Answered: a big store and a small walk-in kiosk.
+6. ~~Escalators~~ Answered: an up and down pair.
+7. ~~The extra exterior door~~ Answered: marked in purple, south-west side of the entrance lobby. Still to confirm: what is it (side door, service door, emergency exit, or a second public entrance) and what is outside it?
+
+## Next
+
+- When you answer, I'll update this file and then draw the same plan as a clean, scaled data description (walls, openings, doors), which is the input for the blockout.
+- Floors 2 to 4 come before the final floor 1 placement, because the atriums are anchored from the upper floors. Start with floor 2 (food court floor).

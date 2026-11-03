@@ -1,0 +1,435 @@
+{
+ "status": "DRAFT v1: positions rough, derived from sketches v2 (distribution) and v3 (proportions) fitted to the real outline. Meters, x east, y north, origin = footprint south-west bounding corner. Floor 1 is partly below street level in the south-east, so it may extend past the outline there.",
+ "polygons": [
+  {
+   "id": "sw_diag_hall",
+   "label": "Diagonal hall along the SW outline (from the west hall to the entrance lobby)",
+   "points": [
+    [
+     34.2,
+     62.7
+    ],
+    [
+     62.5,
+     26.4
+    ],
+    [
+     67.2,
+     30.1
+    ],
+    [
+     38.9,
+     66.4
+    ]
+   ],
+   "kind": "hall"
+  },
+  {
+   "id": "sw_stores_w",
+   "label": "Diagonal hall stores, west part",
+   "points": [
+    [
+     26.3,
+     56.6
+    ],
+    [
+     39.2,
+     40.0
+    ],
+    [
+     47.1,
+     46.1
+    ],
+    [
+     34.2,
+     62.7
+    ]
+   ],
+   "kind": "shop"
+  },
+  {
+   "id": "sw_stores_e",
+   "label": "Diagonal hall stores, east part",
+   "points": [
+    [
+     42.9,
+     35.3
+    ],
+    [
+     54.6,
+     20.3
+    ],
+    [
+     62.5,
+     26.4
+    ],
+    [
+     50.8,
+     41.4
+    ]
+   ],
+   "kind": "shop"
+  },
+  {
+   "id": "sw_spur",
+   "label": "Short hall to the purple exit (between the two stores)",
+   "points": [
+    [
+     36.1,
+     37.5
+    ],
+    [
+     39.7,
+     32.8
+    ],
+    [
+     50.8,
+     41.4
+    ],
+    [
+     47.1,
+     46.1
+    ]
+   ],
+   "kind": "hall"
+  }
+ ],
+ "boxes": [
+  {
+   "id": "atrium_b",
+   "label": "Atrium B (open void)",
+   "x0": 51,
+   "x1": 90,
+   "y0": 122,
+   "y1": 158,
+   "kind": "void"
+  },
+  {
+   "id": "atrium_a",
+   "label": "Atrium A (open void)",
+   "x0": 52,
+   "x1": 92,
+   "y0": 52,
+   "y1": 111,
+   "kind": "void"
+  },
+  {
+   "id": "cross_corridor",
+   "label": "Cross-corridor",
+   "x0": 51,
+   "x1": 93,
+   "y0": 111,
+   "y1": 122,
+   "kind": "hall"
+  },
+  {
+   "id": "hall_north",
+   "label": "North hall",
+   "x0": 8,
+   "x1": 98,
+   "y0": 160,
+   "y1": 167,
+   "kind": "hall"
+  },
+  {
+   "id": "hall_ew_garage",
+   "label": "East-west hall to garage (opening 2)",
+   "x0": 5,
+   "x1": 51,
+   "y0": 110,
+   "y1": 117,
+   "kind": "hall"
+  },
+  {
+   "id": "b_elevators",
+   "label": "Elevator pair (B, NE)",
+   "x0": 80,
+   "x1": 88,
+   "y0": 150,
+   "y1": 157,
+   "kind": "elevator"
+  },
+  {
+   "id": "b_stairs",
+   "label": "Stairs (B, NW)",
+   "x0": 53,
+   "x1": 60,
+   "y0": 150,
+   "y1": 157,
+   "kind": "stairs"
+  },
+  {
+   "id": "b_center_stair",
+   "label": "Center curved stair (B, S)",
+   "x0": 64,
+   "x1": 74,
+   "y0": 123,
+   "y1": 133,
+   "kind": "stairs"
+  },
+  {
+   "id": "a_escalators",
+   "label": "Escalators up/down (A, N edge)",
+   "x0": 60,
+   "x1": 80,
+   "y0": 103,
+   "y1": 109,
+   "kind": "escalator"
+  },
+  {
+   "id": "a_stairs",
+   "label": "Stairs (A, SW)",
+   "x0": 55,
+   "x1": 62,
+   "y0": 53,
+   "y1": 60,
+   "kind": "stairs"
+  },
+  {
+   "id": "a_elevators",
+   "label": "Elevator pair (A, SE)",
+   "x0": 80,
+   "x1": 88,
+   "y0": 53,
+   "y1": 60,
+   "kind": "elevator"
+  },
+  {
+   "id": "shop_s1",
+   "label": "Small shop",
+   "x0": 62,
+   "x1": 68,
+   "y0": 38,
+   "y1": 47,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_s2",
+   "label": "Small shop",
+   "x0": 70,
+   "x1": 80,
+   "y0": 38,
+   "y1": 47,
+   "kind": "shop"
+  },
+  {
+   "id": "shop_s3",
+   "label": "Small shop",
+   "x0": 82,
+   "x1": 91,
+   "y0": 38,
+   "y1": 47,
+   "kind": "shop"
+  },
+  {
+   "id": "lobby",
+   "label": "Entrance lobby",
+   "x0": 61,
+   "x1": 97,
+   "y0": 0,
+   "y1": 37,
+   "kind": "hall"
+  },
+  {
+   "id": "walkin_kiosk",
+   "label": "Walk-in kiosk",
+   "x0": 63,
+   "x1": 71,
+   "y0": 18,
+   "y1": 25,
+   "kind": "shop"
+  },
+  {
+   "id": "top_left_block",
+   "label": "Top-left block",
+   "x0": 15,
+   "x1": 50,
+   "y0": 167,
+   "y1": 187,
+   "kind": "shop"
+  },
+  {
+   "id": "nw_bath",
+   "label": "Bathrooms (NW)",
+   "x0": 17,
+   "x1": 31,
+   "y0": 167,
+   "y1": 176,
+   "kind": "bath"
+  },
+  {
+   "id": "nw_stairs",
+   "label": "Stairs (NW)",
+   "x0": 32,
+   "x1": 42,
+   "y0": 167,
+   "y1": 176,
+   "kind": "stairs"
+  },
+  {
+   "id": "big_store",
+   "label": "Big store (north)",
+   "x0": 66,
+   "x1": 86,
+   "y0": 166,
+   "y1": 183,
+   "kind": "shop"
+  },
+  {
+   "id": "ne_block",
+   "label": "NE store block",
+   "x0": 92,
+   "x1": 112,
+   "y0": 158,
+   "y1": 177,
+   "kind": "shop"
+  },
+  {
+   "id": "ne_bath",
+   "label": "Bathrooms (NE)",
+   "x0": 105,
+   "x1": 119,
+   "y0": 148,
+   "y1": 156,
+   "kind": "bath"
+  },
+  {
+   "id": "west_n",
+   "label": "Store block W1 north",
+   "x0": 15,
+   "x1": 27,
+   "y0": 117,
+   "y1": 158,
+   "kind": "shop"
+  },
+  {
+   "id": "west_s",
+   "label": "Store block W1 south",
+   "x0": 17,
+   "x1": 28,
+   "y0": 79,
+   "y1": 110,
+   "kind": "shop"
+  },
+  {
+   "id": "west_2n",
+   "label": "Store block W2 north",
+   "x0": 34,
+   "x1": 45,
+   "y0": 117,
+   "y1": 158,
+   "kind": "shop"
+  },
+  {
+   "id": "west_2s",
+   "label": "Store block W2 south",
+   "x0": 34,
+   "x1": 45,
+   "y0": 68,
+   "y1": 110,
+   "kind": "shop"
+  },
+  {
+   "id": "parking",
+   "label": "Parking lot, same level as floor 1",
+   "x0": 2,
+   "x1": 15,
+   "y0": 85,
+   "y1": 183,
+   "kind": "garage"
+  },
+  {
+   "id": "west_hall_inner",
+   "label": "West hall (next to the atriums)",
+   "x0": 45,
+   "x1": 51,
+   "y0": 62,
+   "y1": 158,
+   "kind": "hall"
+  },
+  {
+   "id": "west_hall_outer",
+   "label": "West hall (between W1 and W2 store blocks)",
+   "x0": 28,
+   "x1": 34,
+   "y0": 62,
+   "y1": 158,
+   "kind": "hall"
+  },
+  {
+   "id": "east_hall",
+   "label": "East hall (stores, mirrors the west hall)",
+   "x0": 93,
+   "x1": 100,
+   "y0": 62,
+   "y1": 150,
+   "kind": "hall"
+  },
+  {
+   "id": "east_stores",
+   "label": "East store block",
+   "x0": 100,
+   "x1": 112.5,
+   "y0": 78,
+   "y1": 146,
+   "kind": "shop"
+  },
+  {
+   "id": "secret_hall_s",
+   "label": "Secret hallway (game), from SE bathrooms",
+   "x0": 108,
+   "x1": 115.5,
+   "y0": 66,
+   "y1": 69,
+   "kind": "secret"
+  },
+  {
+   "id": "secret_hall",
+   "label": "Secret hallway (game), runs north to NE bathrooms",
+   "x0": 113,
+   "x1": 115.5,
+   "y0": 66,
+   "y1": 150,
+   "kind": "secret"
+  },
+  {
+   "id": "se_bath",
+   "label": "Bathrooms (SE), past outline",
+   "x0": 100,
+   "x1": 108,
+   "y0": 62,
+   "y1": 76,
+   "kind": "bath"
+  }
+ ],
+ "openings": [
+  {
+   "id": "main_entrance",
+   "label": "Main entrance (stairs up from street)",
+   "x": 88,
+   "y": 10,
+   "kind": "door"
+  },
+  {
+   "id": "side_exit",
+   "label": "Side exit (purple), end of the short hall",
+   "x": 37.9,
+   "y": 35.2,
+   "kind": "door"
+  },
+  {
+   "id": "garage_open_1",
+   "label": "Parking-lot opening 1",
+   "x": 4,
+   "y": 163.5,
+   "kind": "door"
+  },
+  {
+   "id": "garage_open_2",
+   "label": "Parking-lot opening 2",
+   "x": 4,
+   "y": 113.5,
+   "kind": "door"
+  }
+ ]
+}
