@@ -124,9 +124,9 @@
   },
   {
    "id": "hall_north",
-   "label": "North hall",
+   "label": "North hall (runs all the way east)",
    "x0": 8,
-   "x1": 98,
+   "x1": 125,
    "y0": 160,
    "y1": 167,
    "kind": "hall"
@@ -298,17 +298,26 @@
    "label": "Big store (north)",
    "x0": 66,
    "x1": 86,
-   "y0": 166,
+   "y0": 167,
    "y1": 183,
    "kind": "shop"
   },
   {
    "id": "ne_block",
-   "label": "NE store block",
+   "label": "NE store block (aligned with the big store)",
    "x0": 92,
    "x1": 112,
+   "y0": 167,
+   "y1": 183,
+   "kind": "shop"
+  },
+  {
+   "id": "ne_end_store",
+   "label": "Store closing the east end of the north hall",
+   "x0": 125,
+   "x1": 134,
    "y0": 158,
-   "y1": 177,
+   "y1": 170,
    "kind": "shop"
   },
   {
