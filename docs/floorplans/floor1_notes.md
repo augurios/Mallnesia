@@ -107,6 +107,8 @@ Files: `floor1_plan_v2.png` and `floor1_plan_v2.json` (v1 is kept for comparison
 
 **Stairs and elevators (v2):** Atrium B's north stairs and elevator pair sit against its north wall, reached from the north hall. The center curved stair sits against the cross-corridor (y 123 to 132). The escalators run the full width of Atrium A (x 51 to 90) just below the cross-corridor, from the west hall to the east hall. Atrium A's stairs and elevator pair sit against its south wall, reached from the south hall.
 
+**South shops and diagonal hall (v2):** the west shop and Atrium A's stairs both start at the atrium's west side (x 51 to 60). To make room, the 45 degree diagonal hall now ends at the inner west hall instead of running into the lobby. The inner west hall runs down to the lobby, whose north-west corner widens to meet it (x 51 to 57, y 30 to 36). The west store block stops at x 45 and runs south along the inner hall into the lobby's west stores. The three shops (x 51 to 60, 66 to 76, 81 to 90) are separated by walkable passages: 6 m after the west shop and 5 m between the middle and east shops, both linking the south hall to the lobby.
+
 ## Open questions
 
 1. **Scale.** Measured from the real building outline; see "Scale check". Decision needed on how to use it.

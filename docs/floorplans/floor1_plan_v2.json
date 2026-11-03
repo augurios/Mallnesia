@@ -81,15 +81,23 @@
      36
     ],
     [
-     57,
+     51,
      36
+    ],
+    [
+     51,
+     30
+    ],
+    [
+     57,
+     30
     ]
    ],
    "kind": "hall"
   },
   {
    "id": "sw_diag_hall",
-   "label": "Diagonal hall (45 degrees) from the outer west hall to the entrance lobby",
+   "label": "Diagonal hall (45 degrees) from the outer west hall to the inner west hall",
    "points": [
     [
      27,
@@ -100,16 +108,12 @@
      73
     ],
     [
-     62,
-     38
+     45,
+     55
     ],
     [
-     62,
-     36
-    ],
-    [
-     56,
-     36
+     45,
+     47
     ]
    ],
    "kind": "hall"
@@ -150,12 +154,12 @@
      48.5
     ],
     [
-     56.0,
-     36.0
+     45,
+     47
     ],
     [
-     50.0,
-     30.0
+     45,
+     35
     ]
    ],
    "kind": "shop"
@@ -223,9 +227,9 @@
   },
   {
    "id": "south_shop_1",
-   "label": "Shop",
-   "x0": 63,
-   "x1": 72,
+   "label": "Shop (west, aligned with the Atrium A stairs and the atrium's west side)",
+   "x0": 51,
+   "x1": 60,
    "y0": 36,
    "y1": 45,
    "kind": "shop"
@@ -233,11 +237,29 @@
   {
    "id": "south_shop_2",
    "label": "Shop",
-   "x0": 72,
-   "x1": 81,
+   "x0": 66,
+   "x1": 76,
    "y0": 36,
    "y1": 45,
    "kind": "shop"
+  },
+  {
+   "id": "south_pass_1",
+   "label": "Passage between the west shop and the middle shop",
+   "x0": 60,
+   "x1": 66,
+   "y0": 36,
+   "y1": 45,
+   "kind": "hall"
+  },
+  {
+   "id": "south_pass_2",
+   "label": "Passage between the middle and east shops (5 m)",
+   "x0": 76,
+   "x1": 81,
+   "y0": 36,
+   "y1": 45,
+   "kind": "hall"
   },
   {
    "id": "south_shop_3",
@@ -286,8 +308,8 @@
   },
   {
    "id": "a_stairs",
-   "label": "Stairs (A, SW), on the south hall",
-   "x0": 54,
+   "label": "Stairs (A, SW), on the south hall, aligned with the west shop",
+   "x0": 51,
    "x1": 60,
    "y0": 51,
    "y1": 57,
@@ -349,10 +371,10 @@
   },
   {
    "id": "west_hall_inner",
-   "label": "West hall (next to the atriums)",
+   "label": "West hall (next to the atriums), runs down to the lobby",
    "x0": 45,
    "x1": 51,
-   "y0": 45,
+   "y0": 30,
    "y1": 159,
    "kind": "hall"
   },
@@ -521,10 +543,10 @@
   {
    "id": "lobby_store_w",
    "label": "West store block: the diagonal stores continue south along the lobby",
-   "x0": 48,
+   "x0": 45,
    "x1": 57,
    "y0": 1,
-   "y1": 33,
+   "y1": 30,
    "kind": "shop"
   }
  ],
