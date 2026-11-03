@@ -103,6 +103,10 @@ Files: `floor1_plan_v2.png` and `floor1_plan_v2.json` (v1 is kept for comparison
 
 **Lobby stores (v2):** they are not separate boxes. On the east side the east store block continues south along the lobby (down to y 18). On the west side the diagonal store block turns and runs all the way south along the lobby's west wall. The walk-in kiosk is an island in the middle of the lobby.
 
+**SE short hall and bathrooms moved south (v2):** moved 9 m (kept on the 3 m grid) from the first spot. The short hall (y 33 to 39) branches east where the east hall meets the lobby, with a store block on each side (the south one continues along the lobby). The SE bathrooms are at its east end (x 108 to 120, y 30 to 45) and the secret hallway ends at their top.
+
+**Stairs and elevators (v2):** Atrium B's north stairs and elevator pair sit against its north wall, reached from the north hall. The center curved stair sits against the cross-corridor (y 123 to 132). The escalators run the full width of Atrium A (x 51 to 90) just below the cross-corridor, from the west hall to the east hall. Atrium A's stairs and elevator pair sit against its south wall, reached from the south hall.
+
 ## Open questions
 
 1. **Scale.** Measured from the real building outline; see "Scale check". Decision needed on how to use it.

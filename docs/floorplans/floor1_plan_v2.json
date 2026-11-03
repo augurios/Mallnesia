@@ -250,56 +250,56 @@
   },
   {
    "id": "b_elevators",
-   "label": "Elevator pair (B, NE)",
+   "label": "Elevator pair (B, NE), on the north hall",
    "x0": 78,
    "x1": 87,
-   "y0": 150,
-   "y1": 156,
+   "y0": 153,
+   "y1": 159,
    "kind": "elevator"
   },
   {
    "id": "b_stairs",
-   "label": "Stairs (B, NW)",
+   "label": "Stairs (B, NW), on the north hall",
    "x0": 54,
    "x1": 60,
-   "y0": 150,
-   "y1": 156,
+   "y0": 153,
+   "y1": 159,
    "kind": "stairs"
   },
   {
    "id": "b_center_stair",
-   "label": "Center curved stair (B, S)",
+   "label": "Center curved stair (B, S), on the cross-corridor",
    "x0": 63,
    "x1": 72,
-   "y0": 126,
-   "y1": 135,
+   "y0": 123,
+   "y1": 132,
    "kind": "stairs"
   },
   {
    "id": "a_escalators",
-   "label": "Escalators up/down (A, N edge)",
-   "x0": 60,
-   "x1": 78,
-   "y0": 102,
-   "y1": 108,
+   "label": "Escalators up/down, full width from the west hall to the east hall",
+   "x0": 51,
+   "x1": 90,
+   "y0": 105,
+   "y1": 111,
    "kind": "escalator"
   },
   {
    "id": "a_stairs",
-   "label": "Stairs (A, SW)",
+   "label": "Stairs (A, SW), on the south hall",
    "x0": 54,
    "x1": 60,
-   "y0": 54,
-   "y1": 60,
+   "y0": 51,
+   "y1": 57,
    "kind": "stairs"
   },
   {
    "id": "a_elevators",
-   "label": "Elevator pair (A, SE)",
+   "label": "Elevator pair (A, SE), on the south hall",
    "x0": 78,
    "x1": 87,
-   "y0": 54,
-   "y1": 60,
+   "y0": 51,
+   "y1": 57,
    "kind": "elevator"
   },
   {
@@ -367,11 +367,20 @@
   },
   {
    "id": "east_stores",
-   "label": "East stores",
+   "label": "East stores (north of the short hall, up to the north hall)",
    "x0": 96,
    "x1": 108,
-   "y0": 48,
+   "y0": 39,
    "y1": 159,
+   "kind": "shop"
+  },
+  {
+   "id": "east_stores_s",
+   "label": "East store block (south of the short hall, continues along the lobby)",
+   "x0": 96,
+   "x1": 108,
+   "y0": 18,
+   "y1": 33,
    "kind": "shop"
   },
   {
@@ -379,26 +388,17 @@
    "label": "Short hall east to the SE bathrooms",
    "x0": 96,
    "x1": 108,
-   "y0": 42,
-   "y1": 48,
+   "y0": 33,
+   "y1": 39,
    "kind": "hall"
-  },
-  {
-   "id": "east_stores_s",
-   "label": "East store block: continues south along the lobby",
-   "x0": 96,
-   "x1": 108,
-   "y0": 18,
-   "y1": 42,
-   "kind": "shop"
   },
   {
    "id": "se_bath",
    "label": "Bathrooms (SE)",
    "x0": 108,
    "x1": 120,
-   "y0": 39,
-   "y1": 54,
+   "y0": 30,
+   "y1": 45,
    "kind": "bath"
   },
   {
@@ -406,7 +406,7 @@
    "label": "Secret hallway (game): SE bathrooms to NE bathrooms",
    "x0": 108,
    "x1": 111,
-   "y0": 54,
+   "y0": 45,
    "y1": 147,
    "kind": "secret"
   },
