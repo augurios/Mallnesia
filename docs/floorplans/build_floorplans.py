@@ -110,7 +110,7 @@ BALCONIES = [
 
 COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs": "#e0c8a0",
           "escalator": "#ffe680", "shop": "#dcdcdc", "bath": "#9be29b", "garage": "#c9c9d8",
-          "secret": "#e3c9f0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
+          "secret": "#e3c9f0", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
 WALKABLE = {"void", "hall", "bath", "garage", "secret", "foodcourt", "balcony"}
 
 
@@ -123,6 +123,13 @@ def floor_items(floor):
             k = side_kind
             if floor > 1:
                 l = l.replace("West block", "Restaurant windows (west)").replace("East block", "Restaurant windows (east)")
+        if floor > 1 and i == "walkin_kiosk":
+            l, k = "Stairs between floors 2, 3 and 4 (replaces the kiosk)", "stairs"
+        if floor > 1 and i.startswith("south_shop_"):
+            if floor == 2:
+                l, k = "Kiosk", "kiosk"
+            else:
+                l, k = "Candy / toy coin machines", "machines"
         items.append((i, l, ("box", (a, b, c, d)), k))
     for i, l, p, k in POLYS:
         if i == "south_area" and floor > 1:
@@ -181,7 +188,7 @@ def check(items, R=0.5):
 LABELS = {"atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cross-corridor", "parking": "garage side",
           "secret_hall": "secret", "big_store": "big store", "west_2n": "W2 N", "west_2s": "W2 S", "west_n": "W1 N",
           "west_s": "W1 S", "hall_north": "north hall", "ne_block": "NE block", "top_left_block": "top-left block",
-          "north_stores": "stores", "north_stores_w": "stores", "north_stores_e": "stores", "walkin_kiosk": "kiosk",
+          "north_stores": "stores", "north_stores_w": "stores", "north_stores_e": "stores", "walkin_kiosk": "kiosk", 
           "nw_bath": "bath", "ne_bath": "bath", "se_bath": "bath", "b_center_stair": "center stair",
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
           "south_hall": "south hall", "south_shop_1": "shop", "south_shop_2": "shop", "south_shop_3": "shop",
@@ -232,6 +239,10 @@ def render(floor, items, doors):
         txt = LABELS.get(i)
         if i in ("east_side_south", "west_side_south"):
             txt = "restaurants" if floor > 1 else "stores"
+        if floor > 1 and i == "walkin_kiosk":
+            txt = "stairs"
+        if floor > 1 and i.startswith("south_shop_"):
+            txt = "kiosk" if floor == 2 else "machines"
         if txt:
             x, y = T((v[0] + v[1]) / 2, (v[2] + v[3]) / 2)
             if i in VERTICAL:

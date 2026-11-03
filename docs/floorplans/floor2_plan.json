@@ -290,21 +290,21 @@
   },
   {
    "id": "south_shop_1",
-   "label": "Shop (west, aligned with the Atrium A stairs and the atrium's west side)",
+   "label": "Kiosk",
    "x0": 51,
    "x1": 60,
    "y0": 36,
    "y1": 45,
-   "kind": "shop"
+   "kind": "kiosk"
   },
   {
    "id": "south_shop_2",
-   "label": "Shop",
+   "label": "Kiosk",
    "x0": 66,
    "x1": 76,
    "y0": 36,
    "y1": 45,
-   "kind": "shop"
+   "kind": "kiosk"
   },
   {
    "id": "south_pass_1",
@@ -326,12 +326,12 @@
   },
   {
    "id": "south_shop_3",
-   "label": "Shop",
+   "label": "Kiosk",
    "x0": 81,
    "x1": 90,
    "y0": 36,
    "y1": 45,
-   "kind": "shop"
+   "kind": "kiosk"
   },
   {
    "id": "b_elevators",
@@ -623,12 +623,12 @@
   },
   {
    "id": "walkin_kiosk",
-   "label": "Walk-in kiosk (island in the lobby / food court)",
+   "label": "Stairs between floors 2, 3 and 4 (replaces the kiosk)",
    "x0": 72,
    "x1": 81,
    "y0": 15,
    "y1": 21,
-   "kind": "shop"
+   "kind": "stairs"
   },
   {
    "id": "west_side_south",
