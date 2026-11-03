@@ -677,6 +677,24 @@
    "y0": 105,
    "y1": 111,
    "kind": "intermittent"
+  },
+  {
+   "id": "boxoffice_floor",
+   "label": "West hall extension over the NW corner of Atrium B (cinema box office area)",
+   "x0": 51,
+   "x1": 57,
+   "y0": 141,
+   "y1": 153,
+   "kind": "hall"
+  },
+  {
+   "id": "boxoffice",
+   "label": "Cinema box office counter, facing the west hall",
+   "x0": 57,
+   "x1": 60,
+   "y0": 141,
+   "y1": 153,
+   "kind": "kiosk"
   }
  ],
  "openings": [

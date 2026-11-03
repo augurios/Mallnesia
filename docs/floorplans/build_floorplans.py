@@ -199,6 +199,10 @@ def floor_items(floor):
             items.append((i, l, ("poly", p), k))
     for i, l, a, b, c, d, k in INTERMITTENT:
         items.append((i, l, ("box", (a, b, c, d)), k))
+    if floor == 3:
+        # the west hall widens over the north-west corner of Atrium B; the cinema box office is there
+        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 141, 153)), "hall"))
+        items.append(("boxoffice", "Cinema box office counter, facing the west hall", ("box", (57, 60, 141, 153)), "kiosk"))
     return items
 
 
@@ -250,7 +254,7 @@ LABELS = {"atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cro
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
           "south_hall": "south hall", "south_shop_1": "shop", "south_shop_2": "shop", "south_shop_3": "shop",
           "east_hall": "east hall", "west_hall_inner": "west hall", "west_hall_outer": "west hall",
-          "hall_ew_garage": "garage hall", "cinema_food": "cinema food",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
+          "hall_ew_garage": "garage hall", "cinema_food": "cinema food", "boxoffice": "", "boxoffice_floor": "",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
 VERTICAL = ("parking", "secret_hall", "east_hall", "west_hall_inner", "west_hall_outer", "west_2n", "west_2s")
 
 

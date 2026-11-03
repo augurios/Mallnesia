@@ -174,3 +174,7 @@ My choices: the 24 m stand width, the 18 m depth, the door positions, the split 
 ## Number of floors
 
 The main building has 3 floors, not 4 (Augusto's correction). Floor 4 was removed from the plans and the generator.
+
+## Cinema box office (floor 3)
+
+On floor 3 the inner west hall extends east over the north-west corner of Atrium B (x 51 to 57, y 141 to 153), and the cinema box office is there: a 3 m deep counter (x 57 to 60, y 141 to 153) with its front facing west, toward the west hall. The size and exact position along the atrium edge are my choice; the stairs on the north hall (x 54 to 60, y 153 to 159) stay as they are, just north of it.
