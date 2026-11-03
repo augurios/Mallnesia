@@ -94,7 +94,6 @@ DOORS_F1 = [
 ]
 DOORS_UP = [
     ("balcony_door_main", "Balcony door (where the main entrance is on floor 1)", 88, 10),
-    ("balcony_door_side", "Balcony door at the end of the short hall") + UV(-9, 72),
     ("garage_open_1", "Garage connection 1", 15, 162),
     ("garage_open_2", "Garage connection 2", 15, 114),
 ]
@@ -134,6 +133,10 @@ def floor_items(floor):
     for i, l, p, k in POLYS:
         if i == "south_area" and floor > 1:
             l, k = "Food court (seating)", "foodcourt"
+        if i == "sw_spur" and floor > 1:
+            # no short hall / side exit on upper floors: the restaurant windows run unbroken
+            p = [UV(-13, 80), UV(-13, 92), UV(-5, 92), UV(-5, 80)]
+            l, k = "Restaurant windows between the two diagonal blocks (no short hall)", "restaurant"
         if k == "side":
             k = side_kind
             if floor > 1:
@@ -141,6 +144,8 @@ def floor_items(floor):
         items.append((i, l, ("poly", p), k))
     if floor > 1:
         for i, l, p, k in BALCONIES:
+            if i == "balcony_side":
+                continue
             items.append((i, l, ("poly", p), k))
     return items
 
@@ -267,7 +272,7 @@ def render(floor, items, doors):
         dr.ellipse([px - 9, py - 9, px + 9, py + 9], fill=(150, 60, 200) if purple else (230, 120, 0), outline="black")
     dr.text((ox, 24), "Floor %d (3 m grid, meters, north up)" % floor, fill="black", font=fb)
     sub = ("Orange dot = door/opening, purple = side exit. Thin grid = 3 m, bold = 30 m." if floor == 1 else
-           "Orange dot = door/opening, purple = balcony door at the end of the short hall. Red-orange = restaurant windows, teal = balconies. Thin grid = 3 m, bold = 30 m.")
+           "Orange dot = door/opening, Red-orange = restaurant windows, teal = balconies. Thin grid = 3 m, bold = 30 m.")
     dr.text((ox, 56), sub, fill=(60, 60, 60), font=fs)
     if floor == 1:
         mx, my = T(88, 10)

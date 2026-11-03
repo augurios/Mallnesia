@@ -167,11 +167,11 @@
   },
   {
    "id": "sw_spur",
-   "label": "Short hall to the side door (between the two stores)",
+   "label": "Restaurant windows between the two diagonal blocks (no short hall)",
    "points": [
     [
-     29.5,
-     42.5
+     33.5,
+     46.5
     ],
     [
      39.5,
@@ -182,11 +182,11 @@
      48.5
     ],
     [
-     33.5,
-     38.5
+     37.5,
+     42.5
     ]
    ],
-   "kind": "hall"
+   "kind": "restaurant"
   },
   {
    "id": "balcony_south",
@@ -223,29 +223,6 @@
     [
      57,
      1
-    ]
-   ],
-   "kind": "balcony"
-  },
-  {
-   "id": "balcony_side",
-   "label": "Small balcony at the end of the short hall",
-   "points": [
-    [
-     29.5,
-     42.5
-    ],
-    [
-     33.5,
-     38.5
-    ],
-    [
-     30.5,
-     35.5
-    ],
-    [
-     26.5,
-     39.5
     ]
    ],
    "kind": "balcony"
@@ -646,12 +623,6 @@
    "label": "Balcony door (where the main entrance is on floor 1)",
    "x": 88,
    "y": 10
-  },
-  {
-   "id": "balcony_door_side",
-   "label": "Balcony door at the end of the short hall",
-   "x": 31.5,
-   "y": 40.5
   },
   {
    "id": "garage_open_1",
