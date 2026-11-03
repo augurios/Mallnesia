@@ -88,6 +88,17 @@ Built by Augusto's instruction: **the satellite outline as the scale reference a
 - **Things I changed from the sketches so they fit:** the north-east store block and the top-left block were pulled in from past the outline; the west store column was clipped at the south-west diagonal; icon boxes (stairs, elevators, escalators) are now plausible sizes instead of sketch sizes.
 - **Known weak spots:** the small shops south of Atrium A, the exact depth of the entrance lobby, the width of the secret hallway, and everything within about 10 m of the outline edges. Treat as a placeholder to walk through, not as measured fact.
 
+## Floor 1 plan, draft v2 (grid-snapped)
+
+Files: `floor1_plan_v2.png` and `floor1_plan_v2.json` (v1 is kept for comparison). Same layout as v1 after the corrections above, snapped to a **3 m grid**.
+
+- **Module:** every box edge is a multiple of 3 m. Halls are 6 m, store rows 12 m deep (W1, W2, east stores), the cross-corridor 12 m, the wide north hall 18 m.
+- **Aligned:** the atriums share the same x range (51 to 90); the west halls, the east hall and the north hall meet the atriums edge to edge; the big store, NE block and top-left block share one row (y 165 to 183); the east hall lines up with the hall beside the NE block.
+- **Added to make it connect:** a 6 m south hall under Atrium A, linking the west hall, the east hall and the shops (three 9 m shops now sit below it).
+- **Connectivity check (script):** all halls, atriums, bathrooms, the lobby, the parking lot and the secret hallway form one connected walkable area. No store overlaps a hall.
+- **Off-grid on purpose:** only the south-west diagonal hall. It is now exactly 45 degrees, no longer tied to the real outline (the outline is dropped from the picture). It starts at the bottom of the outer west hall, crosses the junction of the inner west hall and the south hall, and ends at the lobby's north-west corner. The stores sit on its south-west side, with the short hall to the purple exit in the middle.
+- **Not modeled yet:** doors into stores and bathrooms, wall thickness, and the stores' interiors.
+
 ## Open questions
 
 1. **Scale.** Measured from the real building outline; see "Scale check". Decision needed on how to use it.
