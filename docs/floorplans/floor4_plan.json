@@ -1,5 +1,6 @@
 {
- "status": "DRAFT v2: grid-snapped (3 m module). Meters, x east, y north, origin = footprint south-west bounding corner. Halls 6 m, store rows 12 m deep. Only the south-west diagonal hall is off-grid (exactly 45 degrees).",
+ "floor": 4,
+ "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the 5 m shop passage and the south area outline.",
  "grid_m": 3,
  "polygons": [
   {
@@ -53,8 +54,8 @@
    "kind": "shop"
   },
   {
-   "id": "entrance_lobby",
-   "label": "Entrance lobby",
+   "id": "south_area",
+   "label": "Food court (seating)",
    "points": [
     [
      57,
@@ -93,7 +94,7 @@
      30
     ]
    ],
-   "kind": "hall"
+   "kind": "foodcourt"
   },
   {
    "id": "sw_diag_hall",
@@ -120,7 +121,7 @@
   },
   {
    "id": "sw_stores_w",
-   "label": "Diagonal hall stores, west part",
+   "label": "Restaurant windows along the diagonal hall, west part",
    "points": [
     [
      21.0,
@@ -139,11 +140,11 @@
      46.5
     ]
    ],
-   "kind": "shop"
+   "kind": "restaurant"
   },
   {
    "id": "sw_stores_e",
-   "label": "Diagonal hall stores, east part",
+   "label": "Restaurant windows along the diagonal hall, east part",
    "points": [
     [
      37.5,
@@ -162,11 +163,11 @@
      35
     ]
    ],
-   "kind": "shop"
+   "kind": "restaurant"
   },
   {
    "id": "sw_spur",
-   "label": "Short hall to the purple exit (between the two stores)",
+   "label": "Short hall to the side door (between the two stores)",
    "points": [
     [
      29.5,
@@ -186,6 +187,68 @@
     ]
    ],
    "kind": "hall"
+  },
+  {
+   "id": "balcony_south",
+   "label": "Balcony along the south and south-east wall",
+   "points": [
+    [
+     57,
+     -3
+    ],
+    [
+     72,
+     -4
+    ],
+    [
+     85,
+     0
+    ],
+    [
+     97.1,
+     13.4
+    ],
+    [
+     94,
+     16
+    ],
+    [
+     84,
+     4
+    ],
+    [
+     72,
+     0
+    ],
+    [
+     57,
+     1
+    ]
+   ],
+   "kind": "balcony"
+  },
+  {
+   "id": "balcony_side",
+   "label": "Small balcony at the end of the short hall",
+   "points": [
+    [
+     29.5,
+     42.5
+    ],
+    [
+     33.5,
+     38.5
+    ],
+    [
+     30.5,
+     35.5
+    ],
+    [
+     26.5,
+     39.5
+    ]
+   ],
+   "kind": "balcony"
   }
  ],
  "boxes": [
@@ -326,7 +389,7 @@
   },
   {
    "id": "parking",
-   "label": "Parking lot, same level as floor 1",
+   "label": "Parking lot / garage side",
    "x0": 3,
    "x1": 15,
    "y0": 84,
@@ -371,7 +434,7 @@
   },
   {
    "id": "west_hall_inner",
-   "label": "West hall (next to the atriums), runs down to the lobby",
+   "label": "West hall (next to the atriums), runs down to the lobby / food court",
    "x0": 45,
    "x1": 51,
    "y0": 30,
@@ -397,13 +460,13 @@
    "kind": "shop"
   },
   {
-   "id": "east_stores_s",
-   "label": "East store block (south of the short hall, continues along the lobby)",
+   "id": "east_side_south",
+   "label": "Restaurant windows (east) south of the short hall (continues along the lobby / food court)",
    "x0": 96,
    "x1": 108,
    "y0": 18,
    "y1": 33,
-   "kind": "shop"
+   "kind": "restaurant"
   },
   {
    "id": "east_spur",
@@ -560,7 +623,7 @@
   },
   {
    "id": "walkin_kiosk",
-   "label": "Walk-in kiosk (island in the lobby)",
+   "label": "Walk-in kiosk (island in the lobby / food court)",
    "x0": 72,
    "x1": 81,
    "y0": 15,
@@ -568,37 +631,37 @@
    "kind": "shop"
   },
   {
-   "id": "lobby_store_w",
-   "label": "West store block: the diagonal stores continue south along the lobby",
+   "id": "west_side_south",
+   "label": "Restaurant windows (west): the diagonal stores continue south along the lobby / food court",
    "x0": 45,
    "x1": 57,
    "y0": 1,
    "y1": 30,
-   "kind": "shop"
+   "kind": "restaurant"
   }
  ],
  "openings": [
   {
-   "id": "main_entrance",
-   "label": "Main entrance (stairs up from street)",
+   "id": "balcony_door_main",
+   "label": "Balcony door (where the main entrance is on floor 1)",
    "x": 88,
    "y": 10
   },
   {
-   "id": "side_exit",
-   "label": "Side exit (purple), end of the short hall",
+   "id": "balcony_door_side",
+   "label": "Balcony door at the end of the short hall",
    "x": 31.5,
    "y": 40.5
   },
   {
    "id": "garage_open_1",
-   "label": "Parking-lot opening 1",
+   "label": "Garage connection 1",
    "x": 15,
    "y": 162
   },
   {
    "id": "garage_open_2",
-   "label": "Parking-lot opening 2",
+   "label": "Garage connection 2",
    "x": 15,
    "y": 114
   }

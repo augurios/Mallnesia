@@ -1,0 +1,669 @@
+{
+ "floor": 2,
+ "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the 5 m shop passage and the south area outline.",
+ "grid_m": 3,
+ "polygons": [
+  {
+   "id": "west_s",
+   "label": "W1 stores south (runs down to the diagonal stores)",
+   "points": [
+    [
+     15,
+     111
+    ],
+    [
+     27,
+     111
+    ],
+    [
+     27,
+     65
+    ],
+    [
+     21,
+     59
+    ],
+    [
+     15,
+     59
+    ]
+   ],
+   "kind": "shop"
+  },
+  {
+   "id": "west_2s",
+   "label": "W2 stores south (runs down to the diagonal hall)",
+   "points": [
+    [
+     33,
+     111
+    ],
+    [
+     45,
+     111
+    ],
+    [
+     45,
+     55
+    ],
+    [
+     33,
+     67
+    ]
+   ],
+   "kind": "shop"
+  },
+  {
+   "id": "south_area",
+   "label": "Food court (seating)",
+   "points": [
+    [
+     57,
+     1
+    ],
+    [
+     72,
+     0
+    ],
+    [
+     84,
+     4
+    ],
+    [
+     94,
+     16
+    ],
+    [
+     96,
+     18
+    ],
+    [
+     96,
+     36
+    ],
+    [
+     51,
+     36
+    ],
+    [
+     51,
+     30
+    ],
+    [
+     57,
+     30
+    ]
+   ],
+   "kind": "foodcourt"
+  },
+  {
+   "id": "sw_diag_hall",
+   "label": "Diagonal hall (45 degrees) from the outer west hall to the inner west hall",
+   "points": [
+    [
+     27,
+     65
+    ],
+    [
+     27,
+     73
+    ],
+    [
+     45,
+     55
+    ],
+    [
+     45,
+     47
+    ]
+   ],
+   "kind": "hall"
+  },
+  {
+   "id": "sw_stores_w",
+   "label": "Restaurant windows along the diagonal hall, west part",
+   "points": [
+    [
+     21.0,
+     59.0
+    ],
+    [
+     27.0,
+     65.0
+    ],
+    [
+     39.5,
+     52.5
+    ],
+    [
+     33.5,
+     46.5
+    ]
+   ],
+   "kind": "restaurant"
+  },
+  {
+   "id": "sw_stores_e",
+   "label": "Restaurant windows along the diagonal hall, east part",
+   "points": [
+    [
+     37.5,
+     42.5
+    ],
+    [
+     43.5,
+     48.5
+    ],
+    [
+     45,
+     47
+    ],
+    [
+     45,
+     35
+    ]
+   ],
+   "kind": "restaurant"
+  },
+  {
+   "id": "sw_spur",
+   "label": "Short hall to the side door (between the two stores)",
+   "points": [
+    [
+     29.5,
+     42.5
+    ],
+    [
+     39.5,
+     52.5
+    ],
+    [
+     43.5,
+     48.5
+    ],
+    [
+     33.5,
+     38.5
+    ]
+   ],
+   "kind": "hall"
+  },
+  {
+   "id": "balcony_south",
+   "label": "Balcony along the south and south-east wall",
+   "points": [
+    [
+     57,
+     -3
+    ],
+    [
+     72,
+     -4
+    ],
+    [
+     85,
+     0
+    ],
+    [
+     97.1,
+     13.4
+    ],
+    [
+     94,
+     16
+    ],
+    [
+     84,
+     4
+    ],
+    [
+     72,
+     0
+    ],
+    [
+     57,
+     1
+    ]
+   ],
+   "kind": "balcony"
+  },
+  {
+   "id": "balcony_side",
+   "label": "Small balcony at the end of the short hall",
+   "points": [
+    [
+     29.5,
+     42.5
+    ],
+    [
+     33.5,
+     38.5
+    ],
+    [
+     30.5,
+     35.5
+    ],
+    [
+     26.5,
+     39.5
+    ]
+   ],
+   "kind": "balcony"
+  }
+ ],
+ "boxes": [
+  {
+   "id": "atrium_b",
+   "label": "Atrium B (open void)",
+   "x0": 51,
+   "x1": 90,
+   "y0": 123,
+   "y1": 159,
+   "kind": "void"
+  },
+  {
+   "id": "cross_corridor",
+   "label": "Cross-corridor",
+   "x0": 51,
+   "x1": 90,
+   "y0": 111,
+   "y1": 123,
+   "kind": "hall"
+  },
+  {
+   "id": "atrium_a",
+   "label": "Atrium A (open void)",
+   "x0": 51,
+   "x1": 90,
+   "y0": 51,
+   "y1": 111,
+   "kind": "void"
+  },
+  {
+   "id": "south_hall",
+   "label": "South hall (below Atrium A)",
+   "x0": 45,
+   "x1": 90,
+   "y0": 45,
+   "y1": 51,
+   "kind": "hall"
+  },
+  {
+   "id": "south_shop_1",
+   "label": "Shop (west, aligned with the Atrium A stairs and the atrium's west side)",
+   "x0": 51,
+   "x1": 60,
+   "y0": 36,
+   "y1": 45,
+   "kind": "shop"
+  },
+  {
+   "id": "south_shop_2",
+   "label": "Shop",
+   "x0": 66,
+   "x1": 76,
+   "y0": 36,
+   "y1": 45,
+   "kind": "shop"
+  },
+  {
+   "id": "south_pass_1",
+   "label": "Passage between the west shop and the middle shop",
+   "x0": 60,
+   "x1": 66,
+   "y0": 36,
+   "y1": 45,
+   "kind": "hall"
+  },
+  {
+   "id": "south_pass_2",
+   "label": "Passage between the middle and east shops (5 m)",
+   "x0": 76,
+   "x1": 81,
+   "y0": 36,
+   "y1": 45,
+   "kind": "hall"
+  },
+  {
+   "id": "south_shop_3",
+   "label": "Shop",
+   "x0": 81,
+   "x1": 90,
+   "y0": 36,
+   "y1": 45,
+   "kind": "shop"
+  },
+  {
+   "id": "b_elevators",
+   "label": "Elevator pair (B, NE), on the north hall",
+   "x0": 78,
+   "x1": 87,
+   "y0": 153,
+   "y1": 159,
+   "kind": "elevator"
+  },
+  {
+   "id": "b_stairs",
+   "label": "Stairs (B, NW), on the north hall",
+   "x0": 54,
+   "x1": 60,
+   "y0": 153,
+   "y1": 159,
+   "kind": "stairs"
+  },
+  {
+   "id": "b_center_stair",
+   "label": "Center curved stair (B, S), on the cross-corridor",
+   "x0": 63,
+   "x1": 72,
+   "y0": 123,
+   "y1": 132,
+   "kind": "stairs"
+  },
+  {
+   "id": "a_escalators",
+   "label": "Escalators up/down, full width from the west hall to the east hall",
+   "x0": 51,
+   "x1": 90,
+   "y0": 105,
+   "y1": 111,
+   "kind": "escalator"
+  },
+  {
+   "id": "a_stairs",
+   "label": "Stairs (A, SW), on the south hall, aligned with the west shop",
+   "x0": 51,
+   "x1": 60,
+   "y0": 51,
+   "y1": 57,
+   "kind": "stairs"
+  },
+  {
+   "id": "a_elevators",
+   "label": "Elevator pair (A, SE), on the south hall",
+   "x0": 78,
+   "x1": 87,
+   "y0": 51,
+   "y1": 57,
+   "kind": "elevator"
+  },
+  {
+   "id": "parking",
+   "label": "Parking lot / garage side",
+   "x0": 3,
+   "x1": 15,
+   "y0": 84,
+   "y1": 183,
+   "kind": "garage"
+  },
+  {
+   "id": "west_n",
+   "label": "W1 stores north",
+   "x0": 15,
+   "x1": 27,
+   "y0": 117,
+   "y1": 159,
+   "kind": "shop"
+  },
+  {
+   "id": "hall_ew_garage",
+   "label": "East-west hall to the garage",
+   "x0": 15,
+   "x1": 45,
+   "y0": 111,
+   "y1": 117,
+   "kind": "hall"
+  },
+  {
+   "id": "west_hall_outer",
+   "label": "West hall (outer)",
+   "x0": 27,
+   "x1": 33,
+   "y0": 63,
+   "y1": 159,
+   "kind": "hall"
+  },
+  {
+   "id": "west_2n",
+   "label": "W2 stores north",
+   "x0": 33,
+   "x1": 45,
+   "y0": 117,
+   "y1": 159,
+   "kind": "shop"
+  },
+  {
+   "id": "west_hall_inner",
+   "label": "West hall (next to the atriums), runs down to the lobby / food court",
+   "x0": 45,
+   "x1": 51,
+   "y0": 30,
+   "y1": 159,
+   "kind": "hall"
+  },
+  {
+   "id": "east_hall",
+   "label": "East hall",
+   "x0": 90,
+   "x1": 96,
+   "y0": 36,
+   "y1": 165,
+   "kind": "hall"
+  },
+  {
+   "id": "east_stores",
+   "label": "East stores (north of the short hall, up to the north hall)",
+   "x0": 96,
+   "x1": 108,
+   "y0": 39,
+   "y1": 159,
+   "kind": "shop"
+  },
+  {
+   "id": "east_side_south",
+   "label": "Restaurant windows (east) south of the short hall (continues along the lobby / food court)",
+   "x0": 96,
+   "x1": 108,
+   "y0": 18,
+   "y1": 33,
+   "kind": "restaurant"
+  },
+  {
+   "id": "east_spur",
+   "label": "Short hall east to the SE bathrooms",
+   "x0": 96,
+   "x1": 108,
+   "y0": 33,
+   "y1": 39,
+   "kind": "hall"
+  },
+  {
+   "id": "se_bath",
+   "label": "Bathrooms (SE)",
+   "x0": 108,
+   "x1": 120,
+   "y0": 30,
+   "y1": 45,
+   "kind": "bath"
+  },
+  {
+   "id": "secret_hall",
+   "label": "Secret hallway (game): SE bathrooms to NE bathrooms",
+   "x0": 108,
+   "x1": 111,
+   "y0": 45,
+   "y1": 147,
+   "kind": "secret"
+  },
+  {
+   "id": "ne_bath",
+   "label": "Bathrooms (NE), door on the north hall",
+   "x0": 108,
+   "x1": 120,
+   "y0": 147,
+   "y1": 159,
+   "kind": "bath"
+  },
+  {
+   "id": "hall_north",
+   "label": "North hall (ends at a store wall)",
+   "x0": 15,
+   "x1": 120,
+   "y0": 159,
+   "y1": 165,
+   "kind": "hall"
+  },
+  {
+   "id": "top_left_block",
+   "label": "Top-left block",
+   "x0": 15,
+   "x1": 48,
+   "y0": 165,
+   "y1": 183,
+   "kind": "shop"
+  },
+  {
+   "id": "nw_bath",
+   "label": "Bathrooms (NW)",
+   "x0": 15,
+   "x1": 27,
+   "y0": 165,
+   "y1": 174,
+   "kind": "bath"
+  },
+  {
+   "id": "nw_stairs",
+   "label": "Stairs (NW)",
+   "x0": 27,
+   "x1": 36,
+   "y0": 165,
+   "y1": 174,
+   "kind": "stairs"
+  },
+  {
+   "id": "n_hall_up",
+   "label": "Wide hall north",
+   "x0": 48,
+   "x1": 66,
+   "y0": 165,
+   "y1": 189,
+   "kind": "hall"
+  },
+  {
+   "id": "big_store",
+   "label": "Big store",
+   "x0": 66,
+   "x1": 90,
+   "y0": 165,
+   "y1": 183,
+   "kind": "shop"
+  },
+  {
+   "id": "n_hall_behind",
+   "label": "Hall behind the big store",
+   "x0": 48,
+   "x1": 96,
+   "y0": 183,
+   "y1": 189,
+   "kind": "hall"
+  },
+  {
+   "id": "north_stores",
+   "label": "Store block along the outer (north) side of the hall behind the wide hall and big store",
+   "x0": 48,
+   "x1": 96,
+   "y0": 189,
+   "y1": 201,
+   "kind": "shop"
+  },
+  {
+   "id": "north_stores_w",
+   "label": "North stores, west end (wraps around the hall end)",
+   "x0": 36,
+   "x1": 48,
+   "y0": 183,
+   "y1": 201,
+   "kind": "shop"
+  },
+  {
+   "id": "north_stores_e",
+   "label": "North stores, east end (wraps around the hall end)",
+   "x0": 96,
+   "x1": 108,
+   "y0": 183,
+   "y1": 201,
+   "kind": "shop"
+  },
+  {
+   "id": "n_hall_down",
+   "label": "Hall down beside the NE block",
+   "x0": 90,
+   "x1": 96,
+   "y0": 165,
+   "y1": 189,
+   "kind": "hall"
+  },
+  {
+   "id": "ne_block",
+   "label": "NE store block",
+   "x0": 96,
+   "x1": 114,
+   "y0": 165,
+   "y1": 183,
+   "kind": "shop"
+  },
+  {
+   "id": "ne_end_store",
+   "label": "Store closing the north hall",
+   "x0": 120,
+   "x1": 132,
+   "y0": 153,
+   "y1": 171,
+   "kind": "shop"
+  },
+  {
+   "id": "walkin_kiosk",
+   "label": "Walk-in kiosk (island in the lobby / food court)",
+   "x0": 72,
+   "x1": 81,
+   "y0": 15,
+   "y1": 21,
+   "kind": "shop"
+  },
+  {
+   "id": "west_side_south",
+   "label": "Restaurant windows (west): the diagonal stores continue south along the lobby / food court",
+   "x0": 45,
+   "x1": 57,
+   "y0": 1,
+   "y1": 30,
+   "kind": "restaurant"
+  }
+ ],
+ "openings": [
+  {
+   "id": "balcony_door_main",
+   "label": "Balcony door (where the main entrance is on floor 1)",
+   "x": 88,
+   "y": 10
+  },
+  {
+   "id": "balcony_door_side",
+   "label": "Balcony door at the end of the short hall",
+   "x": 31.5,
+   "y": 40.5
+  },
+  {
+   "id": "garage_open_1",
+   "label": "Garage connection 1",
+   "x": 15,
+   "y": 162
+  },
+  {
+   "id": "garage_open_2",
+   "label": "Garage connection 2",
+   "x": 15,
+   "y": 114
+  }
+ ]
+}
