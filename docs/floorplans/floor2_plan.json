@@ -464,15 +464,6 @@
    "kind": "bath"
   },
   {
-   "id": "secret_hall",
-   "label": "Secret hallway (game): SE bathrooms to NE bathrooms",
-   "x0": 108,
-   "x1": 111,
-   "y0": 45,
-   "y1": 147,
-   "kind": "secret"
-  },
-  {
    "id": "ne_bath",
    "label": "Bathrooms (NE), door on the north hall",
    "x0": 108,
@@ -752,6 +743,24 @@
    "kind": "intermittent"
   },
   {
+   "id": "secret_2_south",
+   "label": "Secret hallway (floor 2): from the south-west end of the restaurants...",
+   "x0": 12,
+   "x1": 45,
+   "y0": 1,
+   "y1": 4,
+   "kind": "secret"
+  },
+  {
+   "id": "secret_2_west",
+   "label": "Secret hallway (floor 2): ...north along the garage side to the NW bathrooms",
+   "x0": 12,
+   "x1": 15,
+   "y0": 4,
+   "y1": 174,
+   "kind": "secret"
+  },
+  {
    "id": "w2n_wood_kiosk",
    "label": "Wood kiosk beside the W2 N elevator bank, facing the west hall",
    "x0": 33,
@@ -788,6 +797,12 @@
    "label": "Garage connection 2",
    "x": 15,
    "y": 114
+  },
+  {
+   "id": "secret_door_restaurant",
+   "label": "Secret hallway door into the back of the west restaurants",
+   "x": 45,
+   "y": 2.5
   },
   {
    "id": "north_exit",

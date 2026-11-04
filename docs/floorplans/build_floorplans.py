@@ -201,6 +201,16 @@ def floor_items(floor):
             items.append((i, l, ("poly", p), k))
     for i, l, a, b, c, d, k in INTERMITTENT:
         items.append((i, l, ("box", (a, b, c, d)), k))
+    if floor > 1:
+        # the secret hallway moves on the upper floors
+        items = [it for it in items if it[0] != "secret_hall"]
+        if floor == 2:
+            items.append(("secret_2_south", "Secret hallway (floor 2): from the south-west end of the restaurants...", ("box", (12, 45, 1, 4)), "secret"))
+            items.append(("secret_2_west", "Secret hallway (floor 2): ...north along the garage side to the NW bathrooms", ("box", (12, 15, 4, 174)), "secret"))
+        else:
+            items.append(("secret_3_nw", "Secret hallway (floor 3): from the NW bathrooms, up through the top-left block", ("box", (15, 18, 174, 201)), "secret"))
+            items.append(("secret_3_north", "Secret hallway (floor 3): east behind the cinema", ("box", (18, 123, 198, 201)), "secret"))
+            items.append(("secret_3_east", "Secret hallway (floor 3): down the east side to the NE bathrooms", ("box", (120, 123, 150, 198)), "secret"))
     # fixtures from the reference photos (see reference/photo_map.md)
     items.append(("w2n_wood_kiosk", "Wood kiosk beside the W2 N elevator bank, facing the west hall", ("box", (33, 36, 147, 153)), "kiosk"))
     if floor == 1:
@@ -355,6 +365,8 @@ def build(floor):
     doors = DOORS_F1 if floor == 1 else DOORS_UP
     if floor == 3:
         doors = doors + [("cinema_entrance_%d" % (n + 1), "Cinema %d entrance" % (n + 1), x, 171) for n, x in enumerate((57, 87))]
+    if floor == 2:
+        doors = doors + [("secret_door_restaurant", "Secret hallway door into the back of the west restaurants", 45, 2.5)]
     if floor == 2:
         doors = doors + [("north_exit", "Possible exit at the north end of the narrow hall", 51, 201)]
     comps = check(items)

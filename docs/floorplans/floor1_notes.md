@@ -190,3 +190,13 @@ Applied after the photo map (`reference/photo_map.md`), all agreed by Augusto:
 - **Food court stairs (floors 2 and 3):** widened to 12 m x 6 m (x 72 to 84) for the wide curved stair. The plan still draws it as a box; the curve is for the blockout.
 - **Atrium roof:** nothing in the plan; Atrium B has the same truss roof as Atrium A (confirmed).
 - **Confirmed as drawn:** the two entrance doors either side of the kiosk along the diagonal wall, and the bank at the south end of the east block.
+
+## Secret hallway on each floor
+
+The secret hallway (3 m wide) is in a different place on each floor (decided by Augusto):
+
+- **Floor 1:** from the SE bathrooms north to the NE bathrooms (x 108 to 111, y 45 to 147), as before.
+- **Floor 2:** from the south-west end of the west restaurants, west along the south edge (x 12 to 45, y 1 to 4, with a door into the back of the restaurants at x 45), then north along the garage side (x 12 to 15, y 4 to 174) to the NW bathrooms. It runs over the east edge of the garage strip.
+- **Floor 3:** from the NW bathrooms up through the top-left block (x 15 to 18, y 174 to 201), east behind the cinema (x 18 to 123, y 198 to 201, carved from the north stores and the back of the cinemas), then down the east side (x 120 to 123, y 150 to 198) to the east wall of the NE bathrooms, through the store at the end of the north hall. Starting point is the NW bathrooms, not a new west bathroom.
+
+The routes and the 3 m width are my choices, within what Augusto picked. The hall carves 3 m off the back of the cinemas on floor 3.

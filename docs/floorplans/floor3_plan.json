@@ -526,15 +526,6 @@
    "kind": "bath"
   },
   {
-   "id": "secret_hall",
-   "label": "Secret hallway (game): SE bathrooms to NE bathrooms",
-   "x0": 108,
-   "x1": 111,
-   "y0": 45,
-   "y1": 147,
-   "kind": "secret"
-  },
-  {
    "id": "ne_bath",
    "label": "Bathrooms (NE), door on the north hall",
    "x0": 108,
@@ -677,6 +668,33 @@
    "y0": 105,
    "y1": 111,
    "kind": "intermittent"
+  },
+  {
+   "id": "secret_3_nw",
+   "label": "Secret hallway (floor 3): from the NW bathrooms, up through the top-left block",
+   "x0": 15,
+   "x1": 18,
+   "y0": 174,
+   "y1": 201,
+   "kind": "secret"
+  },
+  {
+   "id": "secret_3_north",
+   "label": "Secret hallway (floor 3): east behind the cinema",
+   "x0": 18,
+   "x1": 123,
+   "y0": 198,
+   "y1": 201,
+   "kind": "secret"
+  },
+  {
+   "id": "secret_3_east",
+   "label": "Secret hallway (floor 3): down the east side to the NE bathrooms",
+   "x0": 120,
+   "x1": 123,
+   "y0": 150,
+   "y1": 198,
+   "kind": "secret"
   },
   {
    "id": "w2n_wood_kiosk",
