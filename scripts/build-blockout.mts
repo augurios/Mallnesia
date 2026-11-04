@@ -208,6 +208,16 @@ function outsideMask(f: Floor): Uint8Array {
 
 const stats = { walkable: [0, 0, 0] };
 
+// Floor 3: the halls and bridges around the atriums have no dropped ceiling; they open up to the roof truss.
+const OPEN_X = [45, 84];
+const OPEN_Y = [45, 165];
+const isOpenCeiling = (f: Floor, fi: number, i: number, j: number) => {
+  if (fi !== 2 || at(f, i, j) !== WALK || kindAt(f, i, j) !== "hall") return false;
+  const x = (i + 0.5) * CELL;
+  const y = (j + 0.5) * CELL;
+  return x >= OPEN_X[0] && x < OPEN_X[1] && y >= OPEN_Y[0] && y < OPEN_Y[1];
+};
+
 floors.forEach((f, fi) => {
   const floorNo = fi + 1;
   const y0 = fi * FLOOR_H;
@@ -219,10 +229,11 @@ floors.forEach((f, fi) => {
     // floors and ceilings, merged along x
     let runStart = -1;
     let runMat = "";
+    let runOpen = false;
     const flush = (end: number) => {
       if (runStart >= 0) {
         flatRun(runMat, runStart, end, j, y0, true);
-        if (runMat !== "floor_atrium") flatRun("ceilings", runStart, end, j, y0 + CEIL_H, false);
+        if (runMat !== "floor_atrium" && !runOpen) flatRun("ceilings", runStart, end, j, y0 + CEIL_H, false);
       }
       runStart = -1;
     };
@@ -234,10 +245,12 @@ floors.forEach((f, fi) => {
         mat = k === "void" ? "floor_atrium" : k === "bath" ? "floor_bath" : k === "garage" ? "floor_garage" : "floors";
         stats.walkable[fi]++;
       }
-      if (mat !== runMat || mat === "") {
+      const open = mat !== "" && isOpenCeiling(f, fi, i, j);
+      if (mat !== runMat || open !== runOpen || mat === "") {
         flush(i);
         if (mat) runStart = i;
         runMat = mat;
+        runOpen = open;
       }
     }
 
@@ -246,12 +259,18 @@ floors.forEach((f, fi) => {
       if (c !== WALK && c !== HOLE) continue;
       const k = f.kind[j * NX + i];
       const nearVoid = (k === "void");
+      const open = isOpenCeiling(f, fi, i, j);
       for (const { d, di, dj } of DIRS) {
         const nc = at(f, i + di, j + dj);
         const nk = kindAt(f, i + di, j + dj);
         if (c === WALK) {
-          if (nc === WALK) continue;
-          const wallH = nearVoid ? FLOOR_H : CEIL_H;
+          if (nc === WALK) {
+            // lintel where an open-ceiling hall meets a room that keeps its dropped ceiling
+            if (open && !isOpenCeiling(f, fi, i + di, j + dj) && nk !== "void")
+              edges.push({ dir: d, i, j, mat: "walls", y0: y0 + CEIL_H, h: ROOF_Y - y0 - CEIL_H });
+            continue;
+          }
+          const wallH = nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
           if (nc === HOLE) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (k === "garage" && nc === EMPTY) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (nc === EMPTY && isOutside(i + di, j + dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
@@ -270,12 +289,12 @@ floors.forEach((f, fi) => {
   }
   wallRuns(edges);
 
-  // Roof over the atriums (hole cells of the top floor).
+  // Roof over the atriums and the open-ceiling halls (top floor).
   if (floorNo === 3) {
     for (let j = 0; j < NY; j++) {
       let start = -1;
       for (let i = 0; i <= NX; i++) {
-        const hole = i < NX && f.cls[j * NX + i] === HOLE;
+        const hole = i < NX && (f.cls[j * NX + i] === HOLE || isOpenCeiling(f, fi, i, j));
         if (hole && start < 0) start = i;
         if (!hole && start >= 0) {
           flatRun("roof", start, i, j, ROOF_Y, false);

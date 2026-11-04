@@ -230,3 +230,7 @@ Walking the blockout, the atriums felt too wide. A 12 m band, north to south, is
 - **Lobby and food courts:** narrower by 12 m; the main doors are at (74.5, 7) and (79.5, 13), the balcony door at (76, 10), the bank at x 84 to 96.
 - **My choices for things the cut ran through:** the middle south shop fell in the band, so there are now two south shops (x 51 to 60 and 69 to 78) with one 9 m passage between them (two kiosks / machine areas on floors 2 and 3). The center curved stair was recentered (x 60 to 69). The walk-in kiosk and the food court stairs kept their size and moved 6 m west (kiosk x 66 to 75, stairs x 66 to 78).
 - **Blockout:** glass walls now go wherever a walkable area meets the outside of the building (not the real footprint outline, which the cut building no longer follows exactly).
+
+## Floor 3: halls open to the roof (decided by Augusto)
+
+On floor 3 the halls around the atriums have no dropped ceiling; they open up to the roof truss. In the blockout this covers the halls and the cross corridor inside x 45 to 84, y 45 to 165 (west hall, east hall, cross corridor, south hall, the part of the north hall in that range, the box office extension). The north hall keeps its low ceiling outside that range, so the ceiling steps up where it passes the atrium (accepted by Augusto). Floors 1 and 2 are unchanged.
