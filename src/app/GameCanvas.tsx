@@ -28,6 +28,14 @@ export default function GameCanvas() {
           {es.floor} {status.floor} · {status.x.toFixed(1)}, {status.y.toFixed(1)}
         </div>
       )}
+      {status && (
+        <div className="game-flashlight" aria-label={es.flashlight}>
+          <div
+            className={status.flashlightOn ? "game-flashlight-fill on" : "game-flashlight-fill"}
+            style={{ width: `${Math.round(status.charge * 100)}%` }}
+          />
+        </div>
+      )}
       {!locked && (
         <div className="game-hint" onClick={() => runtimeRef.current?.requestLock()}>
           <div>

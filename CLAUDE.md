@@ -49,7 +49,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 - **No combat.** Threats are avoided, hidden from, or endured. Never add weapons the player can use.
 - **Sanity:** drained by darkness, apparitions, and the watchers. Low sanity increases hallucinations and makes the mall shift more (e.g., more wrong-floor elevator results).
-- **Light:** a flashlight with limited charge (equivalent of Amnesia's lantern oil). Charge drains while it is on and recharges in lit areas or at fixed charging points. There are no battery pickups.
+- **Light:** a flashlight with limited charge (equivalent of Amnesia's lantern oil). Charge drains while it is on (2 minutes for a full charge) and **recharges by itself while it is off** (90 seconds to refill; decided by Augusto, replacing lit areas and charging points). There are no battery pickups.
 - **Locked zones:** no keys or access cards. The mall opens and locks sections on its own, tied to story beats.
 - **Doors:** the player never opens or closes doors. The mall does, on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive.
 - **Interaction:** limited to hiding spots (including abandoned cars), readable notes, and security-room monitors. **No inventory and no item pickup.**

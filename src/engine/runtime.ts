@@ -8,6 +8,9 @@ export interface PlayerStatus {
   /** Position in floor-plan meters (x east, y north). */
   x: number;
   y: number;
+  /** Flashlight charge, 0 to 1, and whether the light is on. */
+  charge: number;
+  flashlightOn: boolean;
 }
 
 export interface RuntimeOptions {
@@ -26,6 +29,11 @@ const RUN_SPEED = 7;
 const LOOK_SPEED = 0.0022;
 const PLAYER_RADIUS = 0.35;
 const COLLIDER_HEIGHT = 1.0; // the collision sphere sits at chest height, so railings (1.1 m) block too
+const FLASH_INTENSITY = 60;
+const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
+const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
+const FLASH_MIN_ON = 0.1; // can't switch on below this
+const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
 const FLOOR_HEIGHT = 5; // keep in sync with scripts/build-blockout.mts
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 
@@ -53,8 +61,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const params = new URLSearchParams(window.location.search);
   camera.fov = parseFloat(params.get("fov") ?? "") || camera.fov; // debug: ?fov=<vertical degrees>
 
-  scene.add(new THREE.AmbientLight(0x6070a0, 0.9));
-  const torch = new THREE.SpotLight(0xfff2d0, 60, 40, Math.PI / 5, 0.4);
+  const ambientLevel = parseFloat(params.get("ambient") ?? "");
+  scene.add(new THREE.AmbientLight(0x6070a0, Number.isFinite(ambientLevel) ? ambientLevel : 0.3)); // debug: ?ambient=<intensity>
+  const torch = new THREE.SpotLight(0xfff2d0, FLASH_INTENSITY, 40, Math.PI / 5, 0.4);
   torch.position.set(0, 0, 0);
   torch.target.position.set(0, 0, -1);
   camera.add(torch, torch.target);
@@ -92,6 +101,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
+    if (e.code === "KeyF" && !e.repeat) {
+      if (flashOn) flashOn = false;
+      else if (charge >= FLASH_MIN_ON) flashOn = true;
+    }
     const jump = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];
     if (jump !== undefined) {
       floor = jump;
@@ -161,6 +174,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   }
 
   let last = performance.now();
+  let charge = 1;
+  let flashOn = true;
   let frame = 0;
   let statusTimer = 0;
   const tick = () => {
@@ -180,13 +195,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       collide();
     }
 
+    charge = flashOn ? Math.max(0, charge - FLASH_DRAIN * dt) : Math.min(1, charge + FLASH_RECHARGE * dt);
+    if (charge === 0) flashOn = false;
+    torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
+
     camera.position.set(player.x, floor * FLOOR_HEIGHT + EYE_HEIGHT, player.z);
     camera.rotation.set(pitch, yaw, 0);
     renderer.render(scene, camera);
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
-      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z });
+      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn });
     }
   };
   tick();

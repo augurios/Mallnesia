@@ -39,3 +39,22 @@ body {
   color: #aaa;
   pointer-events: none;
 }
+
+.game-flashlight {
+  position: absolute;
+  left: 12px;
+  bottom: 14px;
+  width: 120px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+.game-flashlight-fill {
+  height: 100%;
+  background: #777;
+}
+
+.game-flashlight-fill.on {
+  background: #e8d9a0;
+}
