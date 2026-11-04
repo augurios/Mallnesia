@@ -234,3 +234,7 @@ Walking the blockout, the atriums felt too wide. A 12 m band, north to south, is
 ## Floor 3: halls open to the roof (decided by Augusto)
 
 On floor 3 the halls around the atriums have no dropped ceiling; they open up to the roof truss. In the blockout this covers the halls and the cross corridor inside x 45 to 84, y 45 to 165 (west hall, east hall, cross corridor, south hall, the part of the north hall in that range, the box office extension). The north hall keeps its low ceiling outside that range, so the ceiling steps up where it passes the atrium (accepted by Augusto). Floors 1 and 2 are unchanged.
+
+## Food court stairs moved (decided by Augusto)
+
+The wide curved stairs between floors 2 and 3 in the food court moved 10 m north (y 25 to 31, x 66 to 78 unchanged) and are rotated 180 degrees. Floor 1 keeps the walk-in kiosk where it was (y 15 to 21). The blockout stairs are a solid block, so the rotation has no visible effect yet; it applies when the stairs get a real model (which end is the top landing and which the foot is still to decide).

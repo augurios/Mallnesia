@@ -177,6 +177,7 @@ def floor_items(floor):
         if floor > 1 and i == "walkin_kiosk":
             l, k = "Wide curved stairs between floors 2 and 3 (replaces the kiosk)", "stairs"
             b = 78
+            c, d = 25, 31  # moved 10 m north (rotated 180 degrees: facing recorded in the notes)
         if floor > 1 and i.startswith("south_shop_"):
             if floor == 2:
                 l, k = "Kiosk", "kiosk"

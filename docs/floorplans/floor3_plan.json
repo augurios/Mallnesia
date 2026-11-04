@@ -593,8 +593,8 @@
    "label": "Wide curved stairs between floors 2 and 3 (replaces the kiosk)",
    "x0": 66,
    "x1": 78,
-   "y0": 15,
-   "y1": 21,
+   "y0": 25,
+   "y1": 31,
    "kind": "stairs"
   },
   {
