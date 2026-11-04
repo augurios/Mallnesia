@@ -95,7 +95,8 @@ INTERMITTENT = [
 
 # floor 1: street doors; floors 2 and 3: balcony doors
 DOORS_F1 = [
-    ("main_entrance", "Main entrance (stairs up from street)", 88, 10),
+    ("main_entrance_1", "Main entrance, folding glass door 1 (south-west of the kiosk)", 86.5, 7),
+    ("main_entrance_2", "Main entrance, folding glass door 2 (north-east of the kiosk)", 91.5, 13),
     ("side_exit", "Side exit (purple), end of the short hall") + UV(-9, 72),
     ("garage_open_1", "Parking-lot opening 1", 15, 162),
     ("garage_open_2", "Parking-lot opening 2", 15, 114),
@@ -169,7 +170,8 @@ def floor_items(floor):
             if floor > 1:
                 l = l.replace("West block", "Restaurant windows (west)").replace("East block", "Restaurant windows (east)")
         if floor > 1 and i == "walkin_kiosk":
-            l, k = "Stairs between floors 2 and 3 (replaces the kiosk)", "stairs"
+            l, k = "Wide curved stairs between floors 2 and 3 (replaces the kiosk)", "stairs"
+            b = 84
         if floor > 1 and i.startswith("south_shop_"):
             if floor == 2:
                 l, k = "Kiosk", "kiosk"
@@ -199,6 +201,13 @@ def floor_items(floor):
             items.append((i, l, ("poly", p), k))
     for i, l, a, b, c, d, k in INTERMITTENT:
         items.append((i, l, ("box", (a, b, c, d)), k))
+    # fixtures from the reference photos (see reference/photo_map.md)
+    items.append(("w2n_wood_kiosk", "Wood kiosk beside the W2 N elevator bank, facing the west hall", ("box", (33, 36, 147, 153)), "kiosk"))
+    if floor == 1:
+        items.append(("main_entrance_kiosk", "Kiosk between the two main entrance doors", ("box", (87.5, 90.5, 8.5, 11.5)), "kiosk"))
+        items.append(("bank", "Bank: first store east of the main entrance", ("box", (96, 108, 18, 27)), "shop"))
+    if floor == 2:
+        items.append(("atrium_b_bridge", "Arched bridge (cross corridor) over Atrium B, floor 2", ("box", (51, 90, 144, 147)), "hall"))
     if floor == 3:
         # the west hall widens over the north-west corner of Atrium B; the cinema box office is there
         items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 141, 153)), "hall"))
@@ -254,7 +263,7 @@ LABELS = {"atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cro
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
           "south_hall": "south hall", "south_shop_1": "shop", "south_shop_2": "shop", "south_shop_3": "shop",
           "east_hall": "east hall", "west_hall_inner": "west hall", "west_hall_outer": "west hall",
-          "hall_ew_garage": "garage hall", "cinema_food": "cinema food", "boxoffice": "", "boxoffice_floor": "",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
+          "hall_ew_garage": "garage hall", "cinema_food": "cinema food", "boxoffice": "", "w2n_wood_kiosk": "", "main_entrance_kiosk": "", "bank": "bank", "atrium_b_bridge": "", "boxoffice_floor": "",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
 VERTICAL = ("parking", "secret_hall", "east_hall", "west_hall_inner", "west_hall_outer", "west_2n", "west_2s")
 
 
@@ -299,7 +308,7 @@ def render(floor, items, doors):
             continue
         txt = LABELS.get(i)
         if i in ("east_side_south", "west_side_south"):
-            txt = "restaurants" if floor > 1 else "stores"
+            txt = "restaurants" if floor > 1 else ("" if i == "east_side_south" else "stores")
         if floor == 2 and i == "n_hall_up":
             txt = "narrow hall"
         if floor > 1 and i == "walkin_kiosk":

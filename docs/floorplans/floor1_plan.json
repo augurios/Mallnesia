@@ -603,14 +603,47 @@
    "y0": 105,
    "y1": 111,
    "kind": "intermittent"
+  },
+  {
+   "id": "w2n_wood_kiosk",
+   "label": "Wood kiosk beside the W2 N elevator bank, facing the west hall",
+   "x0": 33,
+   "x1": 36,
+   "y0": 147,
+   "y1": 153,
+   "kind": "kiosk"
+  },
+  {
+   "id": "main_entrance_kiosk",
+   "label": "Kiosk between the two main entrance doors",
+   "x0": 87.5,
+   "x1": 90.5,
+   "y0": 8.5,
+   "y1": 11.5,
+   "kind": "kiosk"
+  },
+  {
+   "id": "bank",
+   "label": "Bank: first store east of the main entrance",
+   "x0": 96,
+   "x1": 108,
+   "y0": 18,
+   "y1": 27,
+   "kind": "shop"
   }
  ],
  "openings": [
   {
-   "id": "main_entrance",
-   "label": "Main entrance (stairs up from street)",
-   "x": 88,
-   "y": 10
+   "id": "main_entrance_1",
+   "label": "Main entrance, folding glass door 1 (south-west of the kiosk)",
+   "x": 86.5,
+   "y": 7
+  },
+  {
+   "id": "main_entrance_2",
+   "label": "Main entrance, folding glass door 2 (north-east of the kiosk)",
+   "x": 91.5,
+   "y": 13
   },
   {
    "id": "side_exit",

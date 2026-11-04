@@ -178,3 +178,14 @@ The main building has 3 floors, not 4 (Augusto's correction). Floor 4 was remove
 ## Cinema box office (floor 3)
 
 On floor 3 the inner west hall extends east over the north-west corner of Atrium B (x 51 to 57, y 141 to 153), and the cinema box office is there: a 3 m deep counter (x 57 to 60, y 141 to 153) with its front facing west, toward the west hall. The size and exact position along the atrium edge are my choice; the stairs on the north hall (x 54 to 60, y 153 to 159) stay as they are, just north of it.
+
+## Changes from the reference photo pass
+
+Applied after the photo map (`reference/photo_map.md`), all agreed by Augusto:
+
+- **Floor 2 bridge:** a 3 m wide arched bridge (cross corridor) over Atrium B, east to west (x 51 to 90, y 144 to 147), linking the west and east halls. Floor 2 only. The position along Atrium B is my choice.
+- **Main entrance (floor 1):** two folding glass doors (at about x 86.5, y 7 and x 91.5, y 13) with a 3 m kiosk between them (x 87.5 to 90.5, y 8.5 to 11.5). Floors 2 and 3 keep the single balcony door.
+- **Bank (floor 1):** the first store east of the main entrance, the south end of the east block (x 96 to 108, y 18 to 27).
+- **W2 N elevator bank:** a wood kiosk (x 33 to 36, y 147 to 153) just south of the intermittent elevator, facing the west hall, on all floors.
+- **Food court stairs (floors 2 and 3):** widened to 12 m x 6 m (x 72 to 84) for the wide curved stair. The plan still draws it as a box; the curve is for the blockout.
+- **Atrium roof:** nothing in the plan; Atrium B is assumed to have a roof like Atrium A's.

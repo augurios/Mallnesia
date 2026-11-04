@@ -617,9 +617,9 @@
   },
   {
    "id": "walkin_kiosk",
-   "label": "Stairs between floors 2 and 3 (replaces the kiosk)",
+   "label": "Wide curved stairs between floors 2 and 3 (replaces the kiosk)",
    "x0": 72,
-   "x1": 81,
+   "x1": 84,
    "y0": 15,
    "y1": 21,
    "kind": "stairs"
@@ -677,6 +677,15 @@
    "y0": 105,
    "y1": 111,
    "kind": "intermittent"
+  },
+  {
+   "id": "w2n_wood_kiosk",
+   "label": "Wood kiosk beside the W2 N elevator bank, facing the west hall",
+   "x0": 33,
+   "x1": 36,
+   "y0": 147,
+   "y1": 153,
+   "kind": "kiosk"
   },
   {
    "id": "boxoffice_floor",
