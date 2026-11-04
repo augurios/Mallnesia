@@ -213,3 +213,7 @@ The routes and the 3 m width are my choices, within what Augusto picked. The hal
 - **Garage side:** just the strip as drawn, with openings in the wall, open to the dark. The real garage stays the separate procedural level.
 - **Windows:** glass walls where the plan has the real outline (main entrance, food court, balcony walls), with a flat dark backdrop outside. No skyline for now.
 - **Not asked, my defaults:** wall thickness about 0.3 m, stairs and escalators as simple ramps and steps, plain glass railings, flat materials taken from the photos.
+
+## Small open restaurant (floor 2)
+
+The floor 2 secret hallway used to end against a closed restaurant block. The south end of that block (x 45 to 57, y 1 to 7, 12 by 6 m) is now a **small open restaurant**: a walkable room with its east side open to the food court. It joins the secret hallway (west end, y 1 to 4) to the food court. The rest of the block (y 7 to 30) stays closed. Added by Augusto's request; size cut down at his request (first draft was 12 by 12 m).

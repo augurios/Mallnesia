@@ -591,12 +591,21 @@
   },
   {
    "id": "west_side_south",
-   "label": "Restaurant windows (west): the diagonal stores continue south along the lobby / food court",
+   "label": "Restaurant windows (west), north of the small open restaurant",
+   "x0": 45,
+   "x1": 57,
+   "y0": 7,
+   "y1": 30,
+   "kind": "restaurant"
+  },
+  {
+   "id": "secret_2_room",
+   "label": "Small open restaurant: walk-in room joining the secret hallway to the food court",
    "x0": 45,
    "x1": 57,
    "y0": 1,
-   "y1": 30,
-   "kind": "restaurant"
+   "y1": 7,
+   "kind": "restaurant_open"
   },
   {
    "id": "shop_n1_a",
@@ -800,7 +809,7 @@
   },
   {
    "id": "secret_door_restaurant",
-   "label": "Secret hallway door into the back of the west restaurants",
+   "label": "Secret hallway opening into the small open restaurant",
    "x": 45,
    "y": 2.5
   },

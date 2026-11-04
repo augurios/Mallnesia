@@ -24,7 +24,7 @@ type Box = { id: string; kind: string; x0: number; x1: number; y0: number; y1: n
 type Poly = { id: string; kind: string; points: [number, number][] };
 type Plan = { boxes: Box[]; polygons: Poly[] };
 
-const WALKABLE = new Set(["hall", "foodcourt", "balcony", "bath", "secret", "garage", "cinema_lobby"]);
+const WALKABLE = new Set(["hall", "foodcourt", "balcony", "bath", "secret", "garage", "cinema_lobby", "restaurant_open"]);
 const SOLID = new Set([
   "shop", "restaurant", "cinema", "kiosk", "elevator", "escalator", "intermittent", "machines", "stairs",
 ]);

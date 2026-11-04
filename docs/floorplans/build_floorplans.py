@@ -118,8 +118,8 @@ BALCONIES = [
 
 COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs": "#e0c8a0",
           "escalator": "#ffe680", "shop": "#dcdcdc", "bath": "#9be29b", "garage": "#c9c9d8",
-          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc"}
-WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony"}
+          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc", "restaurant_open": "#fbd9c8"}
+WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony", "restaurant_open"}
 
 
 def north_floor2(items):
@@ -177,8 +177,12 @@ def floor_items(floor):
                 l, k = "Kiosk", "kiosk"
             else:
                 l, k = "Candy / toy coin machines", "machines"
+        if floor == 2 and i == "west_side_south":
+            c = 7  # the south end of this block is the small open restaurant below
+            l = "Restaurant windows (west), north of the small open restaurant"
         items.append((i, l, ("box", (a, b, c, d)), k))
     if floor == 2:
+        items.append(("secret_2_room", "Small open restaurant: walk-in room joining the secret hallway to the food court", ("box", (45, 57, 1, 7)), "restaurant_open"))
         items = north_floor2(items)
     if floor == 3:
         items = north_cinema(items)
@@ -265,7 +269,7 @@ def check(items, R=0.5):
     return comps
 
 
-LABELS = {"atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cross-corridor", "parking": "garage side",
+LABELS = {"secret_2_room": "open rest.", "atrium_b": "Atrium B", "atrium_a": "Atrium A", "cross_corridor": "cross-corridor", "parking": "garage side",
           "secret_hall": "secret", "big_store": "big store", "west_2n": "W2 N", "west_2s": "W2 S", "west_n": "W1 N",
           "west_s": "W1 S", "hall_north": "north hall", "ne_block": "NE block", "top_left_block": "top-left block",
           "north_stores": "stores", "north_stores_w": "stores", "north_stores_e": "stores", "walkin_kiosk": "kiosk", 
@@ -366,7 +370,7 @@ def build(floor):
     if floor == 3:
         doors = doors + [("cinema_entrance_%d" % (n + 1), "Cinema %d entrance" % (n + 1), x, 171) for n, x in enumerate((57, 87))]
     if floor == 2:
-        doors = doors + [("secret_door_restaurant", "Secret hallway door into the back of the west restaurants", 45, 2.5)]
+        doors = doors + [("secret_door_restaurant", "Secret hallway opening into the small open restaurant", 45, 2.5)]
     if floor == 2:
         doors = doors + [("north_exit", "Possible exit at the north end of the narrow hall", 51, 201)]
     comps = check(items)
