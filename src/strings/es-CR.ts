@@ -5,4 +5,8 @@ export const es = {
   debugFloors: "1, 2, 3: saltar de piso (provisional)",
   floor: "Piso",
   flashlight: "Linterna",
+  paused: "Pausa",
+  resume: "Continuar",
+  quality: "Calidad gráfica",
+  qualityLevels: { low: "Baja", medium: "Media", high: "Alta" },
 } as const;

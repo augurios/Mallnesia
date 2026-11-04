@@ -2,19 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createRuntime, type PlayerStatus, type Runtime } from "@/engine/runtime";
+import { QUALITY_LEVELS, type QualityLevel } from "@/engine/quality";
 import { es } from "@/strings/es-CR";
 
 export default function GameCanvas() {
   const rootRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<Runtime | null>(null);
   const [locked, setLocked] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [quality, setQuality] = useState<QualityLevel>("high");
   const [status, setStatus] = useState<PlayerStatus | null>(null);
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    const runtime = createRuntime(root, { onLockChange: setLocked, onStatus: setStatus });
+    const runtime = createRuntime(root, {
+      onLockChange: (isLocked) => {
+        setLocked(isLocked);
+        if (isLocked) setStarted(true);
+      },
+      onStatus: setStatus,
+    });
     runtimeRef.current = runtime;
+    setQuality(runtime.getQuality());
     return () => {
       runtime.dispose();
       runtimeRef.current = null;
@@ -39,9 +49,24 @@ export default function GameCanvas() {
       {!locked && (
         <div className="game-hint" onClick={() => runtimeRef.current?.requestLock()}>
           <div>
-            <h1>{es.clickToPlay}</h1>
-            <p>{es.controls}</p>
-            <p>{es.debugFloors}</p>
+            <h1>{started ? es.paused : es.clickToPlay}</h1>
+            <p>{started ? es.resume : es.controls}</p>
+            {!started && <p>{es.debugFloors}</p>}
+            <div className="game-quality" onClick={(e) => e.stopPropagation()}>
+              <span>{es.quality}</span>
+              {QUALITY_LEVELS.map((level) => (
+                <button
+                  key={level}
+                  className={level === quality ? "on" : undefined}
+                  onClick={() => {
+                    runtimeRef.current?.setQuality(level);
+                    setQuality(level);
+                  }}
+                >
+                  {es.qualityLevels[level]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

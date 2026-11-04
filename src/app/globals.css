@@ -31,6 +31,29 @@ body {
   cursor: pointer;
 }
 
+.game-quality {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 24px;
+  cursor: default;
+}
+
+.game-quality button {
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #555;
+  padding: 4px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.game-quality button.on {
+  color: #fff;
+  border-color: #e8d9a0;
+}
+
 .game-status {
   position: absolute;
   top: 8px;

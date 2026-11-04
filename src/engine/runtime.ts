@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { MeshBVH } from "three-mesh-bvh";
+import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 
 export interface PlayerStatus {
   floor: number;
@@ -20,6 +21,9 @@ export interface RuntimeOptions {
 
 export interface Runtime {
   requestLock(): void;
+  getQuality(): QualityLevel;
+  /** Applies a preset right away and remembers it for next time. */
+  setQuality(level: QualityLevel): void;
   dispose(): void;
 }
 
@@ -48,7 +52,6 @@ const SPAWNS: { x: number; y: number }[] = [
 /** First-person walk through the mall blockout: pointer-lock look, WASD, BVH wall collision. No React in here. */
 export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): Runtime {
   const renderer = new THREE.WebGLRenderer({ antialias: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   root.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -59,6 +62,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   camera.rotation.order = "YXZ";
 
   const params = new URLSearchParams(window.location.search);
+  const urlQuality = params.get("quality"); // debug: ?quality=low|medium|high (not saved)
   camera.fov = parseFloat(params.get("fov") ?? "") || camera.fov; // debug: ?fov=<vertical degrees>
 
   const ambientLevel = parseFloat(params.get("ambient") ?? "");
@@ -68,6 +72,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   torch.target.position.set(0, 0, -1);
   camera.add(torch, torch.target);
   scene.add(camera);
+
+  let quality: QualityLevel = isQualityLevel(urlQuality) ? urlQuality : loadQuality();
+  const applyQuality = () => {
+    const preset = QUALITY_PRESETS[quality];
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.maxPixelRatio));
+    (scene.fog as THREE.Fog).far = preset.fogFar;
+    torch.distance = preset.torchDistance;
+    resize();
+  };
 
   // Player state. Plan y is north, so the three.js z axis is -y.
   const num = (key: string, fallback: number) => {
@@ -135,7 +148,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   window.addEventListener("resize", resize);
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("pointerlockchange", onLockChange);
-  resize();
+  applyQuality();
 
   const sphere = new THREE.Sphere();
   const closest = new THREE.Vector3();
@@ -181,7 +194,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const tick = () => {
     frame = requestAnimationFrame(tick);
     const now = performance.now();
-    const dt = Math.min((now - last) / 1000, 0.1);
+    const dt = locked ? Math.min((now - last) / 1000, 0.1) : 0; // paused while the pointer is free
     last = now;
 
     const forward = (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0);
@@ -213,6 +226,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   return {
     requestLock() {
       renderer.domElement.requestPointerLock();
+    },
+    getQuality: () => quality,
+    setQuality(level) {
+      quality = level;
+      saveQuality(level);
+      applyQuality();
     },
     dispose() {
       cancelAnimationFrame(frame);
