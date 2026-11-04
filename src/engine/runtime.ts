@@ -141,10 +141,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         intersectsTriangle: (tri) => {
           tri.closestPointToPoint(sphere.center, closest);
           push.subVectors(sphere.center, closest);
+          // Ignore geometry on other floors: it must be within reach in 3D, not just horizontally.
+          const dy = push.y;
+          if (Math.abs(dy) >= PLAYER_RADIUS) return false;
           push.y = 0;
           const dist = push.length();
-          if (dist >= PLAYER_RADIUS || dist < 1e-6) return false;
-          push.multiplyScalar((PLAYER_RADIUS - dist) / dist);
+          const reach = Math.sqrt(PLAYER_RADIUS * PLAYER_RADIUS - dy * dy);
+          if (dist >= reach || dist < 1e-6) return false;
+          push.multiplyScalar((reach - dist) / dist);
           sphere.center.add(push);
           player.x = sphere.center.x;
           player.z = sphere.center.z;
