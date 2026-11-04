@@ -60,5 +60,5 @@ Where each reference photo was taken, as confirmed by Augusto (the "same frame" 
 - **Main entrance:** the real entrance has two folding glass doors with a kiosk between them; the plan has one main-entrance door on floor 1.
 - **Bank at the lobby's east side:** the first store east of the main entrance is a bank, per the entrance photos.
 - **Elevator hall in W2 N:** the photos show a real elevator bank with a wood kiosk beside it in the W2 N corner; the plan has it as an intermittent elevator.
-- **Atrium roof:** only Atrium A's roof was confirmed; assume Atrium B's is similar until told otherwise.
+- **Atrium roof:** Atrium B has the same truss roof as Atrium A (confirmed).
 - **Food court stairs:** the photo shows a wide curved stair with black strips, not a simple box.

@@ -183,9 +183,10 @@ On floor 3 the inner west hall extends east over the north-west corner of Atrium
 
 Applied after the photo map (`reference/photo_map.md`), all agreed by Augusto:
 
-- **Floor 2 bridge:** a 3 m wide arched bridge (cross corridor) over Atrium B, east to west (x 51 to 90, y 144 to 147), linking the west and east halls. Floor 2 only. The position along Atrium B is my choice.
+- **Floor 2 bridge:** a 3 m wide arched bridge (cross corridor) over Atrium B, east to west (x 51 to 90, y 135 to 138, the middle of Atrium B), linking the west and east halls. Floor 2 only. Position confirmed by Augusto.
 - **Main entrance (floor 1):** two folding glass doors (at about x 86.5, y 7 and x 91.5, y 13) with a 3 m kiosk between them (x 87.5 to 90.5, y 8.5 to 11.5). Floors 2 and 3 keep the single balcony door.
 - **Bank (floor 1):** the first store east of the main entrance, the south end of the east block (x 96 to 108, y 18 to 27).
 - **W2 N elevator bank:** a wood kiosk (x 33 to 36, y 147 to 153) just south of the intermittent elevator, facing the west hall, on all floors.
 - **Food court stairs (floors 2 and 3):** widened to 12 m x 6 m (x 72 to 84) for the wide curved stair. The plan still draws it as a box; the curve is for the blockout.
-- **Atrium roof:** nothing in the plan; Atrium B is assumed to have a roof like Atrium A's.
+- **Atrium roof:** nothing in the plan; Atrium B has the same truss roof as Atrium A (confirmed).
+- **Confirmed as drawn:** the two entrance doors either side of the kiosk along the diagonal wall, and the bank at the south end of the east block.

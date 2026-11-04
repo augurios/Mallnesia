@@ -207,7 +207,7 @@ def floor_items(floor):
         items.append(("main_entrance_kiosk", "Kiosk between the two main entrance doors", ("box", (87.5, 90.5, 8.5, 11.5)), "kiosk"))
         items.append(("bank", "Bank: first store east of the main entrance", ("box", (96, 108, 18, 27)), "shop"))
     if floor == 2:
-        items.append(("atrium_b_bridge", "Arched bridge (cross corridor) over Atrium B, floor 2", ("box", (51, 90, 144, 147)), "hall"))
+        items.append(("atrium_b_bridge", "Arched bridge (cross corridor) over Atrium B, floor 2", ("box", (51, 90, 135, 138)), "hall"))
     if floor == 3:
         # the west hall widens over the north-west corner of Atrium B; the cinema box office is there
         items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 141, 153)), "hall"))
