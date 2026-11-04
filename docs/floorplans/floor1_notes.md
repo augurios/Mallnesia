@@ -200,3 +200,16 @@ The secret hallway (3 m wide) is in a different place on each floor (decided by 
 - **Floor 3:** from the NW bathrooms up through the top-left block (x 15 to 18, y 174 to 201), east behind the cinema (x 18 to 123, y 198 to 201, carved from the north stores and the back of the cinemas), then down the east side (x 120 to 123, y 150 to 198) to the east wall of the NE bathrooms, through the store at the end of the north hall. Starting point is the NW bathrooms, not a new west bathroom.
 
 The routes and the 3 m width are my choices, within what Augusto picked. The hall carves 3 m off the back of the cinemas on floor 3.
+
+## Blockout parameters (decided by Augusto)
+
+- **Floor-to-floor height:** 5 m (floors 1 to 2 and 2 to 3).
+- **Hall ceiling height:** 3.5 m (dropped ceiling).
+- **Atrium height:** about 20 m from the floor 1 slab to the top of the truss roof (3 floors of 5 m, plus about 5 m of truss).
+- **Floor 1 level:** no level difference to model. The player never goes outside, so the entrance, the garage openings and floor 1 are all treated as one level.
+- **Stores and restaurants:** closed shut, not walkable (after hours). Shells with solid or glass fronts.
+- **Bathrooms:** walkable rooms.
+- **Bathroom doors:** on the hall each bathroom faces (NW and NE on the north hall, SE on the short hall spur); I pick the exact spot.
+- **Garage side:** just the strip as drawn, with openings in the wall, open to the dark. The real garage stays the separate procedural level.
+- **Windows:** glass walls where the plan has the real outline (main entrance, food court, balcony walls), with a flat dark backdrop outside. No skyline for now.
+- **Not asked, my defaults:** wall thickness about 0.3 m, stairs and escalators as simple ramps and steps, plain glass railings, flat materials taken from the photos.
