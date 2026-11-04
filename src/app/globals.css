@@ -30,3 +30,12 @@ body {
   background: rgba(0, 0, 0, 0.6);
   cursor: pointer;
 }
+
+.game-status {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 13px;
+  color: #aaa;
+  pointer-events: none;
+}

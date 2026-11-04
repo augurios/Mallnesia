@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "blockout": "node scripts/build-blockout.mts"
   },
   "dependencies": {
     "next": "16.4.5",
@@ -16,6 +17,7 @@
     "three-mesh-bvh": "^0.9.18"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
