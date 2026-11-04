@@ -12,7 +12,7 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
 - **Time of day (decided):** **night**, mall closed, lights mostly off. Very little light, mostly coming from outside (street, sky glow through glass and roof), plus tiny standby lights and a few deliberately placed stuck-on fixtures. Dark tones. The reference photos were taken during the day with the mall open and lit, so they show materials and layout, not in-game lighting.
 - **In-game name:** a lightly fictionalized name that locals will recognize as Mall San Pedro (final name undecided). Do not use the real name in game content until Augusto decides otherwise, since the game links a real, operating business to crimes and hauntings.
 
-- **Release:** free, on the web (itch.io or similar).
+- **Release:** free, on the web (itch.io or similar), as a **static export** (plain files, no server).
 - **Platforms:** desktop browsers first; mobile touch support where practical.
 - **Owner:** Augusto. He makes all creative decisions; propose, don't decide.
 
@@ -24,7 +24,7 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
     - Legend 9 (gray corridors): no keys or access cards; the mall opens sections itself.
     - Legend 16 (fifth floor): the weapons cache is a scene to look at, not an item to take.
     - Legend 17 (laughing-drug photo): examined where it lies, not picked up. Not yet redesigned (Later).
-- `docs/base-project-claude.md` — the original CLAUDE.md from the base project (commands, code conventions, module notes). Keep following its technical conventions unless this file overrides them.
+- `docs/engine-architecture.md` — the engine module map (Next.js + TypeScript, plain Three.js). The original base project's CLAUDE.md is not in this repo.
 
 ## Central premise
 
@@ -34,15 +34,15 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 
 ## Tech stack and base project
 
-- **Base:** [dirien/backrooms](https://github.com/dirien/backrooms) — Three.js + Vite browser horror game. Chosen after testing three candidates for stability and code quality.
-- **Planned additions:** levels modeled in Blender and loaded as glTF/GLB; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
+- **Base (decided):** a **Next.js (App Router) + TypeScript** project, exported statically (`output: 'export'`). The 3D engine is **plain Three.js** in framework-free TypeScript (`src/engine/`); React/Next handles only menu, HUD, pause and settings. [dirien/backrooms](https://github.com/dirien/backrooms) (Three.js + Vite) is a **reference for architecture only**. It has no license, so we do not copy its code; we rebuild the ideas in our own code.
+- **Planned additions:** the mall as a blockout GLB generated from the floor-plan JSON by a Node script (no Blender installed), later hand-modeled; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
 
-### Module plan (relative to the base project)
+### Module plan (relative to the backrooms reference)
 
 | Action | Modules |
 |---|---|
-| Keep | Sanity system and effects, audio pipeline (`audio.js`), input and mobile controls (`input.js`), HUD, quality presets, shaders and fade transitions, lint and profiling setup |
-| Adapt | `world.js` → parking-garage chunk generator. `entity.js` → the shadow, the girl in white, the watchers. `levels.js` → mall areas plus the garage as its own level |
+| Keep (rebuilt in TypeScript) | Sanity system and effects, audio pipeline (`audio.ts`), input and mobile controls (`input.ts`), HUD, quality presets, shaders and fade transitions, lint setup |
+| Adapt | chunk streaming (`world.js` in the reference) → parking-garage chunk generator. `entity.js` → the shadow, the girl in white, the watchers. `levels.js` → mall areas plus the garage as its own level |
 | Add | Hand-built mall from GLB, mesh collision, self-moving doors (driven by the mall), physics props for night-noise events, hiding spots, readable notes, flashlight with limited charge, stealth and detection (noise, light, line of sight), the guard NPC, security camera room, win and fail states, save/load |
 
 ## Game mechanics
