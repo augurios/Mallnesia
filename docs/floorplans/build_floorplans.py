@@ -7,7 +7,7 @@ floors 2 and 3 replace it with a food court (restaurant windows instead of store
 the sides, balconies instead of the main doors and street access).
 
 Meters, x east, y north, origin = south-west corner of the real building footprint
-(footprint_osm.json). Every box edge is a multiple of 3 m, except the 5 m shop passage,
+(footprint_osm.json). Every box edge is a multiple of 3 m, except the atrium tower split (x 64.5),
 the 45-degree south-west diagonal hall and the lobby / food court outline.
 """
 import json
@@ -18,21 +18,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # id, label, x0, x1, y0, y1, kind
 BOXES = [
-    ("atrium_b", "Atrium B (open void)", 51, 90, 123, 159, "void"),
-    ("cross_corridor", "Cross-corridor", 51, 90, 111, 123, "hall"),
-    ("atrium_a", "Atrium A (open void)", 51, 90, 51, 111, "void"),
-    ("south_hall", "South hall (below Atrium A)", 45, 90, 45, 51, "hall"),
+    ("atrium_b", "Atrium B (open void)", 51, 78, 123, 159, "void"),
+    ("cross_corridor", "Cross-corridor", 51, 78, 111, 123, "hall"),
+    ("atrium_a", "Atrium A (open void)", 51, 78, 51, 111, "void"),
+    ("south_hall", "South hall (below Atrium A)", 45, 78, 45, 51, "hall"),
     ("south_shop_1", "Shop (west, aligned with the Atrium A stairs and the atrium's west side)", 51, 60, 36, 45, "shop"),
-    ("south_shop_2", "Shop", 66, 76, 36, 45, "shop"),
-    ("south_pass_1", "Passage between the west shop and the middle shop", 60, 66, 36, 45, "hall"),
-    ("south_pass_2", "Passage between the middle and east shops (5 m)", 76, 81, 36, 45, "hall"),
-    ("south_shop_3", "Shop", 81, 90, 36, 45, "shop"),
-    ("b_elevators", "Elevator pair (B, NE), on the north hall", 78, 87, 153, 159, "elevator"),
-    ("b_stairs", "Stairs (B, NW), on the north hall", 54, 60, 153, 159, "stairs"),
-    ("b_center_stair", "Center curved stair (B, S), on the cross-corridor", 63, 72, 123, 132, "stairs"),
-    ("a_escalators", "Escalators up/down, full width from the west hall to the east hall", 51, 90, 105, 111, "escalator"),
-    ("a_stairs", "Stairs (A, SW), on the south hall, aligned with the west shop", 51, 60, 51, 57, "stairs"),
-    ("a_elevators", "Elevator pair (A, SE), on the south hall", 78, 87, 51, 57, "elevator"),
+    ("south_pass_1", "Passage between the west and east shops (9 m; the middle shop went in the v3 cut)", 60, 69, 36, 45, "hall"),
+    ("south_shop_3", "Shop (east)", 69, 78, 36, 45, "shop"),
+    ("b_elevators", "Elevator pair (B, north tower, east half), on the north hall", 64.5, 78, 153, 159, "elevator"),
+    ("b_stairs", "Stairs (B, north tower, west half), on the north hall", 51, 64.5, 153, 159, "stairs"),
+    ("b_center_stair", "Center curved stair (B, S), on the cross-corridor", 60, 69, 123, 132, "stairs"),
+    ("a_escalators", "Escalators up/down, full width from the west hall to the east hall", 51, 78, 105, 111, "escalator"),
+    ("a_stairs", "Stairs (A, south tower, west half), on the south hall", 51, 64.5, 51, 57, "stairs"),
+    ("a_elevators", "Elevator pair (A, south tower, east half), on the south hall", 64.5, 78, 51, 57, "elevator"),
     # west side, west to east
     ("parking", "Parking lot / garage side", 3, 15, 84, 183, "garage"),
     ("west_n", "W1 stores north", 15, 27, 117, 159, "shop"),
@@ -41,33 +39,33 @@ BOXES = [
     ("west_2n", "W2 stores north", 33, 45, 117, 159, "shop"),
     ("west_hall_inner", "West hall (next to the atriums), runs down to the lobby / food court", 45, 51, 30, 159, "hall"),
     # east side
-    ("east_hall", "East hall", 90, 96, 36, 165, "hall"),
-    ("east_stores", "East stores (north of the short hall, up to the north hall)", 96, 108, 39, 159, "shop"),
-    ("east_side_south", "East block south of the short hall (continues along the lobby / food court)", 96, 108, 18, 33, "side"),
-    ("east_spur", "Short hall east to the SE bathrooms", 96, 108, 33, 39, "hall"),
-    ("se_bath", "Bathrooms (SE)", 108, 120, 30, 45, "bath"),
-    ("secret_hall", "Secret hallway (game): SE bathrooms to NE bathrooms", 108, 111, 45, 147, "secret"),
-    ("ne_bath", "Bathrooms (NE), door on the north hall", 108, 120, 147, 159, "bath"),
+    ("east_hall", "East hall", 78, 84, 36, 165, "hall"),
+    ("east_stores", "East stores (north of the short hall, up to the north hall)", 84, 96, 39, 159, "shop"),
+    ("east_side_south", "East block south of the short hall (continues along the lobby / food court)", 84, 96, 18, 33, "side"),
+    ("east_spur", "Short hall east to the SE bathrooms", 84, 96, 33, 39, "hall"),
+    ("se_bath", "Bathrooms (SE)", 96, 108, 30, 45, "bath"),
+    ("secret_hall", "Secret hallway (game): SE bathrooms to NE bathrooms", 96, 99, 45, 147, "secret"),
+    ("ne_bath", "Bathrooms (NE), door on the north hall", 96, 108, 147, 159, "bath"),
     # north
-    ("hall_north", "North hall (ends at a store wall)", 15, 120, 159, 165, "hall"),
+    ("hall_north", "North hall (ends at a store wall)", 15, 108, 159, 165, "hall"),
     ("top_left_block", "Top-left block", 15, 48, 165, 183, "shop"),
     ("nw_bath", "Bathrooms (NW)", 15, 27, 165, 174, "bath"),
     ("nw_stairs", "Stairs (NW)", 27, 36, 165, 174, "stairs"),
     ("n_hall_up", "Wide hall north", 48, 66, 165, 189, "hall"),
-    ("big_store", "Big store", 66, 90, 165, 183, "shop"),
-    ("n_hall_behind", "Hall behind the big store", 48, 96, 183, 189, "hall"),
-    ("north_stores", "Store block along the outer (north) side of the hall behind the wide hall and big store", 48, 96, 189, 201, "shop"),
+    ("big_store", "Big store", 66, 78, 165, 183, "shop"),
+    ("n_hall_behind", "Hall behind the big store", 48, 84, 183, 189, "hall"),
+    ("north_stores", "Store block along the outer (north) side of the hall behind the wide hall and big store", 48, 84, 189, 201, "shop"),
     ("north_stores_w", "North stores, west end (wraps around the hall end)", 36, 48, 183, 201, "shop"),
-    ("north_stores_e", "North stores, east end (wraps around the hall end)", 96, 108, 183, 201, "shop"),
-    ("n_hall_down", "Hall down beside the NE block", 90, 96, 165, 189, "hall"),
-    ("ne_block", "NE store block", 96, 114, 165, 183, "shop"),
-    ("ne_end_store", "Store closing the north hall", 120, 132, 153, 171, "shop"),
+    ("north_stores_e", "North stores, east end (wraps around the hall end)", 84, 96, 183, 201, "shop"),
+    ("n_hall_down", "Hall down beside the NE block", 78, 84, 165, 189, "hall"),
+    ("ne_block", "NE store block", 84, 102, 165, 183, "shop"),
+    ("ne_end_store", "Store closing the north hall", 108, 120, 153, 171, "shop"),
     # south
-    ("walkin_kiosk", "Walk-in kiosk (island in the lobby / food court)", 72, 81, 15, 21, "shop"),
+    ("walkin_kiosk", "Walk-in kiosk (island in the lobby / food court)", 66, 75, 15, 21, "shop"),
     ("west_side_south", "West block: the diagonal stores continue south along the lobby / food court", 45, 57, 1, 30, "side"),
 ]
 
-SOUTH_AREA = [(57, 1), (72, 0), (84, 4), (94, 16), (96, 18), (96, 36), (51, 36), (51, 30), (57, 30)]
+SOUTH_AREA = [(57, 1), (66, 0.5), (72, 4), (82, 16), (84, 18), (84, 36), (51, 36), (51, 30), (57, 30)]
 
 
 def UV(u, v):
@@ -95,14 +93,14 @@ INTERMITTENT = [
 
 # floor 1: street doors; floors 2 and 3: balcony doors
 DOORS_F1 = [
-    ("main_entrance_1", "Main entrance, folding glass door 1 (south-west of the kiosk)", 86.5, 7),
-    ("main_entrance_2", "Main entrance, folding glass door 2 (north-east of the kiosk)", 91.5, 13),
+    ("main_entrance_1", "Main entrance, folding glass door 1 (south-west of the kiosk)", 74.5, 7),
+    ("main_entrance_2", "Main entrance, folding glass door 2 (north-east of the kiosk)", 79.5, 13),
     ("side_exit", "Side exit (purple), end of the short hall") + UV(-9, 72),
     ("garage_open_1", "Parking-lot opening 1", 15, 162),
     ("garage_open_2", "Parking-lot opening 2", 15, 114),
 ]
 DOORS_UP = [
-    ("balcony_door_main", "Balcony door (where the main entrance is on floor 1)", 88, 10),
+    ("balcony_door_main", "Balcony door (where the main entrance is on floor 1)", 76, 10),
     ("garage_open_1", "Garage connection 1", 15, 162),
     ("garage_open_2", "Garage connection 2", 15, 114),
 ]
@@ -111,7 +109,7 @@ DOORS_UP = [
 # and a small one at the end of the short hall
 BALCONIES = [
     ("balcony_south", "Balcony along the south and south-east wall",
-     [(57, -3), (72, -4), (85, 0), (97.1, 13.4), (94, 16), (84, 4), (72, 0), (57, 1)], "balcony"),
+     [(57, -3), (66, -3.6), (73, 0), (85.1, 13.4), (82, 16), (72, 4), (66, 0.5), (57, 1)], "balcony"),
     ("balcony_side", "Small balcony at the end of the short hall",
      [UV(-13, 72), UV(-5, 72), UV(-5, 66), UV(-13, 66)], "balcony"),
 ]
@@ -123,8 +121,8 @@ WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcou
 
 
 def north_floor2(items):
-    """Floor 2 north end: a narrow (6 m) hall runs all the way north to a possible exit, and four square shops
-    separated by passages replace the big store."""
+    """Floor 2 north end: a narrow (6 m) hall runs all the way north to a possible exit, and six square shops
+    (two rows of three) separated by passages replace the big store."""
     out = []
     for it in items:
         i = it[0]
@@ -133,18 +131,18 @@ def north_floor2(items):
         if i == "n_hall_up":
             it = (i, "Narrow hall north (6 m), runs to a possible exit at the north end", ("box", (48, 54, 165, 201)), "hall")
         elif i == "north_stores":
-            it = (i, "North stores (the narrow hall cuts through the west end)", ("box", (54, 96, 189, 201)), "shop")
+            it = (i, "North stores (the narrow hall cuts through the west end)", ("box", (54, 84, 189, 201)), "shop")
         out.append(it)
-    # two rows of 6 m x 6 m square shops on the 3 m grid, 3 m between the rows, 4 m passages between columns
-    # (4 x 6 + 3 x 4 = 36 m); the 3 m left behind the back row joins the hall behind
-    for n in range(4):
-        x0 = 54 + n * 10
+    # two rows of 6 m x 6 m square shops on the 3 m grid, 3 m between the rows, 3 m passages between columns
+    # (3 x 6 + 2 x 3 = 24 m, one column went in the v3 cut); the 3 m left behind the back row joins the hall behind
+    for n in range(3):
+        x0 = 54 + n * 9
         out.append(("shop_n%d_a" % (n + 1), "Shop %dA (floor 2, 6 m square, front row)" % (n + 1), ("box", (x0, x0 + 6, 165, 171)), "shop"))
         out.append(("shop_n%d_b" % (n + 1), "Shop %dB (floor 2, 6 m square, back row)" % (n + 1), ("box", (x0, x0 + 6, 174, 180)), "shop"))
-    for x0 in (60, 70, 80):
-        out.append(("passage_n_%d" % x0, "4 m passage between shop columns", ("box", (x0, x0 + 4, 165, 183)), "hall"))
-    out.append(("gap_n", "3 m gap between the shop rows", ("box", (54, 90, 171, 174)), "hall"))
-    out.append(("strip_n", "3 m strip behind the back row (joins the hall behind)", ("box", (54, 90, 180, 183)), "hall"))
+    for x0 in (60, 69):
+        out.append(("passage_n_%d" % x0, "3 m passage between shop columns", ("box", (x0, x0 + 3, 165, 183)), "hall"))
+    out.append(("gap_n", "3 m gap between the shop rows", ("box", (54, 78, 171, 174)), "hall"))
+    out.append(("strip_n", "3 m strip behind the back row (joins the hall behind)", ("box", (54, 78, 180, 183)), "hall"))
     return out
 
 
@@ -152,11 +150,18 @@ def north_cinema(items):
     """Floor 3, north part (east of the top-left block up to the NE block): a cinema food station in the
     middle with two wide cinemas on its sides, which also run behind it."""
     drop = {"n_hall_up", "big_store", "n_hall_behind", "north_stores", "n_hall_down"}
-    out = [it for it in items if it[0] not in drop]
-    out.append(("cinema_lobby", "Cinema concourse (in front of the stores, the food station and the cinema entrances)", ("box", (48, 96, 165, 171)), "cinema_lobby"))
-    out.append(("cinema_food", "Cinema food stand (middle, wide counter faces the concourse)", ("box", (60, 84, 171, 189)), "kiosk"))
-    out.append(("cinema_1", "Cinema 1 (west of the food stand, and behind it)", ("poly", [(48, 171), (60, 171), (60, 189), (72, 189), (72, 201), (48, 201)]), "cinema"))
-    out.append(("cinema_2", "Cinema 2 (east of the food stand, and behind it)", ("poly", [(96, 171), (84, 171), (84, 189), (72, 189), (72, 201), (96, 201)]), "cinema"))
+    # v3 cut: the cinema keeps its 48 m and moves 6 m west; the blocks on each side lose 6 m
+    side = {
+        "top_left_block": ("box", (15, 42, 165, 183)),
+        "north_stores_w": ("box", (36, 42, 183, 201)),
+        "north_stores_e": ("box", (90, 96, 183, 201)),
+        "ne_block": ("box", (90, 102, 165, 183)),
+    }
+    out = [(i, l, side.get(i, s), k) for i, l, s, k in items if i not in drop]
+    out.append(("cinema_lobby", "Cinema concourse (in front of the stores, the food station and the cinema entrances)", ("box", (42, 90, 165, 171)), "cinema_lobby"))
+    out.append(("cinema_food", "Cinema food stand (middle, wide counter faces the concourse)", ("box", (54, 78, 171, 189)), "kiosk"))
+    out.append(("cinema_1", "Cinema 1 (west of the food stand, and behind it)", ("poly", [(42, 171), (54, 171), (54, 189), (66, 189), (66, 201), (42, 201)]), "cinema"))
+    out.append(("cinema_2", "Cinema 2 (east of the food stand, and behind it)", ("poly", [(90, 171), (78, 171), (78, 189), (66, 189), (66, 201), (90, 201)]), "cinema"))
     return out
 
 
@@ -171,7 +176,7 @@ def floor_items(floor):
                 l = l.replace("West block", "Restaurant windows (west)").replace("East block", "Restaurant windows (east)")
         if floor > 1 and i == "walkin_kiosk":
             l, k = "Wide curved stairs between floors 2 and 3 (replaces the kiosk)", "stairs"
-            b = 84
+            b = 78
         if floor > 1 and i.startswith("south_shop_"):
             if floor == 2:
                 l, k = "Kiosk", "kiosk"
@@ -213,15 +218,15 @@ def floor_items(floor):
             items.append(("secret_2_west", "Secret hallway (floor 2): ...north along the garage side to the NW bathrooms", ("box", (12, 15, 4, 174)), "secret"))
         else:
             items.append(("secret_3_nw", "Secret hallway (floor 3): from the NW bathrooms, up through the top-left block", ("box", (15, 18, 174, 201)), "secret"))
-            items.append(("secret_3_north", "Secret hallway (floor 3): east behind the cinema", ("box", (18, 123, 198, 201)), "secret"))
-            items.append(("secret_3_east", "Secret hallway (floor 3): down the east side to the NE bathrooms", ("box", (120, 123, 150, 198)), "secret"))
+            items.append(("secret_3_north", "Secret hallway (floor 3): east behind the cinema", ("box", (18, 111, 198, 201)), "secret"))
+            items.append(("secret_3_east", "Secret hallway (floor 3): down the east side to the NE bathrooms", ("box", (108, 111, 150, 198)), "secret"))
     # fixtures from the reference photos (see reference/photo_map.md)
     items.append(("w2n_wood_kiosk", "Wood kiosk beside the W2 N elevator bank, facing the west hall", ("box", (33, 36, 147, 153)), "kiosk"))
     if floor == 1:
-        items.append(("main_entrance_kiosk", "Kiosk between the two main entrance doors", ("box", (87.5, 90.5, 8.5, 11.5)), "kiosk"))
-        items.append(("bank", "Bank: first store east of the main entrance", ("box", (96, 108, 18, 27)), "shop"))
+        items.append(("main_entrance_kiosk", "Kiosk between the two main entrance doors", ("box", (75.5, 78.5, 8.5, 11.5)), "kiosk"))
+        items.append(("bank", "Bank: first store east of the main entrance", ("box", (84, 96, 18, 27)), "shop"))
     if floor == 2:
-        items.append(("atrium_b_bridge", "Arched bridge (cross corridor) over Atrium B, floor 2", ("box", (51, 90, 135, 138)), "hall"))
+        items.append(("atrium_b_bridge", "Arched bridge (cross corridor) over Atrium B, floor 2", ("box", (51, 78, 135, 138)), "hall"))
     if floor == 3:
         # the west hall widens over the north-west corner of Atrium B; the cinema box office is there
         items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 141, 153)), "hall"))
@@ -275,7 +280,7 @@ LABELS = {"secret_2_room": "open rest.", "atrium_b": "Atrium B", "atrium_a": "At
           "north_stores": "stores", "north_stores_w": "stores", "north_stores_e": "stores", "walkin_kiosk": "kiosk", 
           "nw_bath": "bath", "ne_bath": "bath", "se_bath": "bath", "b_center_stair": "center stair",
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
-          "south_hall": "south hall", "south_shop_1": "shop", "south_shop_2": "shop", "south_shop_3": "shop",
+          "south_hall": "south hall", "south_shop_1": "shop", "south_shop_3": "shop",
           "east_hall": "east hall", "west_hall_inner": "west hall", "west_hall_outer": "west hall",
           "hall_ew_garage": "garage hall", "cinema_food": "cinema food", "boxoffice": "", "w2n_wood_kiosk": "", "main_entrance_kiosk": "", "bank": "bank", "atrium_b_bridge": "", "boxoffice_floor": "",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
 VERTICAL = ("parking", "secret_hall", "east_hall", "west_hall_inner", "west_hall_outer", "west_2n", "west_2s")
@@ -343,13 +348,13 @@ def render(floor, items, doors):
             x, y = T((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2 + 8)
             rot_text({"west_s": "W1 S", "west_2s": "W2 S"}[i], x, y)
         if i == "balcony_south":
-            px, py = T(76, -1)
+            px, py = T(66, -1)
             dr.text((px - 20, py - 4), "balcony", fill="black", font=f)
-    dr.text(T(66, 28), "entrance lobby" if floor == 1 else "food court", fill="black", font=f)
+    dr.text(T(60, 28), "entrance lobby" if floor == 1 else "food court", fill="black", font=f)
     dr.text(T(6, 52), "diagonal hall + " + ("stores" if floor == 1 else "restaurants"), fill="black", font=fs)
     if floor == 3:
-        dr.text(T(55, 196), "cinema 1", fill="black", font=f)
-        dr.text(T(77, 196), "cinema 2", fill="black", font=f)
+        dr.text(T(49, 196), "cinema 1", fill="black", font=f)
+        dr.text(T(71, 196), "cinema 2", fill="black", font=f)
     for i, l, x, y in doors:
         px, py = T(x, y)
         purple = i in ("side_exit", "balcony_door_side")
@@ -359,7 +364,7 @@ def render(floor, items, doors):
            "Orange dot = door/opening, Red-orange = restaurant windows, teal = balconies. Thin grid = 3 m, bold = 30 m.")
     dr.text((ox, 56), sub, fill=(60, 60, 60), font=fs)
     if floor == 1:
-        mx, my = T(88, 10)
+        mx, my = T(76, 10)
         dr.text((mx - 50, my + 14), "main entrance", fill="black", font=f)
     im.save(os.path.join(HERE, "floor%d_plan.png" % floor))
 
@@ -368,7 +373,7 @@ def build(floor):
     items = floor_items(floor)
     doors = DOORS_F1 if floor == 1 else DOORS_UP
     if floor == 3:
-        doors = doors + [("cinema_entrance_%d" % (n + 1), "Cinema %d entrance" % (n + 1), x, 171) for n, x in enumerate((57, 87))]
+        doors = doors + [("cinema_entrance_%d" % (n + 1), "Cinema %d entrance" % (n + 1), x, 171) for n, x in enumerate((51, 81))]
     if floor == 2:
         doors = doors + [("secret_door_restaurant", "Secret hallway opening into the small open restaurant", 45, 2.5)]
     if floor == 2:
@@ -377,7 +382,7 @@ def build(floor):
     print("floor %d: walkable areas = %d (should be 1)" % (floor, comps))
     data = {
         "floor": floor,
-        "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the 5 m shop passage and the south area outline.",
+        "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the atrium tower split (x 64.5) and the south area outline.",
         "grid_m": 3,
         "polygons": [dict(id=i, label=l, points=v[1], kind=k) for i, l, v, k in items if v[0] == "poly"],
         "boxes": [dict(id=i, label=l, x0=v[1][0], x1=v[1][1], y0=v[1][2], y1=v[1][3], kind=k) for i, l, v, k in items if v[0] == "box"],

@@ -1,6 +1,6 @@
 {
  "floor": 2,
- "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the 5 m shop passage and the south area outline.",
+ "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the atrium tower split (x 64.5) and the south area outline.",
  "grid_m": 3,
  "polygons": [
   {
@@ -62,23 +62,23 @@
      1
     ],
     [
-     72,
-     0
+     66,
+     0.5
     ],
     [
-     84,
+     72,
      4
     ],
     [
-     94,
+     82,
      16
     ],
     [
-     96,
+     84,
      18
     ],
     [
-     96,
+     84,
      36
     ],
     [
@@ -197,28 +197,28 @@
      -3
     ],
     [
-     72,
-     -4
+     66,
+     -3.6
     ],
     [
-     85,
+     73,
      0
     ],
     [
-     97.1,
+     85.1,
      13.4
     ],
     [
-     94,
+     82,
      16
     ],
     [
-     84,
+     72,
      4
     ],
     [
-     72,
-     0
+     66,
+     0.5
     ],
     [
      57,
@@ -233,7 +233,7 @@
    "id": "atrium_b",
    "label": "Atrium B (open void)",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 123,
    "y1": 159,
    "kind": "void"
@@ -242,7 +242,7 @@
    "id": "cross_corridor",
    "label": "Cross-corridor",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 111,
    "y1": 123,
    "kind": "hall"
@@ -251,7 +251,7 @@
    "id": "atrium_a",
    "label": "Atrium A (open void)",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 51,
    "y1": 111,
    "kind": "void"
@@ -260,7 +260,7 @@
    "id": "south_hall",
    "label": "South hall (below Atrium A)",
    "x0": 45,
-   "x1": 90,
+   "x1": 78,
    "y0": 45,
    "y1": 51,
    "kind": "hall"
@@ -275,28 +275,10 @@
    "kind": "kiosk"
   },
   {
-   "id": "south_shop_2",
-   "label": "Kiosk",
-   "x0": 66,
-   "x1": 76,
-   "y0": 36,
-   "y1": 45,
-   "kind": "kiosk"
-  },
-  {
    "id": "south_pass_1",
-   "label": "Passage between the west shop and the middle shop",
+   "label": "Passage between the west and east shops (9 m; the middle shop went in the v3 cut)",
    "x0": 60,
-   "x1": 66,
-   "y0": 36,
-   "y1": 45,
-   "kind": "hall"
-  },
-  {
-   "id": "south_pass_2",
-   "label": "Passage between the middle and east shops (5 m)",
-   "x0": 76,
-   "x1": 81,
+   "x1": 69,
    "y0": 36,
    "y1": 45,
    "kind": "hall"
@@ -304,26 +286,26 @@
   {
    "id": "south_shop_3",
    "label": "Kiosk",
-   "x0": 81,
-   "x1": 90,
+   "x0": 69,
+   "x1": 78,
    "y0": 36,
    "y1": 45,
    "kind": "kiosk"
   },
   {
    "id": "b_elevators",
-   "label": "Elevator pair (B, NE), on the north hall",
-   "x0": 78,
-   "x1": 87,
+   "label": "Elevator pair (B, north tower, east half), on the north hall",
+   "x0": 64.5,
+   "x1": 78,
    "y0": 153,
    "y1": 159,
    "kind": "elevator"
   },
   {
    "id": "b_stairs",
-   "label": "Stairs (B, NW), on the north hall",
-   "x0": 54,
-   "x1": 60,
+   "label": "Stairs (B, north tower, west half), on the north hall",
+   "x0": 51,
+   "x1": 64.5,
    "y0": 153,
    "y1": 159,
    "kind": "stairs"
@@ -331,8 +313,8 @@
   {
    "id": "b_center_stair",
    "label": "Center curved stair (B, S), on the cross-corridor",
-   "x0": 63,
-   "x1": 72,
+   "x0": 60,
+   "x1": 69,
    "y0": 123,
    "y1": 132,
    "kind": "stairs"
@@ -341,25 +323,25 @@
    "id": "a_escalators",
    "label": "Escalators up/down, full width from the west hall to the east hall",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 105,
    "y1": 111,
    "kind": "escalator"
   },
   {
    "id": "a_stairs",
-   "label": "Stairs (A, SW), on the south hall, aligned with the west shop",
+   "label": "Stairs (A, south tower, west half), on the south hall",
    "x0": 51,
-   "x1": 60,
+   "x1": 64.5,
    "y0": 51,
    "y1": 57,
    "kind": "stairs"
   },
   {
    "id": "a_elevators",
-   "label": "Elevator pair (A, SE), on the south hall",
-   "x0": 78,
-   "x1": 87,
+   "label": "Elevator pair (A, south tower, east half), on the south hall",
+   "x0": 64.5,
+   "x1": 78,
    "y0": 51,
    "y1": 57,
    "kind": "elevator"
@@ -421,8 +403,8 @@
   {
    "id": "east_hall",
    "label": "East hall",
-   "x0": 90,
-   "x1": 96,
+   "x0": 78,
+   "x1": 84,
    "y0": 36,
    "y1": 165,
    "kind": "hall"
@@ -430,8 +412,8 @@
   {
    "id": "east_stores",
    "label": "East stores (north of the short hall, up to the north hall)",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 39,
    "y1": 159,
    "kind": "shop"
@@ -439,8 +421,8 @@
   {
    "id": "east_side_south",
    "label": "Restaurant windows (east) south of the short hall (continues along the lobby / food court)",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 18,
    "y1": 33,
    "kind": "restaurant"
@@ -448,8 +430,8 @@
   {
    "id": "east_spur",
    "label": "Short hall east to the SE bathrooms",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 33,
    "y1": 39,
    "kind": "hall"
@@ -457,8 +439,8 @@
   {
    "id": "se_bath",
    "label": "Bathrooms (SE)",
-   "x0": 108,
-   "x1": 120,
+   "x0": 96,
+   "x1": 108,
    "y0": 30,
    "y1": 45,
    "kind": "bath"
@@ -466,8 +448,8 @@
   {
    "id": "ne_bath",
    "label": "Bathrooms (NE), door on the north hall",
-   "x0": 108,
-   "x1": 120,
+   "x0": 96,
+   "x1": 108,
    "y0": 147,
    "y1": 159,
    "kind": "bath"
@@ -476,7 +458,7 @@
    "id": "hall_north",
    "label": "North hall (ends at a store wall)",
    "x0": 15,
-   "x1": 120,
+   "x1": 108,
    "y0": 159,
    "y1": 165,
    "kind": "hall"
@@ -521,7 +503,7 @@
    "id": "n_hall_behind",
    "label": "Hall behind the big store",
    "x0": 48,
-   "x1": 96,
+   "x1": 84,
    "y0": 183,
    "y1": 189,
    "kind": "hall"
@@ -530,7 +512,7 @@
    "id": "north_stores",
    "label": "North stores (the narrow hall cuts through the west end)",
    "x0": 54,
-   "x1": 96,
+   "x1": 84,
    "y0": 189,
    "y1": 201,
    "kind": "shop"
@@ -547,8 +529,8 @@
   {
    "id": "north_stores_e",
    "label": "North stores, east end (wraps around the hall end)",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 183,
    "y1": 201,
    "kind": "shop"
@@ -556,8 +538,8 @@
   {
    "id": "n_hall_down",
    "label": "Hall down beside the NE block",
-   "x0": 90,
-   "x1": 96,
+   "x0": 78,
+   "x1": 84,
    "y0": 165,
    "y1": 189,
    "kind": "hall"
@@ -565,8 +547,8 @@
   {
    "id": "ne_block",
    "label": "NE store block",
-   "x0": 96,
-   "x1": 114,
+   "x0": 84,
+   "x1": 102,
    "y0": 165,
    "y1": 183,
    "kind": "shop"
@@ -574,8 +556,8 @@
   {
    "id": "ne_end_store",
    "label": "Store closing the north hall",
-   "x0": 120,
-   "x1": 132,
+   "x0": 108,
+   "x1": 120,
    "y0": 153,
    "y1": 171,
    "kind": "shop"
@@ -583,8 +565,8 @@
   {
    "id": "walkin_kiosk",
    "label": "Wide curved stairs between floors 2 and 3 (replaces the kiosk)",
-   "x0": 72,
-   "x1": 84,
+   "x0": 66,
+   "x1": 78,
    "y0": 15,
    "y1": 21,
    "kind": "stairs"
@@ -628,8 +610,8 @@
   {
    "id": "shop_n2_a",
    "label": "Shop 2A (floor 2, 6 m square, front row)",
-   "x0": 64,
-   "x1": 70,
+   "x0": 63,
+   "x1": 69,
    "y0": 165,
    "y1": 171,
    "kind": "shop"
@@ -637,8 +619,8 @@
   {
    "id": "shop_n2_b",
    "label": "Shop 2B (floor 2, 6 m square, back row)",
-   "x0": 64,
-   "x1": 70,
+   "x0": 63,
+   "x1": 69,
    "y0": 174,
    "y1": 180,
    "kind": "shop"
@@ -646,8 +628,8 @@
   {
    "id": "shop_n3_a",
    "label": "Shop 3A (floor 2, 6 m square, front row)",
-   "x0": 74,
-   "x1": 80,
+   "x0": 72,
+   "x1": 78,
    "y0": 165,
    "y1": 171,
    "kind": "shop"
@@ -655,53 +637,26 @@
   {
    "id": "shop_n3_b",
    "label": "Shop 3B (floor 2, 6 m square, back row)",
-   "x0": 74,
-   "x1": 80,
-   "y0": 174,
-   "y1": 180,
-   "kind": "shop"
-  },
-  {
-   "id": "shop_n4_a",
-   "label": "Shop 4A (floor 2, 6 m square, front row)",
-   "x0": 84,
-   "x1": 90,
-   "y0": 165,
-   "y1": 171,
-   "kind": "shop"
-  },
-  {
-   "id": "shop_n4_b",
-   "label": "Shop 4B (floor 2, 6 m square, back row)",
-   "x0": 84,
-   "x1": 90,
+   "x0": 72,
+   "x1": 78,
    "y0": 174,
    "y1": 180,
    "kind": "shop"
   },
   {
    "id": "passage_n_60",
-   "label": "4 m passage between shop columns",
+   "label": "3 m passage between shop columns",
    "x0": 60,
-   "x1": 64,
+   "x1": 63,
    "y0": 165,
    "y1": 183,
    "kind": "hall"
   },
   {
-   "id": "passage_n_70",
-   "label": "4 m passage between shop columns",
-   "x0": 70,
-   "x1": 74,
-   "y0": 165,
-   "y1": 183,
-   "kind": "hall"
-  },
-  {
-   "id": "passage_n_80",
-   "label": "4 m passage between shop columns",
-   "x0": 80,
-   "x1": 84,
+   "id": "passage_n_69",
+   "label": "3 m passage between shop columns",
+   "x0": 69,
+   "x1": 72,
    "y0": 165,
    "y1": 183,
    "kind": "hall"
@@ -710,7 +665,7 @@
    "id": "gap_n",
    "label": "3 m gap between the shop rows",
    "x0": 54,
-   "x1": 90,
+   "x1": 78,
    "y0": 171,
    "y1": 174,
    "kind": "hall"
@@ -719,7 +674,7 @@
    "id": "strip_n",
    "label": "3 m strip behind the back row (joins the hall behind)",
    "x0": 54,
-   "x1": 90,
+   "x1": 78,
    "y0": 180,
    "y1": 183,
    "kind": "hall"
@@ -782,7 +737,7 @@
    "id": "atrium_b_bridge",
    "label": "Arched bridge (cross corridor) over Atrium B, floor 2",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 135,
    "y1": 138,
    "kind": "hall"
@@ -792,7 +747,7 @@
   {
    "id": "balcony_door_main",
    "label": "Balcony door (where the main entrance is on floor 1)",
-   "x": 88,
+   "x": 76,
    "y": 10
   },
   {

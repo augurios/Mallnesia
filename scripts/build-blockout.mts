@@ -35,8 +35,6 @@ const WALK = 1;
 const SOLIDC = 2;
 const HOLE = 3;
 
-const footprint: [number, number][] = JSON.parse(readFileSync(`${PLANS}/footprint_osm.json`, "utf8")).points;
-
 function inPoly(x: number, y: number, pts: [number, number][]): boolean {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -188,8 +186,25 @@ const floors: Floor[] = [1, 2, 3].map((n) => rasterize(JSON.parse(readFileSync(`
 
 const at = (f: Floor, i: number, j: number) => (i < 0 || j < 0 || i >= NX || j >= NY ? EMPTY : f.cls[j * NX + i]);
 const kindAt = (f: Floor, i: number, j: number) => (i < 0 || j < 0 || i >= NX || j >= NY ? "" : f.kind[j * NX + i]);
-const outsideFootprint = (i: number, j: number, di: number, dj: number) =>
-  !inPoly((i + 0.5 + di) * CELL, (j + 0.5 + dj) * CELL, footprint);
+
+/** Empty cells connected to the edge of the grid: the outside of the building. Enclosed gaps are not outside. */
+function outsideMask(f: Floor): Uint8Array {
+  const out = new Uint8Array(NX * NY);
+  const stack: number[] = [];
+  for (let i = 0; i < NX; i++) stack.push(i, (NY - 1) * NX + i);
+  for (let j = 0; j < NY; j++) stack.push(j * NX, j * NX + NX - 1);
+  while (stack.length) {
+    const c = stack.pop()!;
+    if (out[c] || f.cls[c] !== EMPTY) continue;
+    out[c] = 1;
+    const i = c % NX;
+    if (i > 0) stack.push(c - 1);
+    if (i < NX - 1) stack.push(c + 1);
+    if (c >= NX) stack.push(c - NX);
+    if (c < (NY - 1) * NX) stack.push(c + NX);
+  }
+  return out;
+}
 
 const stats = { walkable: [0, 0, 0] };
 
@@ -197,6 +212,8 @@ floors.forEach((f, fi) => {
   const floorNo = fi + 1;
   const y0 = fi * FLOOR_H;
   const edges: Edge[] = [];
+  const outside = outsideMask(f);
+  const isOutside = (i: number, j: number) => i < 0 || j < 0 || i >= NX || j >= NY || outside[j * NX + i] === 1;
 
   for (let j = 0; j < NY; j++) {
     // floors and ceilings, merged along x
@@ -237,7 +254,7 @@ floors.forEach((f, fi) => {
           const wallH = nearVoid ? FLOOR_H : CEIL_H;
           if (nc === HOLE) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (k === "garage" && nc === EMPTY) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
-          else if (nc === EMPTY && outsideFootprint(i, j, di, dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
+          else if (nc === EMPTY && isOutside(i + di, j + dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
           else if (nk === "restaurant") edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
           else edges.push({ dir: d, i, j, mat: "walls", y0, h: wallH });
         } else {
@@ -245,7 +262,7 @@ floors.forEach((f, fi) => {
           // (the top floor continues up to the truss roof).
           if (nc === HOLE || nc === WALK) continue;
           const h = floorNo === 3 ? ROOF_Y - y0 : FLOOR_H;
-          const glass = nc === EMPTY && outsideFootprint(i, j, di, dj);
+          const glass = nc === EMPTY && isOutside(i + di, j + dj);
           edges.push({ dir: d, i, j, mat: glass ? "glass" : "walls", y0, h });
         }
       }
@@ -270,7 +287,7 @@ floors.forEach((f, fi) => {
 });
 
 // Spawn points used by src/engine/runtime.ts must be walkable cells.
-for (const [fi, x, y] of [[0, 80, 28], [1, 48, 100], [2, 48, 100]] as const) {
+for (const [fi, x, y] of [[0, 72, 28], [1, 48, 100], [2, 48, 100]] as const) {
   const i = Math.floor(x / CELL);
   const j = Math.floor(y / CELL);
   const ok = at(floors[fi], i, j) === WALK;
@@ -281,7 +298,7 @@ for (const [fi, x, y] of [[0, 80, 28], [1, 48, 100], [2, 48, 100]] as const) {
 // Debug: BLOCKOUT_DEBUG=<dir> writes one PPM per floor. White = reachable from the spawn,
 // yellow = blocked by collision, red = walkable but unreachable, gray = solid, blue = hole, black = empty.
 if (process.env.BLOCKOUT_DEBUG) {
-  const spawns = [[80, 28], [48, 100], [48, 100]];
+  const spawns = [[72, 28], [48, 100], [48, 100]];
   const colliderGeo = new THREE.BufferGeometry();
   const cp: number[] = [];
   const ci: number[] = [];

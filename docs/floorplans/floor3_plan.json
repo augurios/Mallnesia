@@ -1,6 +1,6 @@
 {
  "floor": 3,
- "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the 5 m shop passage and the south area outline.",
+ "status": "Floor plan, ready for blockout. Meters, x east, y north, origin = south-west corner of the real footprint. 3 m module; halls 6 m, store rows 12 m deep. Off-grid on purpose: the 45-degree south-west diagonal hall, the atrium tower split (x 64.5) and the south area outline.",
  "grid_m": 3,
  "polygons": [
   {
@@ -8,27 +8,27 @@
    "label": "Cinema 1 (west of the food stand, and behind it)",
    "points": [
     [
-     48,
+     42,
      171
     ],
     [
-     60,
+     54,
      171
     ],
     [
-     60,
+     54,
      189
     ],
     [
-     72,
+     66,
      189
     ],
     [
-     72,
+     66,
      201
     ],
     [
-     48,
+     42,
      201
     ]
    ],
@@ -39,27 +39,27 @@
    "label": "Cinema 2 (east of the food stand, and behind it)",
    "points": [
     [
-     96,
+     90,
      171
     ],
     [
-     84,
+     78,
      171
     ],
     [
-     84,
+     78,
      189
     ],
     [
-     72,
+     66,
      189
     ],
     [
-     72,
+     66,
      201
     ],
     [
-     96,
+     90,
      201
     ]
    ],
@@ -124,23 +124,23 @@
      1
     ],
     [
-     72,
-     0
+     66,
+     0.5
     ],
     [
-     84,
+     72,
      4
     ],
     [
-     94,
+     82,
      16
     ],
     [
-     96,
+     84,
      18
     ],
     [
-     96,
+     84,
      36
     ],
     [
@@ -259,28 +259,28 @@
      -3
     ],
     [
-     72,
-     -4
+     66,
+     -3.6
     ],
     [
-     85,
+     73,
      0
     ],
     [
-     97.1,
+     85.1,
      13.4
     ],
     [
-     94,
+     82,
      16
     ],
     [
-     84,
+     72,
      4
     ],
     [
-     72,
-     0
+     66,
+     0.5
     ],
     [
      57,
@@ -295,7 +295,7 @@
    "id": "atrium_b",
    "label": "Atrium B (open void)",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 123,
    "y1": 159,
    "kind": "void"
@@ -304,7 +304,7 @@
    "id": "cross_corridor",
    "label": "Cross-corridor",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 111,
    "y1": 123,
    "kind": "hall"
@@ -313,7 +313,7 @@
    "id": "atrium_a",
    "label": "Atrium A (open void)",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 51,
    "y1": 111,
    "kind": "void"
@@ -322,7 +322,7 @@
    "id": "south_hall",
    "label": "South hall (below Atrium A)",
    "x0": 45,
-   "x1": 90,
+   "x1": 78,
    "y0": 45,
    "y1": 51,
    "kind": "hall"
@@ -337,28 +337,10 @@
    "kind": "machines"
   },
   {
-   "id": "south_shop_2",
-   "label": "Candy / toy coin machines",
-   "x0": 66,
-   "x1": 76,
-   "y0": 36,
-   "y1": 45,
-   "kind": "machines"
-  },
-  {
    "id": "south_pass_1",
-   "label": "Passage between the west shop and the middle shop",
+   "label": "Passage between the west and east shops (9 m; the middle shop went in the v3 cut)",
    "x0": 60,
-   "x1": 66,
-   "y0": 36,
-   "y1": 45,
-   "kind": "hall"
-  },
-  {
-   "id": "south_pass_2",
-   "label": "Passage between the middle and east shops (5 m)",
-   "x0": 76,
-   "x1": 81,
+   "x1": 69,
    "y0": 36,
    "y1": 45,
    "kind": "hall"
@@ -366,26 +348,26 @@
   {
    "id": "south_shop_3",
    "label": "Candy / toy coin machines",
-   "x0": 81,
-   "x1": 90,
+   "x0": 69,
+   "x1": 78,
    "y0": 36,
    "y1": 45,
    "kind": "machines"
   },
   {
    "id": "b_elevators",
-   "label": "Elevator pair (B, NE), on the north hall",
-   "x0": 78,
-   "x1": 87,
+   "label": "Elevator pair (B, north tower, east half), on the north hall",
+   "x0": 64.5,
+   "x1": 78,
    "y0": 153,
    "y1": 159,
    "kind": "elevator"
   },
   {
    "id": "b_stairs",
-   "label": "Stairs (B, NW), on the north hall",
-   "x0": 54,
-   "x1": 60,
+   "label": "Stairs (B, north tower, west half), on the north hall",
+   "x0": 51,
+   "x1": 64.5,
    "y0": 153,
    "y1": 159,
    "kind": "stairs"
@@ -393,8 +375,8 @@
   {
    "id": "b_center_stair",
    "label": "Center curved stair (B, S), on the cross-corridor",
-   "x0": 63,
-   "x1": 72,
+   "x0": 60,
+   "x1": 69,
    "y0": 123,
    "y1": 132,
    "kind": "stairs"
@@ -403,25 +385,25 @@
    "id": "a_escalators",
    "label": "Escalators up/down, full width from the west hall to the east hall",
    "x0": 51,
-   "x1": 90,
+   "x1": 78,
    "y0": 105,
    "y1": 111,
    "kind": "escalator"
   },
   {
    "id": "a_stairs",
-   "label": "Stairs (A, SW), on the south hall, aligned with the west shop",
+   "label": "Stairs (A, south tower, west half), on the south hall",
    "x0": 51,
-   "x1": 60,
+   "x1": 64.5,
    "y0": 51,
    "y1": 57,
    "kind": "stairs"
   },
   {
    "id": "a_elevators",
-   "label": "Elevator pair (A, SE), on the south hall",
-   "x0": 78,
-   "x1": 87,
+   "label": "Elevator pair (A, south tower, east half), on the south hall",
+   "x0": 64.5,
+   "x1": 78,
    "y0": 51,
    "y1": 57,
    "kind": "elevator"
@@ -483,8 +465,8 @@
   {
    "id": "east_hall",
    "label": "East hall",
-   "x0": 90,
-   "x1": 96,
+   "x0": 78,
+   "x1": 84,
    "y0": 36,
    "y1": 165,
    "kind": "hall"
@@ -492,8 +474,8 @@
   {
    "id": "east_stores",
    "label": "East stores (north of the short hall, up to the north hall)",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 39,
    "y1": 159,
    "kind": "shop"
@@ -501,8 +483,8 @@
   {
    "id": "east_side_south",
    "label": "Restaurant windows (east) south of the short hall (continues along the lobby / food court)",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 18,
    "y1": 33,
    "kind": "restaurant"
@@ -510,8 +492,8 @@
   {
    "id": "east_spur",
    "label": "Short hall east to the SE bathrooms",
-   "x0": 96,
-   "x1": 108,
+   "x0": 84,
+   "x1": 96,
    "y0": 33,
    "y1": 39,
    "kind": "hall"
@@ -519,8 +501,8 @@
   {
    "id": "se_bath",
    "label": "Bathrooms (SE)",
-   "x0": 108,
-   "x1": 120,
+   "x0": 96,
+   "x1": 108,
    "y0": 30,
    "y1": 45,
    "kind": "bath"
@@ -528,8 +510,8 @@
   {
    "id": "ne_bath",
    "label": "Bathrooms (NE), door on the north hall",
-   "x0": 108,
-   "x1": 120,
+   "x0": 96,
+   "x1": 108,
    "y0": 147,
    "y1": 159,
    "kind": "bath"
@@ -538,7 +520,7 @@
    "id": "hall_north",
    "label": "North hall (ends at a store wall)",
    "x0": 15,
-   "x1": 120,
+   "x1": 108,
    "y0": 159,
    "y1": 165,
    "kind": "hall"
@@ -547,7 +529,7 @@
    "id": "top_left_block",
    "label": "Top-left block",
    "x0": 15,
-   "x1": 48,
+   "x1": 42,
    "y0": 165,
    "y1": 183,
    "kind": "shop"
@@ -574,7 +556,7 @@
    "id": "north_stores_w",
    "label": "North stores, west end (wraps around the hall end)",
    "x0": 36,
-   "x1": 48,
+   "x1": 42,
    "y0": 183,
    "y1": 201,
    "kind": "shop"
@@ -582,8 +564,8 @@
   {
    "id": "north_stores_e",
    "label": "North stores, east end (wraps around the hall end)",
-   "x0": 96,
-   "x1": 108,
+   "x0": 90,
+   "x1": 96,
    "y0": 183,
    "y1": 201,
    "kind": "shop"
@@ -591,8 +573,8 @@
   {
    "id": "ne_block",
    "label": "NE store block",
-   "x0": 96,
-   "x1": 114,
+   "x0": 90,
+   "x1": 102,
    "y0": 165,
    "y1": 183,
    "kind": "shop"
@@ -600,8 +582,8 @@
   {
    "id": "ne_end_store",
    "label": "Store closing the north hall",
-   "x0": 120,
-   "x1": 132,
+   "x0": 108,
+   "x1": 120,
    "y0": 153,
    "y1": 171,
    "kind": "shop"
@@ -609,8 +591,8 @@
   {
    "id": "walkin_kiosk",
    "label": "Wide curved stairs between floors 2 and 3 (replaces the kiosk)",
-   "x0": 72,
-   "x1": 84,
+   "x0": 66,
+   "x1": 78,
    "y0": 15,
    "y1": 21,
    "kind": "stairs"
@@ -627,8 +609,8 @@
   {
    "id": "cinema_lobby",
    "label": "Cinema concourse (in front of the stores, the food station and the cinema entrances)",
-   "x0": 48,
-   "x1": 96,
+   "x0": 42,
+   "x1": 90,
    "y0": 165,
    "y1": 171,
    "kind": "cinema_lobby"
@@ -636,8 +618,8 @@
   {
    "id": "cinema_food",
    "label": "Cinema food stand (middle, wide counter faces the concourse)",
-   "x0": 60,
-   "x1": 84,
+   "x0": 54,
+   "x1": 78,
    "y0": 171,
    "y1": 189,
    "kind": "kiosk"
@@ -682,7 +664,7 @@
    "id": "secret_3_north",
    "label": "Secret hallway (floor 3): east behind the cinema",
    "x0": 18,
-   "x1": 123,
+   "x1": 111,
    "y0": 198,
    "y1": 201,
    "kind": "secret"
@@ -690,8 +672,8 @@
   {
    "id": "secret_3_east",
    "label": "Secret hallway (floor 3): down the east side to the NE bathrooms",
-   "x0": 120,
-   "x1": 123,
+   "x0": 108,
+   "x1": 111,
    "y0": 150,
    "y1": 198,
    "kind": "secret"
@@ -728,7 +710,7 @@
   {
    "id": "balcony_door_main",
    "label": "Balcony door (where the main entrance is on floor 1)",
-   "x": 88,
+   "x": 76,
    "y": 10
   },
   {
@@ -746,13 +728,13 @@
   {
    "id": "cinema_entrance_1",
    "label": "Cinema 1 entrance",
-   "x": 57,
+   "x": 51,
    "y": 171
   },
   {
    "id": "cinema_entrance_2",
    "label": "Cinema 2 entrance",
-   "x": 87,
+   "x": 81,
    "y": 171
   }
  ]

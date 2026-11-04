@@ -32,7 +32,7 @@ const BLOCKOUT_URL = "./models/mall_blockout.glb";
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
 // Debug keys 1/2/3 jump to these until stairs and elevators exist.
 const SPAWNS: { x: number; y: number }[] = [
-  { x: 80, y: 28 },
+  { x: 72, y: 28 },
   { x: 48, y: 100 },
   { x: 48, y: 100 },
 ];

@@ -217,3 +217,16 @@ The routes and the 3 m width are my choices, within what Augusto picked. The hal
 ## Small open restaurant (floor 2)
 
 The floor 2 secret hallway used to end against a closed restaurant block. The south end of that block (x 45 to 57, y 1 to 7, 12 by 6 m) is now a **small open restaurant**: a walkable room with its east side open to the food court. It joins the secret hallway (west end, y 1 to 4) to the food court. The rest of the block (y 7 to 30) stays closed. Added by Augusto's request; size cut down at his request (first draft was 12 by 12 m).
+
+## The middle cut (v3, decided by Augusto)
+
+Walking the blockout, the atriums felt too wide. A 12 m band, north to south, is cut out of the middle of the whole building on all three floors (x 66 to 78, about a third of the old 39 m atrium, kept on the 3 m grid). Everything east of the band moved 12 m west. This supersedes the x values given above for everything east of x 66.
+
+- **Atriums:** both now x 51 to 78 (27 m). The cross-corridor, escalators and floor 2 bridge follow.
+- **Stair and elevator towers:** at the north end of Atrium B (y 153 to 159) and the south end of Atrium A (y 51 to 57). Each spans the full atrium width: stairs on the west half (x 51 to 64.5), elevator pair on the east half (x 64.5 to 78).
+- **Floor 1 north:** the big store is now 12 m wide (x 66 to 78); the store block behind it and the hall behind run x 48 to 84.
+- **Floor 2 north:** one column of the square shops went: 6 shops in two rows of three (x 54, 63, 72), 3 m passages between columns. The store block behind runs x 54 to 84.
+- **Floor 3 north:** the cinema keeps its 48 m and moved 6 m west (x 42 to 90). The blocks beside it lost 6 m each: top-left block x 15 to 42 and west stores x 36 to 42 (floor 3 only), east stores x 90 to 96, NE block x 90 to 102.
+- **Lobby and food courts:** narrower by 12 m; the main doors are at (74.5, 7) and (79.5, 13), the balcony door at (76, 10), the bank at x 84 to 96.
+- **My choices for things the cut ran through:** the middle south shop fell in the band, so there are now two south shops (x 51 to 60 and 69 to 78) with one 9 m passage between them (two kiosks / machine areas on floors 2 and 3). The center curved stair was recentered (x 60 to 69). The walk-in kiosk and the food court stairs kept their size and moved 6 m west (kiosk x 66 to 75, stairs x 66 to 78).
+- **Blockout:** glass walls now go wherever a walkable area meets the outside of the building (not the real footprint outline, which the cut building no longer follows exactly).
