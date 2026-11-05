@@ -426,8 +426,9 @@ const doorNodes = doorData.doors.map((d) => {
     }
 
   // Lintel: closes the gap between the leaves and the dropped ceiling.
-  const lx = d.axis === "x" ? half : DOOR_T;
-  const lz = d.axis === "x" ? DOOR_T : half;
+  // Same thickness as the leaves, so their faces are flush and the closed door shows no step or seam.
+  const lx = d.axis === "x" ? half : DOOR_T / 2;
+  const lz = d.axis === "x" ? DOOR_T / 2 : half;
   const lintel = boxGeo(d.x - lx, d.x + lx, y0 + doorData.height, y0 + CEIL_H, -d.y - lz, -d.y + lz);
   const wg = geo("walls");
   const base = wg.pos.length / 3;
@@ -490,7 +491,7 @@ for (const { d, y0, half, sx, sz } of doorNodes) {
   for (const leaf of leaves) {
     // At +90 degrees about y a leaf pointing along (dx, dz) ends up pointing along (dz, -dx).
     const sign = leaf.dir[1] * sx - leaf.dir[0] * sz > 0 ? 1 : -1;
-    const len = half - 0.01;
+    const len = half; // leaves meet exactly at the centre: no slit
     const [ax0, ax1] = [Math.min(0, leaf.dir[0] * len), Math.max(0, leaf.dir[0] * len)];
     const [az0, az1] = [Math.min(0, leaf.dir[1] * len), Math.max(0, leaf.dir[1] * len)];
     const box = d.axis === "x"
