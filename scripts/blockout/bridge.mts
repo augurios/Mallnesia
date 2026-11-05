@@ -1,6 +1,6 @@
 import { CELL, NX, FLOOR_H, RAIL_H, HOLE } from "./config.mts";
 import { floors } from "./grid.mts";
-import { type V3, geo, addTo, latheGeo, boxGeo, prismGeo, tubeGeo } from "./geo.mts";
+import { type V3, Geo, geo, addTo, latheGeo, boxGeo, prismGeo, tubeGeo } from "./geo.mts";
 
 // The floor 2 bridge over Atrium B (reference photos atrium_third-floor-looking-down and
 // atrium_upper-floors-from-ground). The plan holds its 6 m band (x 51 to 78, y 135 to 141). Between the two
@@ -84,14 +84,21 @@ export function buildBridge() {
     addTo(geo("chrome"), tubeGeo(off(a, 0), off(a, 0.055), 0.011, 4));
   }
 
-  // Hood (reference: atrium_upper-floors-from-ground and atrium_third-floor-looking-down): a thick, wide
-  // C in the vertical north-south plane. It wraps the ball from a top arm over it, down its back, to a bottom
-  // arm under it that sits on the column, and opens north on the north columns, south on the south ones.
-  // A narrower ridge (the "mohawk") runs along its outside, from the front of the top arm down the back.
-  const W = 0.75; // half the hood's width, across the C
-  const rin = BALL_R + 0.05;
-  const rout = BALL_R + 0.35;
-  const MOHAWK = { w: 0.18, h: 0.22 };
+  // Hood, after the photos (atrium_upper-floors-from-ground, atrium_third-floor-looking-down): crisp-edged
+  // plaster, in the vertical north-south plane, opening north on the north columns and south on the south ones.
+  // - the C body: wraps the ball from over the top, down its back, to a bottom arm under it (a curved
+  //   cradle on the inside, flat sides);
+  // - a flat top plate, wider than the body, reaching forward past the ball with a square end;
+  // - the "mohawk": a narrow squared band on the outside, from the front of the top plate down the back;
+  // - two cheeks hanging below the bottom arm on either side of the column, cut at a slant at the bottom.
+  const W = 0.6; // half the C body's width, across the C
+  const RM = BALL_R + 0.2; // the body's mid-line, around the ball
+  const T = 0.15; // half its thickness
+  const REACH = BALL_R + 0.45; // how far the top plate reaches past the ball's center
+  const E = 0.025; // the small bevel on every edge
+  const body = roundedRect(-W, W, -T, T, E, E);
+  const plate = roundedRect(-W - 0.25, W + 0.25, -T, T + 0.05, E, E);
+  const mohawk = roundedRect(-0.22, 0.22, T - 0.02, T + 0.22, E, E);
   for (const cx of COL_X) {
     const out = cx < ARC.cx ? -1 : 1; // toward the hall
     const edge = out < 0 ? DECK.x0 : DECK.x1; // the floor 3 edge
@@ -104,46 +111,84 @@ export function buildBridge() {
       const fwd = cy === COL_Y[1] ? 1 : -1; // the way the C opens, in plan y
       // f: forward (the way the C opens), u: up from the ball's center, xo: across
       const P = (f: number, u: number, xo: number): V3 => [cx + xo, BALL_Y + u, -(cy + fwd * f)];
-      const ring = (th: number, r: number, xo: number) => P(r * Math.cos(th), r * Math.sin(th), xo);
-      const arc = (t0: number, t1: number, r0: number, r1: number, hw: number, S: number) => {
-        for (let k = 0; k < S; k++) {
-          const a = ((t0 + ((t1 - t0) * k) / S) * Math.PI) / 180;
-          const b = ((t0 + ((t1 - t0) * (k + 1)) / S) * Math.PI) / 180;
-          addTo(slab, prismGeo([
-            ring(a, r0, -hw), ring(a, r1, -hw), ring(b, r1, -hw), ring(b, r0, -hw),
-            ring(a, r0, hw), ring(a, r1, hw), ring(b, r1, hw), ring(b, r0, hw),
-          ]));
-        }
-      };
-      const block = (f0: number, f1: number, u0: number, u1: number, hw: number) => {
-        const a = P(f0, u0, -hw);
-        const b = P(f1, u1, hw);
-        addTo(slab, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), a[1], b[1], Math.min(a[2], b[2]), Math.max(a[2], b[2])));
-      };
-      // column, from the ground floor up to the bottom arm of the hood
-      const h = BALL_Y - rout;
-      addTo(geo("column"), latheGeo(cx, z, [[0.37, 0], [0.37, 0.14], [0.3, 0.17], [0.3, h], [0, h]], 24));
+      const D = (f: number, u: number, xo: number): V3 => [xo, u, -fwd * f]; // a direction in the same frame
+      // the back half circle, with n the outward side at each point
+      const arc = (a0: number, a1: number): Pt[] =>
+        Array.from({ length: 25 }, (_, k) => {
+          const a = ((a0 + ((a1 - a0) * k) / 24) * Math.PI) / 180;
+          return { f: RM * Math.cos(a), u: RM * Math.sin(a), nf: Math.cos(a), nu: Math.sin(a) };
+        });
+      const up = (f: number): Pt => ({ f, u: RM, nf: 0, nu: 1 });
+      addTo(slab, sweepPath([up(0.2), ...arc(90, 270), { f: 0.55, u: -RM, nf: 0, nu: -1 }], body, P, D));
+      addTo(slab, sweepPath([up(REACH), up(-0.05)], plate, P, D));
+      addTo(slab, sweepPath([up(REACH - 0.05), ...arc(90, 235)], mohawk, P, D));
+      // cheeks: on both sides of the column, from the bottom arm down, longer at the back
+      const yb = -RM - T; // underside of the bottom arm
+      for (const [x0, x1] of [[-W, -0.33], [0.33, W]]) {
+        const q = (f: number, u: number, xo: number) => P(f, u, xo);
+        const face = (xo: number) => [q(-0.45, yb + 0.01, xo), q(0.5, yb + 0.01, xo), q(0.5, yb - 0.55, xo), q(-0.45, yb - 1.05, xo)];
+        addTo(slab, prismGeo([...face(x0), ...face(x1)]));
+      }
+      // column, from the ground floor up to the bottom arm
+      addTo(geo("column"), latheGeo(cx, z, [[0.37, 0], [0.37, 0.14], [0.3, 0.17], [0.3, BALL_Y + yb], [0, BALL_Y + yb]], 24));
       // ball, level with the floor 3 floor
       const prof: [number, number][] = [];
-      for (let k = 0; k <= 12; k++) {
-        const a = -Math.PI / 2 + (k / 12) * Math.PI;
+      for (let k = 0; k <= 16; k++) {
+        const a = -Math.PI / 2 + (k / 16) * Math.PI;
         prof.push([BALL_R * Math.cos(a), BALL_Y + BALL_R * Math.sin(a)]);
       }
-      addTo(geo("sphere"), latheGeo(cx, z, prof, 20));
-      // the C: back half of the ring, plus the top and bottom arms reaching forward
-      arc(90, 270, rin, rout, W, 12);
-      const reach = BALL_R + 0.3;
-      block(0, reach, rin, rout, W);
-      block(0, 0.55, -rout, -rin, W);
-      // the mohawk, along the outside of the top arm and down the back to the bottom
-      block(0, reach, rout, rout + MOHAWK.h, MOHAWK.w);
-      arc(90, 270, rout, rout + MOHAWK.h, MOHAWK.w, 12);
-      // corbels around the column top, under the bottom arm
-      block(0.3, 0.62, -rout - 1.1, -rout, 0.35);
-      for (const side of [-1, 1]) {
-        const [x0, x1] = side < 0 ? [cx - 0.62, cx - 0.3] : [cx + 0.3, cx + 0.62];
-        addTo(slab, boxGeo(x0, x1, BALL_Y - rout - 1.1, BALL_Y - rout, z - 0.35, z + 0.35));
-      }
+      addTo(geo("sphere"), latheGeo(cx, z, prof, 32));
     }
   }
+}
+
+type Pt = { f: number; u: number; nf: number; nu: number };
+type Sec = { s: number; t: number; ns: number; nt: number }[];
+
+/** Convex rounded rectangle cross-section (s across, t outward), with its own corner radii at the inner (t0) and outer (t1) side. */
+function roundedRect(s0: number, s1: number, t0: number, t1: number, rIn: number, rOut: number): Sec {
+  const sec: Sec = [];
+  const corners: [number, number, number, number][] = [
+    [s1 - rOut, t1 - rOut, rOut, 0],
+    [s0 + rOut, t1 - rOut, rOut, 90],
+    [s0 + rIn, t0 + rIn, rIn, 180],
+    [s1 - rIn, t0 + rIn, rIn, 270],
+  ];
+  for (const [cs, ct, r, a0] of corners)
+    for (let k = 0; k <= 4; k++) {
+      const a = ((a0 + (90 * k) / 4) * Math.PI) / 180;
+      sec.push({ s: cs + r * Math.cos(a), t: ct + r * Math.sin(a), ns: Math.cos(a), nt: Math.sin(a) });
+    }
+  return sec;
+}
+
+/**
+ * Sweeps a cross-section along a path in a vertical plane, smooth-shaded, with flat caps at both ends.
+ * P maps (f, u, across) to a point, D the same to a direction.
+ */
+function sweepPath(path: Pt[], sec: Sec, P: (f: number, u: number, s: number) => V3, D: (f: number, u: number, s: number) => V3): Geo {
+  const g = new Geo();
+  const v = (p: Pt, q: Sec[number]) => P(p.f + p.nf * q.t, p.u + p.nu * q.t, q.s);
+  const n = (p: Pt, q: Sec[number]) => D(p.nf * q.nt, p.nu * q.nt, q.ns);
+  for (let i = 0; i + 1 < path.length; i++)
+    for (let k = 0; k < sec.length; k++) {
+      const a = path[i];
+      const b = path[i + 1];
+      const q0 = sec[k];
+      const q1 = sec[(k + 1) % sec.length];
+      g.quadN(v(a, q0), v(b, q0), v(b, q1), v(a, q1), n(a, q0), n(b, q0), n(b, q1), n(a, q1));
+    }
+  for (const [p, q] of [[path[0], path[1]], [path[path.length - 1], path[path.length - 2]]]) {
+    const tf = p.f - q.f;
+    const tu = p.u - q.u;
+    const len = Math.hypot(tf, tu) || 1;
+    const cap = D(tf / len, tu / len, 0); // pointing out of the end
+    const c = v(p, { s: 0, t: 0, ns: 0, nt: 0 });
+    for (let k = 0; k < sec.length; k++) {
+      const a = v(p, sec[k]);
+      const b = v(p, sec[(k + 1) % sec.length]);
+      g.quadN(c, a, b, b, cap, cap, cap, cap);
+    }
+  }
+  return g;
 }
