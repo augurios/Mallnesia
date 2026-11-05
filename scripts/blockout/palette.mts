@@ -26,6 +26,7 @@ export const MATERIALS: Record<string, { color: [number, number, number, number]
   barrier: { color: [1, 1, 1, 0], rough: 1, blend: true }, // never drawn: the runtime hides it, but it still collides
   fascia: { color: hex("#5b565a"), rough: 0.7 },
   lamp: { color: hex("#c9c9c2"), rough: 0.6 },
+  sphere: { color: hex("#7d6a52"), rough: 0.95 }, // cork-brown balls on the bridge columns
   column: { color: hex("#656363"), rough: 0.6 }, // painted mid-grey
   elev: { color: hex("#1b1a1a"), rough: 0.2 }, // black glass shafts
   garden: { color: hex("#3c5b34"), rough: 0.8, double: true }, // leaves are one-sided ribbons

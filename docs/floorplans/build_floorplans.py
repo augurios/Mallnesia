@@ -116,8 +116,8 @@ BALCONIES = [
 
 COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs": "#e0c8a0",
           "escalator": "#ffe680", "shop": "#dcdcdc", "bath": "#9be29b", "garage": "#c9c9d8",
-          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc", "restaurant_open": "#fbd9c8"}
-WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony", "restaurant_open"}
+          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc", "restaurant_open": "#fbd9c8", "bridge": "#fff6e0"}
+WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony", "restaurant_open", "bridge"}
 
 
 def north_floor2(items):
@@ -232,10 +232,12 @@ def floor_items(floor):
         items.append(("main_entrance_kiosk", "Kiosk between the two main entrance doors", ("box", (75.5, 78.5, 8.5, 11.5)), "kiosk"))
         items.append(("bank", "Bank: first store east of the main entrance", ("box", (84, 96, 18, 27)), "shop"))
     if floor == 2:
-        items.append(("atrium_b_bridge", "Arched bridge (cross corridor) over Atrium B, floor 2", ("box", (51, 78, 135, 138)), "hall"))
+        # 6 m wide (grown north from y 135 to 138), no ceiling. The arc cut into its south edge between the
+        # columns (the inward D) and the four columns with balls are added by scripts/blockout/bridge.mts.
+        items.append(("atrium_b_bridge", "Bridge (cross corridor) over Atrium B, floor 2, open to the roof", ("box", (51, 78, 135, 141)), "bridge"))
     if floor == 3:
         # the west hall widens over the north-west corner of Atrium B; the cinema box office is there
-        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 141, 153)), "hall"))
+        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 139.5, 153)), "hall"))  # reaches 1.5 m out over the bridge
         items.append(("boxoffice", "Cinema box office counter, facing the west hall", ("box", (57, 60, 141, 153)), "kiosk"))
     return items
 

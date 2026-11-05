@@ -14,14 +14,17 @@
 import { buildShell } from "./blockout/shell.mts";
 import { paintTowers, buildTowers, buildElevatorPiers } from "./blockout/towers.mts";
 import { checkSpawns, debugReachability } from "./blockout/check.mts";
+import { paintBridge, buildBridge } from "./blockout/bridge.mts";
 import { buildDoors } from "./blockout/doors.mts";
 import { writeGlb } from "./blockout/write.mts";
 
 // The order matters: it is the order of the triangles in the file.
 paintTowers();
+paintBridge();
 buildShell();
 buildTowers();
 buildElevatorPiers();
+buildBridge();
 checkSpawns();
 debugReachability();
 const doorNodes = buildDoors();

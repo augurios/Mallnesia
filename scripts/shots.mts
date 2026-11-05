@@ -20,13 +20,17 @@ const b = box("b_stairs");
 const c = box("b_center_stair");
 
 // floor is 1-3; x, y are plan meters; yaw 0 looks north, 90 west; pitch up is positive (degrees).
-const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; pitch: number }[] = [
+const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; pitch: number; extra?: string }[] = [
   { name: "spawn", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0 },
   { name: "stairs_a_from_hall", floor: 1, x: a.x0 + 1.5, y: a.y0 - 4, yaw: 0, pitch: 12 },
   { name: "stairs_b_from_hall", floor: 1, x: b.x0 + 1.5, y: b.y1 + 4, yaw: 180, pitch: 12 },
   { name: "stairs_a_mid_flight", floor: 2, x: a.x0 + 4.5, y: a.y0 + 4, yaw: 0, pitch: -15 },
   { name: "stairs_center_from_atrium", floor: 1, x: c.x0 + 3, y: c.y0 - 8, yaw: 0, pitch: 18 },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
+  // lit up (ambient) to judge shapes, not the night look
+  { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
+  { name: "bridge_from_ground", floor: 1, x: 73, y: 125, yaw: 25, pitch: 32, extra: "&ambient=30&fov=80" },
+  { name: "bridge_deck", floor: 2, x: 48.5, y: 138, yaw: 270, pitch: 5, extra: "&ambient=30&fov=80" },
 ];
 
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".glb": "model/gltf-binary", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml" };
@@ -44,7 +48,7 @@ const port = (server.address() as { port: number }).port;
 
 mkdirSync(SHOTS, { recursive: true });
 for (const v of VIEWS) {
-  const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}`;
+  const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}${v.extra ?? ""}`;
   const file = `${SHOTS}/${v.name}.png`;
   // Async, not spawnSync: the server above lives in this process and has to answer Chrome while it waits.
   const code = await new Promise<number | null>((done) => {

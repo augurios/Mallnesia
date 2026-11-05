@@ -3,6 +3,7 @@ import { type Floor, floors, at, kindAt, outsideMask } from "./grid.mts";
 import { flatRun } from "./geo.mts";
 import { type Dir, type Edge, wallRuns } from "./walls.mts";
 import { isZone } from "./towers.mts";
+import { inBridgeCut } from "./bridge.mts";
 
 export const OPP: Record<Dir, Dir> = { N: "S", S: "N", E: "W", W: "E" };
 export const DIRS: { d: Dir; di: number; dj: number }[] = [
@@ -54,7 +55,7 @@ floors.forEach((f, fi) => {
         stats.walkable[fi]++;
       }
       const kk = i < NX ? f.kind[j * NX + i] : "";
-      const open = mat !== "" && (isOpenCeiling(f, fi, i, j) || kk === "stairzone" || kk === "stairzone_o" || (kk === "stair_landing_o" && fi === 2));
+      const open = mat !== "" && (isOpenCeiling(f, fi, i, j) || kk === "stairzone" || kk === "stairzone_o" || kk === "bridge" || (kk === "stair_landing_o" && fi === 2));
       if (mat !== runMat || open !== runOpen || mat === "") {
         flush(i);
         if (mat) runStart = i;
@@ -77,8 +78,8 @@ floors.forEach((f, fi) => {
           // Slab edge: where a floor that has a ceiling meets an open side (the atrium or a stair), close the
           // 1.5 m of structure between its ceiling and the floor above, so you cannot look between the floors
           // from the stairs. The band faces the open side and is not collidable.
-          const noCeiling = k === "void" || k === "stairzone" || k === "stairzone_o" || open || (k === "stair_landing_o" && floorNo === 3);
-          const openSide = nc === HOLE || (nc === WALK && (nk === "void" || nk === "stairzone" || nk === "stairzone_o"));
+          const noCeiling = k === "void" || k === "bridge" || k === "stairzone" || k === "stairzone_o" || open || (k === "stair_landing_o" && floorNo === 3);
+          const openSide = nc === HOLE || (nc === WALK && (nk === "void" || nk === "bridge" || nk === "stairzone" || nk === "stairzone_o"));
           if (floorNo < 3 && !noCeiling && openSide) {
             const above = floors[fi + 1];
             const ak = kindAt(above, i, j);
@@ -111,7 +112,12 @@ floors.forEach((f, fi) => {
           const wallH = k === "stairzone_o" && floorNo === 3 ? ROOF_Y - y0 : k === "stairzone" || (k === "stair_landing" && floorNo === 3) ? towerH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
           // Along a stair's open sides there is no floating pane of glass at floor level (it would hang in the
           // middle of the flights): the stair has its own balustrades, and an invisible barrier keeps people out.
-          if (nc === HOLE) edges.push({ dir: d, i, j, mat: k === "stairzone" || k === "stairzone_o" ? "barrier" : "rails", y0, h: RAIL_H });
+          // The bridge: a deep white beam under the deck edge. Along its curved edge the beam and the glass are
+          // built smooth in bridge.mts; the cell edge only gets an invisible barrier.
+          const cut = k === "bridge" && nc === HOLE && inBridgeCut(i + di, j + dj);
+          if (nc === HOLE && k === "bridge" && !cut) edges.push({ dir: d, i, j, mat: "slab", y0: y0 - 0.7, h: 0.7 });
+          if (cut) edges.push({ dir: d, i, j, mat: "barrier", y0, h: RAIL_H });
+          else if (nc === HOLE) edges.push({ dir: d, i, j, mat: k === "stairzone" || k === "stairzone_o" ? "barrier" : "rails", y0, h: RAIL_H });
           else if (k === "garage" && nc === EMPTY) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (nc === EMPTY && isOutside(i + di, j + dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
           else if (nk === "restaurant") edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });

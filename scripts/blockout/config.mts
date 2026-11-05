@@ -17,7 +17,7 @@ export type Box = { id: string; kind: string; x0: number; x1: number; y0: number
 export type Poly = { id: string; kind: string; points: [number, number][] };
 export type Plan = { boxes: Box[]; polygons: Poly[] };
 
-export const WALKABLE = new Set(["hall", "foodcourt", "balcony", "bath", "secret", "garage", "cinema_lobby", "restaurant_open"]);
+export const WALKABLE = new Set(["hall", "foodcourt", "balcony", "bath", "secret", "garage", "cinema_lobby", "restaurant_open", "bridge"]);
 export const SOLID = new Set([
   "shop", "restaurant", "cinema", "kiosk", "elevator", "escalator", "intermittent", "machines", "stairs",
 ]);
