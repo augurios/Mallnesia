@@ -15,6 +15,7 @@ const KINDS: Record<string, Kind> = {
   floor_garage: "concrete",
   ceilings: "panels",
   walls: "plaster",
+  slab: "plaster",
   doors: "plaster", // the same pattern as the walls: a closed secret door has to vanish into them
   stairs: "stair",
   column: "stair",
@@ -134,6 +135,15 @@ const COLOR: Record<Kind, string> = {
   }`,
 };
 
+const SLAB = "vec3(0.3, 0.29, 0.27)"; // the underside of a floor
+const BACK: Partial<Record<Kind, string>> = {
+  porcelain: SLAB,
+  porcelain45: SLAB,
+  tile: SLAB,
+  concrete: SLAB,
+  panels: "vec3(0.12, 0.12, 0.13)", // the top of a ceiling, seen from the floor above
+};
+
 const ROUGHNESS: Partial<Record<Kind, string>> = {
   porcelain: "roughnessFactor = mix(mix(0.26, 0.1, gBlack), 0.85, gGrout);",
   porcelain45: "roughnessFactor = mix(mix(0.26, 0.1, gBlack), 0.85, gGrout);",
@@ -148,9 +158,12 @@ function patch(material: THREE.Material, kind: Kind) {
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vWPos;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;");
+    // Floors and ceilings are double-sided: their back is a slab seen from the other floor.
+    const back = BACK[kind];
+    const color = back ? `if (!gl_FrontFacing) { diffuseColor.rgb = ${back}; } else ${COLOR[kind]}` : COLOR[kind];
     let frag = shader.fragmentShader
       .replace("#include <common>", `#include <common>\n${HEADER}`)
-      .replace("#include <color_fragment>", `#include <color_fragment>\n${COLOR[kind]}`);
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${color}`);
     const rough = ROUGHNESS[kind];
     if (rough) frag = frag.replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${rough}`);
     shader.fragmentShader = frag;

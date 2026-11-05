@@ -138,7 +138,7 @@ interface Edge {
   dir: Dir; // side of the cell the wall sits on; the wall faces into the cell
   i: number;
   j: number;
-  mat: "walls" | "glass" | "rails" | "elev" | "barrier"; // barrier: collision only, not drawn
+  mat: "walls" | "glass" | "rails" | "elev" | "barrier" | "slab"; // barrier: collision only, not drawn; slab: the edge of a floor structure
   y0: number;
   h: number;
 }
@@ -193,6 +193,7 @@ function emitWall(first: Edge, last: Edge, horizontal: boolean) {
 
 // ---- build -----------------------------------------------------------------------------------
 
+const OPP: Record<Dir, Dir> = { N: "S", S: "N", E: "W", W: "E" };
 const DIRS: { d: Dir; di: number; dj: number }[] = [
   { d: "N", di: 0, dj: 1 },
   { d: "S", di: 0, dj: -1 },
@@ -332,6 +333,17 @@ floors.forEach((f, fi) => {
         const nk = kindAt(f, i + di, j + dj);
         if (c === WALK) {
           const zone = isZone(k);
+          // Slab edge: where a floor that has a ceiling meets an open side (the atrium or a stair), close the
+          // 1.5 m of structure between its ceiling and the floor above, so you cannot look between the floors
+          // from the stairs. The band faces the open side and is not collidable.
+          const noCeiling = k === "void" || k === "stairzone" || k === "stairzone_o" || open || (k === "stair_landing_o" && floorNo === 3);
+          const openSide = nc === HOLE || (nc === WALK && (nk === "void" || nk === "stairzone" || nk === "stairzone_o"));
+          if (floorNo < 3 && !noCeiling && openSide) {
+            const above = floors[fi + 1];
+            const ak = kindAt(above, i, j);
+            if (at(above, i, j) === WALK && ak !== "stairzone" && ak !== "stairzone_o")
+              edges.push({ dir: OPP[d], i: i + di, j: j + dj, mat: "slab", y0: y0 + CEIL_H, h: FLOOR_H - CEIL_H });
+          }
           const lintel = () => {
             // lintel where an open-ceiling hall meets a room that keeps its dropped ceiling
             if (open && !isOpenCeiling(f, fi, i + di, j + dj) && nk !== "void")
@@ -1061,11 +1073,13 @@ const hex = (h: string, alpha = 1): [number, number, number, number] => {
 // the night: darkness comes from the lighting. Surface detail (tiles, plaster, panels) is added at run time
 // by src/engine/materials.ts, keyed by these material names.
 const MATERIALS: Record<string, { color: [number, number, number, number]; rough: number; blend?: boolean; double?: boolean }> = {
-  floors: { color: hex("#b4b1a8"), rough: 0.3 }, // glossy off-white porcelain
-  floor_atrium: { color: hex("#aaa79e"), rough: 0.3 },
-  floor_bath: { color: hex("#7f8a88"), rough: 0.35 },
-  floor_garage: { color: hex("#817c77"), rough: 0.95 }, // patched concrete
-  ceilings: { color: hex("#9a9890"), rough: 0.9 },
+  // Floors and ceilings are drawn on both sides (their back is the slab seen from the other floor).
+  floors: { color: hex("#b4b1a8"), rough: 0.3, double: true }, // glossy off-white porcelain
+  floor_atrium: { color: hex("#aaa79e"), rough: 0.3, double: true },
+  floor_bath: { color: hex("#7f8a88"), rough: 0.35, double: true },
+  floor_garage: { color: hex("#817c77"), rough: 0.95, double: true }, // patched concrete
+  ceilings: { color: hex("#9a9890"), rough: 0.9, double: true },
+  slab: { color: hex("#a8a59c"), rough: 0.92 }, // the edge band of a floor structure, plaster like the walls
   roof: { color: hex("#797872"), rough: 0.8 }, // painted steel truss
   walls: { color: hex("#a8a59c"), rough: 0.92 }, // near-white plaster, slightly warm
   glass: { color: [0.5, 0.65, 0.8, 0.22], rough: 0.05, blend: true },
