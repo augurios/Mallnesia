@@ -177,7 +177,7 @@ The main building has 3 floors, not 4 (Augusto's correction). Floor 4 was remove
 
 ## Cinema box office (floor 3)
 
-On floor 3 the inner west hall extends east over the north-west corner of Atrium B (x 51 to 57, y 141 to 153), and the cinema box office is there: a 3 m deep counter (x 57 to 60, y 141 to 153) with its front facing west, toward the west hall. The size and exact position along the atrium edge are my choice; the stairs on the north hall (x 54 to 60, y 153 to 159) stay as they are, just north of it.
+On floor 3 the inner west hall extends east over the north-west corner of Atrium B (x 51 to 57, y 141 to 153), and the cinema box office is there: a 3 m deep counter (x 57 to 60, y 141 to 153) with its front facing west, toward the west hall. The size and exact position along the atrium edge are my choice; the stairs on the north hall (x 54 to 60, y 153 to 159) stay as they are, just north of it. **Superseded:** the counter was cut and the extension now runs from y 142.5 (see "Floor 2 bridge" below).
 
 ## Changes from the reference photo pass
 
@@ -261,6 +261,6 @@ The stairs in the two towers (`a_stairs` x 51 to 64.5, y 51 to 57; `b_stairs` x 
 From `atrium_third-floor-looking-down.jpg` and `atrium_upper-floors-from-ground.jpg`. Built in `scripts/blockout/bridge.mts`.
 - **Twice as wide, grown north:** 6 m, x 51 to 78, y 135 to 141 (was y 135 to 138), kind `bridge`. **No ceiling**: open up to the roof.
 - **Inward D:** between the two south columns (x 54 to 75) the south edge is an arc cut into the deck, 3 m deep in the middle (the middle stays 3 m wide). A deep white beam runs under the edge (smooth along the arc) and the glass rail is angled straight panes, as in the photos.
-- **Four columns, two at each end:** x 54 and x 75, at the south edge (y 135) and 1.2 m in from the north edge (y 138.3), from the ground floor up to the floor 3 level. Each holds a cork-brown ball (1.7 m) in a white C-shaped hood that wraps the ball from below on the hall side, over the top and a little down the atrium side, with a cap plate reaching back to the floor 3 edge. A white beam joins each pair just under the floor 3 level, back to the hall edge.
-- **Floor 3 over the bridge:** the box office extension (`boxoffice_floor`) now starts at y 139.5, 1.5 m out over the north part of the bridge. The earlier extra floor 3 tabs over the bridge ends are gone (the columns stand there).
-- **My guesses, to check against the photos:** the depth of the arc, the column positions (the north pair is set in from the edge to clear the box office floor above), the hood's shape and size, and whether the north edge should also curve.
+- **Four columns, two at each end:** x 54 and x 75, at the south edge (y 135) and the north edge (y 141), from the ground floor up to the floor 3 level. Each holds a cork-brown ball (1.7 m) in a white C-shaped hood that wraps the ball from below on the hall side, over the top and a little down the atrium side, with a cap plate reaching back to the floor 3 edge. A white beam joins each pair just under the floor 3 level, back to the hall edge, and runs on north to carry the floor 3 extension.
+- **Floor 3 extensions, held by the north columns:** two, mirrored: west `boxoffice_floor` (x 51 to 57) and east `atrium_b_ext_e` (x 72 to 78), both from the north tower down to y 142.5, just north of the balls. The hood cap plates of the north columns reach to their edge. **The cinema box office counter (x 57 to 60, y 141 to 153) was cut** (decided by Augusto); the west extension is plain hall now.
+- **My guesses, to check against the photos:** the depth of the arc, the hood's shape and size, and whether the north edge should also curve.

@@ -236,9 +236,10 @@ def floor_items(floor):
         # columns (the inward D) and the four columns with balls are added by scripts/blockout/bridge.mts.
         items.append(("atrium_b_bridge", "Bridge (cross corridor) over Atrium B, floor 2, open to the roof", ("box", (51, 78, 135, 141)), "bridge"))
     if floor == 3:
-        # the west hall widens over the north-west corner of Atrium B; the cinema box office is there
-        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B (cinema box office area)", ("box", (51, 57, 139.5, 153)), "hall"))  # reaches 1.5 m out over the bridge
-        items.append(("boxoffice", "Cinema box office counter, facing the west hall", ("box", (57, 60, 141, 153)), "kiosk"))
+        # the west and east halls widen over the north corners of Atrium B, down to the bridge's north columns
+        # (the box office counter that stood here was cut)
+        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B, held by the bridge's north-west column", ("box", (51, 57, 142.5, 153)), "hall"))
+        items.append(("atrium_b_ext_e", "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column", ("box", (72, 78, 142.5, 153)), "hall"))
     return items
 
 
