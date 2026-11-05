@@ -92,3 +92,10 @@ body {
   text-shadow: 0 0 6px #000;
   pointer-events: none;
 }
+
+.game-root[data-hud="off"] .game-hint,
+.game-root[data-hud="off"] .game-status,
+.game-root[data-hud="off"] .game-flashlight,
+.game-root[data-hud="off"] .game-prompt {
+  display: none;
+}

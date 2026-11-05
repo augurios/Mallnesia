@@ -7,6 +7,7 @@ import { es } from "@/strings/es-CR";
 
 export default function GameCanvas() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const hudOff = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("hud") === "off"; // debug: ?hud=off hides the overlays (screenshots)
   const runtimeRef = useRef<Runtime | null>(null);
   const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
@@ -40,7 +41,7 @@ export default function GameCanvas() {
   }, []);
 
   return (
-    <div className="game-root" ref={rootRef}>
+    <div className="game-root" ref={rootRef} data-hud={hudOff ? "off" : undefined}>
       {status && (
         <div className="game-status">
           {es.floor} {status.floor} · {status.x.toFixed(1)}, {status.y.toFixed(1)}

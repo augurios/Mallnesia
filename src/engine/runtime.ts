@@ -4,6 +4,8 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { MeshBVH } from "three-mesh-bvh";
 import { createAudio } from "./audio";
 import { Doors } from "./doors";
+import { styleBlockout } from "./materials";
+import { createPost } from "./post";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 
 export interface PlayerStatus {
@@ -64,11 +66,12 @@ const SPAWNS: { x: number; y: number }[] = [
 /** First-person walk through the mall blockout: pointer-lock look, WASD, BVH wall collision. No React in here. */
 export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): Runtime {
   const renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   root.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x050507);
-  scene.fog = new THREE.Fog(0x050507, 6, 70);
+  scene.background = new THREE.Color(0x04060a); // near black with a blue tint: this is the night
+  scene.fog = new THREE.Fog(0x04060a, 6, 70);
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 250); // vertical fov: 60 is about 92 degrees horizontal at 16:9
   camera.rotation.order = "YXZ";
@@ -77,20 +80,26 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const urlQuality = params.get("quality"); // debug: ?quality=low|medium|high (not saved)
   camera.fov = parseFloat(params.get("fov") ?? "") || camera.fov; // debug: ?fov=<vertical degrees>
 
+  renderer.toneMappingExposure = parseFloat(params.get("exposure") ?? "") || 1.6; // debug: ?exposure=<number>
   const ambientLevel = parseFloat(params.get("ambient") ?? "");
-  scene.add(new THREE.AmbientLight(0x6070a0, Number.isFinite(ambientLevel) ? ambientLevel : 0.3)); // debug: ?ambient=<intensity>
+  // Faint cool sky glow from above, darker blue-grey bounce from below (art doc: never pure black).
+  scene.add(new THREE.HemisphereLight(0x4a5a78, 0x10141c, Number.isFinite(ambientLevel) ? ambientLevel : 2.4)); // debug: ?ambient=<intensity>
   const torch = new THREE.SpotLight(0xfff2d0, FLASH_INTENSITY, 40, Math.PI / 5, 0.4);
   torch.position.set(0, 0, 0);
   torch.target.position.set(0, 0, -1);
   camera.add(torch, torch.target);
   scene.add(camera);
 
+  const post = createPost(renderer, scene, camera);
+  let blockout: THREE.Object3D | null = null;
   let quality: QualityLevel = isQualityLevel(urlQuality) ? urlQuality : loadQuality();
   const applyQuality = () => {
     const preset = QUALITY_PRESETS[quality];
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.maxPixelRatio));
     (scene.fog as THREE.Fog).far = preset.fogFar;
     torch.distance = preset.torchDistance;
+    post.setSettings({ bloom: preset.bloom, film: preset.film });
+    if (blockout) styleBlockout(blockout, preset.detail);
     resize();
   };
 
@@ -140,6 +149,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (o.name === "glass" || o.name === "rails") o.renderOrder = 1;
     });
     scene.add(gltf.scene);
+    blockout = gltf.scene;
+    styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
     doors.load(gltf.scene);
     if (parts.length) bvh = new MeshBVH(mergeGeometries(parts, false));
     if (ground.length) groundBvh = new MeshBVH(mergeGeometries(ground, false));
@@ -187,6 +198,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const w = root.clientWidth || window.innerWidth;
     const h = root.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
+    post.setSize(w, h, renderer.getPixelRatio());
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   };
@@ -294,7 +306,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     camera.updateMatrixWorld();
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
-    renderer.render(scene, camera);
+    post.render(now / 1000);
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
@@ -323,6 +335,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       document.removeEventListener("pointerlockchange", onLockChange);
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
       audio.dispose();
+      post.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },

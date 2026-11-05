@@ -7,14 +7,20 @@ export interface QualityPreset {
   fogFar: number;
   /** Flashlight reach in meters. */
   torchDistance: number;
+  /** Procedural surface detail (tiles, plaster, concrete grain). The costliest per-pixel work. */
+  detail: boolean;
+  /** Bloom around bright highlights. */
+  bloom: boolean;
+  /** Film grain, vignette and color drain. */
+  film: boolean;
 }
 
 export const QUALITY_LEVELS: QualityLevel[] = ["low", "medium", "high"];
 
 export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
-  low: { maxPixelRatio: 0.75, fogFar: 40, torchDistance: 25 },
-  medium: { maxPixelRatio: 1, fogFar: 55, torchDistance: 32 },
-  high: { maxPixelRatio: 2, fogFar: 70, torchDistance: 40 },
+  low: { maxPixelRatio: 0.75, fogFar: 40, torchDistance: 25, detail: false, bloom: false, film: false },
+  medium: { maxPixelRatio: 1, fogFar: 55, torchDistance: 32, detail: true, bloom: false, film: true },
+  high: { maxPixelRatio: 2, fogFar: 70, torchDistance: 40, detail: true, bloom: true, film: true },
 };
 
 const STORAGE_KEY = "elmallvivo.quality";

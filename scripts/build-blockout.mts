@@ -755,25 +755,35 @@ const doorNodes = doorData.doors.map((d) => {
 
 // ---- write GLB ---------------------------------------------------------------------------------
 
+/** sRGB hex to the linear factors glTF expects. */
+const hex = (h: string, alpha = 1): [number, number, number, number] => {
+  const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const n = parseInt(h.slice(1), 16);
+  return [lin(((n >> 16) & 255) / 255), lin(((n >> 8) & 255) / 255), lin((n & 255) / 255), alpha];
+};
+
+// Base colors are the surfaces' own colors from docs/art_style_reference.md (muted, as photographed), not
+// the night: darkness comes from the lighting. Surface detail (tiles, plaster, panels) is added at run time
+// by src/engine/materials.ts, keyed by these material names.
 const MATERIALS: Record<string, { color: [number, number, number, number]; rough: number; blend?: boolean }> = {
-  floors: { color: [0.42, 0.42, 0.44, 1], rough: 0.9 },
-  floor_atrium: { color: [0.46, 0.43, 0.4, 1], rough: 0.9 },
-  floor_bath: { color: [0.4, 0.5, 0.45, 1], rough: 0.7 },
-  floor_garage: { color: [0.33, 0.33, 0.36, 1], rough: 1 },
-  ceilings: { color: [0.3, 0.3, 0.33, 1], rough: 1 },
-  roof: { color: [0.22, 0.22, 0.25, 1], rough: 1 },
-  walls: { color: [0.55, 0.53, 0.5, 1], rough: 0.95 },
-  glass: { color: [0.5, 0.65, 0.8, 0.25], rough: 0.1, blend: true },
-  rails: { color: [0.5, 0.65, 0.8, 0.3], rough: 0.1, blend: true },
-  stairs: { color: [0.74, 0.73, 0.71, 1], rough: 0.8 },
-  steel: { color: [0.1, 0.1, 0.12, 1], rough: 0.5 },
-  fascia: { color: [0.34, 0.3, 0.33, 1], rough: 0.8 },
-  lamp: { color: [0.92, 0.92, 0.88, 1], rough: 0.6 },
-  column: { color: [0.46, 0.44, 0.48, 1], rough: 0.7 },
-  elev: { color: [0.03, 0.03, 0.04, 1], rough: 0.25 },
-  garden: { color: [0.16, 0.34, 0.15, 1], rough: 1 },
-  garden_dark: { color: [0.09, 0.22, 0.1, 1], rough: 1 },
-  stone: { color: [0.42, 0.43, 0.45, 1], rough: 1 },
+  floors: { color: hex("#b4b1a8"), rough: 0.3 }, // glossy off-white porcelain
+  floor_atrium: { color: hex("#aaa79e"), rough: 0.3 },
+  floor_bath: { color: hex("#7f8a88"), rough: 0.35 },
+  floor_garage: { color: hex("#817c77"), rough: 0.95 }, // patched concrete
+  ceilings: { color: hex("#9a9890"), rough: 0.9 },
+  roof: { color: hex("#797872"), rough: 0.8 }, // painted steel truss
+  walls: { color: hex("#a8a59c"), rough: 0.92 }, // near-white plaster, slightly warm
+  glass: { color: [0.5, 0.65, 0.8, 0.22], rough: 0.05, blend: true },
+  rails: { color: [0.5, 0.65, 0.8, 0.28], rough: 0.05, blend: true },
+  stairs: { color: hex("#aca8a3"), rough: 0.7 },
+  steel: { color: hex("#1d1d21"), rough: 0.45 },
+  fascia: { color: hex("#5b565a"), rough: 0.7 },
+  lamp: { color: hex("#c9c9c2"), rough: 0.6 },
+  column: { color: hex("#656363"), rough: 0.6 }, // painted mid-grey
+  elev: { color: hex("#1b1a1a"), rough: 0.2 }, // black glass shafts
+  garden: { color: hex("#34502f"), rough: 1 },
+  garden_dark: { color: hex("#1f3a24"), rough: 1 },
+  stone: { color: hex("#6b6d70"), rough: 1 },
 };
 
 const doc = new Document();

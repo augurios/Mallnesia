@@ -148,6 +148,12 @@ Add the object after it, for example: "plastic food court chair, stackable, red,
 | Emergency stairs | white walls turned grey-blue in the dark, scuffed concrete, worn handrails; a green exit sign is the only light; mundane and tight |
 | Parking garage | half open to the night, so cold outside glow at the edges; sparse fluorescent tubes (a few on, some flickering), orange-banded columns, painted arrows, round mirrors, patched floor; starts normal, then signs skip and arrows point into walls |
 
+## Where the look stands (first pass, Nov 2026)
+
+Done: the blockout's base colors are the muted values from the material table above; world-space procedural detail on floors, walls, ceilings, stairs and concrete; ACES tone mapping with a dark blue fog; a faint hemisphere sky glow; bloom, film grain, vignette and color drain on medium and high.
+
+Not done yet, in the order I would do them: baked per-vertex lighting for the few stuck-on fixtures and the exterior glow (needs subdivided floors and walls); real small textures where procedural patterns are not enough (the food court floor, signage); exit signs, standby LEDs and other tiny lights; the sanity effects driving the post pass; reflections on the glossy floors.
+
 ## Open decisions
 
 - **Decided:** present-day setting (see "Era and condition").

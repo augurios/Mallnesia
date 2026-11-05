@@ -11,6 +11,7 @@ Next.js (App Router) + TypeScript, static export. The game engine is plain Three
   - `world/` (GLB loading, `three-mesh-bvh` collision, garage chunk generator)
   - `entities/` (shadow, girl in white, watchers, guard)
   - `save.ts` (versioned, tolerant of blocked storage)
+- Look (see `docs/art_style_reference.md`, "How the base project gets its look"): `materials.ts` adds procedural surface detail to the blockout's materials in world space (porcelain tiles with granite inserts and glossy grout, plaster with skirting and corner darkening, ceiling panels, stained concrete), keyed by the material names in `scripts/build-blockout.mts`. `post.ts` is the finishing pass (bloom, film grain, vignette, color drain) on top of ACES tone mapping and a hemisphere sky-glow light. Quality presets switch detail, bloom and film individually; low renders straight to the screen. Debug: `?ambient=`, `?exposure=`, `?hud=off`.
 - `src/strings/es-CR.ts` — all UI and in-world text, Costa Rican Spanish.
 - `docs/floorplans/` — floor plans and the generator that will feed the blockout GLB.
 
