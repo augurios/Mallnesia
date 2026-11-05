@@ -45,6 +45,10 @@ const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to ref
 const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
 const FLOOR_HEIGHT = 5; // keep in sync with scripts/build-blockout.mts
+const STEP_UP = 0.5; // the player climbs ledges up to this high (stair risers are 0.125)
+const SNAP_DOWN = 0.4; // and follows the ground down this far without falling
+const GRAVITY = 18;
+const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
@@ -93,8 +97,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const v = parseFloat(params.get(key) ?? "");
     return Number.isFinite(v) ? v : fallback;
   };
+  // `floor` is derived from the player's height each frame (see the tick); it starts from the spawn.
   let floor = Math.min(3, Math.max(1, Math.round(num("floor", 1)))) - 1;
-  const player = new THREE.Vector3(num("x", SPAWNS[floor].x), 0, -num("y", SPAWNS[floor].y));
+  const player = new THREE.Vector3(num("x", SPAWNS[floor].x), floor * FLOOR_HEIGHT, -num("y", SPAWNS[floor].y));
+  let fallSpeed = 0;
+  let eyeY = NaN; // smoothed camera height; NaN = snap to the player next frame
   let yaw = THREE.MathUtils.degToRad(num("yaw", 0));
   let pitch = THREE.MathUtils.degToRad(num("pitch", 0));
 
@@ -111,11 +118,19 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   // Collision: walls, glass and railings merged into one BVH.
   let bvh: MeshBVH | null = null;
+  // Ground: floor slabs and stair treads, raycast downward to find what the player stands on.
+  let groundBvh: MeshBVH | null = null;
   new GLTFLoader().load(BLOCKOUT_URL, (gltf) => {
     const parts: THREE.BufferGeometry[] = [];
+    const ground: THREE.BufferGeometry[] = [];
     gltf.scene.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
-      if (o.name === "walls" || o.name === "glass" || o.name === "rails") {
+      if (o.name.startsWith("floor") || o.name === "stairs") {
+        const g = (o.geometry as THREE.BufferGeometry).clone();
+        g.deleteAttribute("normal");
+        ground.push(g);
+      }
+      if (o.name === "walls" || o.name === "glass" || o.name === "rails" || o.name === "stairs") {
         const g = (o.geometry as THREE.BufferGeometry).clone();
         g.deleteAttribute("normal");
         parts.push(g);
@@ -125,6 +140,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     scene.add(gltf.scene);
     doors.load(gltf.scene);
     if (parts.length) bvh = new MeshBVH(mergeGeometries(parts, false));
+    if (ground.length) groundBvh = new MeshBVH(mergeGeometries(ground, false));
   }, undefined, (err) => console.error("Could not load the mall blockout", err));
 
   const keys = new Set<string>();
@@ -149,7 +165,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const jump = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];
     if (jump !== undefined) {
       floor = jump;
-      player.set(SPAWNS[jump].x, 0, -SPAWNS[jump].y);
+      player.set(SPAWNS[jump].x, jump * FLOOR_HEIGHT, -SPAWNS[jump].y);
+      fallSpeed = 0;
+      eyeY = NaN;
     }
   };
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
@@ -185,7 +203,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   /** Push the player out of any wall within PLAYER_RADIUS, horizontally only. */
   function collide() {
     if (!bvh) return;
-    const baseY = floor * FLOOR_HEIGHT;
+    const baseY = player.y;
     for (let pass = 0; pass < 3; pass++) {
       sphere.center.set(player.x, baseY + COLLIDER_HEIGHT, player.z);
       sphere.radius = PLAYER_RADIUS;
@@ -215,6 +233,30 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   }
 
   const projView = new THREE.Matrix4();
+  const groundRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+
+  /** Stands the player on the highest surface within step height, or lets them fall. */
+  function followGround(dt: number) {
+    if (!groundBvh) return;
+    groundRay.origin.set(player.x, player.y + STEP_UP, player.z);
+    const hit = groundBvh.raycastFirst(groundRay, THREE.FrontSide);
+    if (hit && hit.point.y >= player.y - SNAP_DOWN) {
+      player.y = hit.point.y;
+      fallSpeed = 0;
+      return;
+    }
+    fallSpeed += GRAVITY * dt;
+    player.y -= fallSpeed * dt;
+    if (hit && player.y < hit.point.y) {
+      player.y = hit.point.y;
+      fallSpeed = 0;
+    }
+    if (player.y < -3) {
+      player.y = floor * FLOOR_HEIGHT; // fell out of the world: back to the last floor
+      fallSpeed = 0;
+    }
+  }
+
   let last = performance.now();
   let charge = 1;
   let flashOn = true;
@@ -236,17 +278,20 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       player.z += (-Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * speed;
       collide();
     }
+    followGround(dt);
+    floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
     doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
 
     charge = flashOn ? Math.max(0, charge - FLASH_DRAIN * dt) : Math.min(1, charge + FLASH_RECHARGE * dt);
     if (charge === 0) flashOn = false;
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
 
-    camera.position.set(player.x, floor * FLOOR_HEIGHT + EYE_HEIGHT, player.z);
+    eyeY = Number.isNaN(eyeY) ? player.y : eyeY + (player.y - eyeY) * (1 - Math.exp(-CAMERA_FOLLOW * dt));
+    camera.position.set(player.x, eyeY + EYE_HEIGHT, player.z);
     camera.rotation.set(pitch, yaw, 0);
     camera.updateMatrixWorld();
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-    audio.setListener(player.x, floor * FLOOR_HEIGHT + EYE_HEIGHT, player.z, yaw);
+    audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     renderer.render(scene, camera);
 
     if (++statusTimer >= 10) {

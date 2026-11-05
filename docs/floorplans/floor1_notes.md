@@ -238,3 +238,13 @@ On floor 3 the halls around the atriums have no dropped ceiling; they open up to
 ## Food court stairs moved (decided by Augusto)
 
 The wide curved stairs between floors 2 and 3 in the food court moved 10 m north (y 25 to 31, x 66 to 78 unchanged) and are rotated 180 degrees. Floor 1 keeps the walk-in kiosk where it was (y 15 to 21). The blockout stairs are a solid block, so the rotation has no visible effect yet; it applies when the stairs get a real model (which end is the top landing and which the foot is still to decide).
+
+## Walkable stairs: towers A and B (decided by Augusto, from the photos)
+
+The stairs in the two towers (`a_stairs` x 51 to 64.5, y 51 to 57; `b_stairs` x 51 to 64.5, y 153 to 159) are **open to the atrium**, like `stairs_southern-tower-and-elevators-from-ground` and `stairs_northern-tower-and-elevators`: open treads, glass rails, and round landings that stick out over the atrium. Built in `scripts/build-blockout.mts` (`TOWERS`). A first version with an enclosed shaft was wrong and was replaced.
+
+- **Entries:** the south tower (A) has its hall to the south and the atrium to the north; the north tower (B) is the mirror. **You enter from the hall end on every floor** (including the ground floor), and each floor's flights are stacked exactly over the floor below, like the photos. (An earlier version entered the ground floor from the atrium side; Augusto corrected it.)
+- **Per floor:** a flight of 15 steps up the west lane to a round landing over the atrium (half a floor up), then 15 steps back down the east lane, arriving at the next floor's hall-end landing (1.5 m deep, open to the hall). The round landings sit directly above each other at 2.5 m and 7.5 m. **The base is open, like the photos:** treads are thin open-riser plates on a dark steel stringer, and the space under the flights is a planter garden (beds with plants and river stones) behind a glass fence, with a round planter drum under the lower round landing. You can walk under that landing from the atrium; the garden itself is not enterable. Plants and stones are low-poly placeholders.
+- **Sizes:** two 3 m lanes (6 m) of the 13.5 m box; the remaining 7.5 m stays a solid core next to the elevators. The round landings are 6 m wide and stick out about 3.5 m past the box into the atrium. These are my choices, not measured.
+- **Rails:** glass along every flight and landing edge, along the west side of the stair on every floor (the ground floor too), and across the floor 3 hall end on the lane with no flight up.
+- **Not done yet:** the NW stairs, the intermittent stairs, the center curved stair, the food court wide stair and the escalators are still solid blocks. The glass elevator shafts next to the towers are solid.

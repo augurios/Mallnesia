@@ -182,7 +182,38 @@ const DIRS: { d: Dir; di: number; dj: number }[] = [
   { d: "W", di: -1, dj: 0 },
 ];
 
-const floors: Floor[] = [1, 2, 3].map((n) => rasterize(JSON.parse(readFileSync(`${PLANS}/floor${n}_plan.json`, "utf8")), n));
+const plans: Plan[] = [1, 2, 3].map((n) => JSON.parse(readFileSync(`${PLANS}/floor${n}_plan.json`, "utf8")));
+const floors: Floor[] = plans.map((p, i) => rasterize(p, i + 1));
+
+// ---- stair towers --------------------------------------------------------------------------------
+// The stairs in the two towers are open to the atrium, like the reference photos (stairs_*): 3 m wide
+// flights with open treads, glass rails, and round landings that stick out over the atrium. Every floor
+// is the same and stacked exactly over the one below, as in the photos. The base is open: a planter
+// garden behind a glass fence under the flights, and a round planter under the lower round landing.
+// Each tower is described in a
+// local frame: u runs from the hall end (0) toward the atrium end (6), v runs east from the box's west
+// edge. The south tower (A) has its hall to the south, the north tower (B) to the north, and you enter
+// from the hall end on every floor. Per floor: a flight up the west lane to a round landing over the
+// atrium (half a floor up), then a flight back down the east lane, arriving at the next floor's hall end.
+// The rest of the box (v 6 to 13.5) stays a solid core beside the elevators.
+const TOWERS = [
+  { id: "a_stairs", hall: "S" },
+  { id: "b_stairs", hall: "N" },
+].map((t) => ({ ...t, box: plans[0].boxes.find((b) => b.id === t.id)! }));
+type Tower = (typeof TOWERS)[number];
+const ST = { lane: 3, strip: 1.5, depth: 6, nose: 3, tread: 0.06, slab: 0.35 };
+const isZone = (k: string) => k === "stairzone" || k === "stair_landing";
+/** Tower frame to a three.js point: u toward the atrium from the hall end, v east, h up. */
+const towerPt = (t: Tower, u: number, v: number, h: number): V3 => [t.box.x0 + v, h, -(t.hall === "S" ? t.box.y0 + u : t.box.y1 - u)];
+for (const f of floors)
+  for (const t of TOWERS)
+    for (let j = Math.round(t.box.y0 / CELL); j < Math.round(t.box.y1 / CELL); j++)
+      for (let i = Math.round(t.box.x0 / CELL); i < Math.round((t.box.x0 + 2 * ST.lane) / CELL); i++) {
+        const yc = (j + 0.5) * CELL;
+        const u = t.hall === "S" ? yc - t.box.y0 : t.box.y1 - yc;
+        f.cls[j * NX + i] = WALK;
+        f.kind[j * NX + i] = u < ST.strip ? "stair_landing" : "stairzone";
+      }
 
 const at = (f: Floor, i: number, j: number) => (i < 0 || j < 0 || i >= NX || j >= NY ? EMPTY : f.cls[j * NX + i]);
 const kindAt = (f: Floor, i: number, j: number) => (i < 0 || j < 0 || i >= NX || j >= NY ? "" : f.kind[j * NX + i]);
@@ -243,9 +274,10 @@ floors.forEach((f, fi) => {
       if (c === WALK) {
         const k = f.kind[j * NX + i];
         mat = k === "void" ? "floor_atrium" : k === "bath" ? "floor_bath" : k === "garage" ? "floor_garage" : "floors";
+        if (k === "stairzone" && fi > 0) mat = ""; // open volume: floor only at the base, where the garden is
         stats.walkable[fi]++;
       }
-      const open = mat !== "" && isOpenCeiling(f, fi, i, j);
+      const open = mat !== "" && (isOpenCeiling(f, fi, i, j) || (i < NX && f.kind[j * NX + i] === "stairzone"));
       if (mat !== runMat || open !== runOpen || mat === "") {
         flush(i);
         if (mat) runStart = i;
@@ -264,13 +296,24 @@ floors.forEach((f, fi) => {
         const nc = at(f, i + di, j + dj);
         const nk = kindAt(f, i + di, j + dj);
         if (c === WALK) {
-          if (nc === WALK) {
+          const zone = isZone(k);
+          const lintel = () => {
             // lintel where an open-ceiling hall meets a room that keeps its dropped ceiling
             if (open && !isOpenCeiling(f, fi, i + di, j + dj) && nk !== "void")
               edges.push({ dir: d, i, j, mat: "walls", y0: y0 + CEIL_H, h: ROOF_Y - y0 - CEIL_H });
+          };
+          const shaftH = floorNo === 3 ? CEIL_H : FLOOR_H; // a tower is one tall room, no slab between floors
+          if (nc === WALK) {
+            if (!zone && isZone(nk)) {
+              // A hall (or the atrium floor) beside a stair tower. The hall-end landing is a doorway on
+              // every floor; along the flights it is glass rail (the base is open, see the garden).
+              // From the atrium floor the flights are walked around, not entered (their sides block).
+              if (nk === "stair_landing" || k === "void") lintel();
+              else edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
+            } else lintel();
             continue;
           }
-          const wallH = nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
+          const wallH = k === "stairzone" ? shaftH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
           if (nc === HOLE) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (k === "garage" && nc === EMPTY) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (nc === EMPTY && isOutside(i + di, j + dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
@@ -289,6 +332,10 @@ floors.forEach((f, fi) => {
   }
   wallRuns(edges);
 
+  // Stair towers are open up through the floors: cap them on floor 3.
+  if (floorNo === 3)
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) if (f.kind[j * NX + i] === "stairzone") flatRun("ceilings", i, i + 1, j, y0 + CEIL_H, false);
+
   // Roof over the atriums and the open-ceiling halls (top floor).
   if (floorNo === 3) {
     for (let j = 0; j < NY; j++) {
@@ -304,6 +351,204 @@ floors.forEach((f, fi) => {
     }
   }
 });
+
+// Flights. Ground-floor flights are solid down to the floor (the space under them is closed); the
+// upper flights are thin steps hovering over them. Treads are boxes, rails are glass quads.
+function addTo(target: Geo, g: Geo) {
+  const base = target.pos.length / 3;
+  target.pos.push(...g.pos);
+  target.nrm.push(...g.nrm);
+  for (const k of g.idx) target.idx.push(base + k);
+}
+
+/** Convex polygon (x, z points) extruded from y0 up to y1. */
+function slabGeo(pts: [number, number][], y0: number, y1: number): Geo {
+  const g = new Geo();
+  const n = pts.length;
+  const cx = pts.reduce((a, p) => a + p[0], 0) / n;
+  const cz = pts.reduce((a, p) => a + p[1], 0) / n;
+  const top = pts.map(([x, z]): V3 => [x, y1, z]);
+  const bot = pts.map(([x, z]): V3 => [x, y0, z]);
+  for (let i = 1; i < n - 1; i++) {
+    facedQuad(g, top[0], top[i], top[i + 1], top[i + 1], [0, 1, 0]);
+    facedQuad(g, bot[0], bot[i], bot[i + 1], bot[i + 1], [0, -1, 0]);
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    let nx = pts[j][1] - pts[i][1];
+    let nz = -(pts[j][0] - pts[i][0]);
+    const len = Math.hypot(nx, nz) || 1;
+    nx /= len;
+    nz /= len;
+    if (nx * ((pts[i][0] + pts[j][0]) / 2 - cx) + nz * ((pts[i][1] + pts[j][1]) / 2 - cz) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    facedQuad(g, bot[i], bot[j], top[j], top[i], [nx, 0, nz]);
+  }
+  return g;
+}
+
+/** Convex solid from 8 points: [a0 a1 a2 a3] one end face, [b0 b1 b2 b3] the other, a_i joined to b_i. */
+function prismGeo(p: V3[]): Geo {
+  const g = new Geo();
+  const c = [0, 1, 2].map((k) => p.reduce((acc, q) => acc + q[k], 0) / 8);
+  const faces = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [3, 2, 6, 7], [0, 3, 7, 4], [1, 2, 6, 5]];
+  for (const f of faces) {
+    const [a, b, , d] = f.map((i) => p[i]);
+    let n: V3 = [
+      (b[1] - a[1]) * (d[2] - a[2]) - (b[2] - a[2]) * (d[1] - a[1]),
+      (b[2] - a[2]) * (d[0] - a[0]) - (b[0] - a[0]) * (d[2] - a[2]),
+      (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]),
+    ];
+    const len = Math.hypot(...n) || 1;
+    n = [n[0] / len, n[1] / len, n[2] / len];
+    const fc = [0, 1, 2].map((k) => f.reduce((acc, i) => acc + p[i][k], 0) / 4);
+    if (n[0] * (fc[0] - c[0]) + n[1] * (fc[1] - c[1]) + n[2] * (fc[2] - c[2]) < 0) n = [-n[0], -n[1], -n[2]];
+    facedQuad(g, p[f[0]], p[f[1]], p[f[2]], p[f[3]], n);
+  }
+  return g;
+}
+
+/** Four-sided pyramid (a stylised plant): square base of half-width r at y0, apex h above. */
+function pyramidGeo(cx: number, y0: number, cz: number, r: number, h: number): Geo {
+  const g = new Geo();
+  const base: V3[] = [[cx - r, y0, cz - r], [cx + r, y0, cz - r], [cx + r, y0, cz + r], [cx - r, y0, cz + r]];
+  const apex: V3 = [cx, y0 + h, cz];
+  for (let i = 0; i < 4; i++) {
+    const a = base[i];
+    const b = base[(i + 1) % 4];
+    const mx = (a[0] + b[0]) / 2 - cx;
+    const mz = (a[2] + b[2]) / 2 - cz;
+    const len = Math.hypot(mx, mz, h * 0.5) || 1;
+    facedQuad(g, a, b, apex, apex, [mx / len, (h * 0.5) / len, mz / len]);
+  }
+  return g;
+}
+
+type Rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: number) => void;
+
+/**
+ * The garden at the foot of the stairs (see the photos): planter beds with plants and river stones under
+ * the flights, behind a glass fence, and a round planter drum under the lower round landing.
+ */
+function garden(t: Tower, P: (u: number, v: number, h: number) => V3, rail: Rail) {
+  let seed = t.hall === "S" ? 7 : 19;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const plants = geo("garden");
+  const stones = geo("stone");
+  const bed = (u0: number, u1: number, v0: number, v1: number, h: number, count: number, clear: (u: number) => number = () => 9) => {
+    const a = P(u0, v0, 0);
+    const b = P(u1, v1, 0);
+    addTo(stones, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), 0, h, Math.min(a[2], b[2]), Math.max(a[2], b[2])));
+    for (let i = 0; i < count; i++) {
+      const u = u0 + 0.3 + rnd() * (u1 - u0 - 0.6);
+      const q = P(u, v0 + 0.3 + rnd() * (v1 - v0 - 0.6), h);
+      addTo(plants, pyramidGeo(q[0], h, q[2], 0.2 + rnd() * 0.3, Math.min(0.5 + rnd() * 0.9, Math.max(0.2, clear(u)))));
+      if (i % 3 === 0) {
+        const s = P(u0 + 0.2 + rnd() * (u1 - u0 - 0.4), v0 + 0.2 + rnd() * (v1 - v0 - 0.4), h);
+        addTo(stones, boxGeo(s[0] - 0.12, s[0] + 0.12, h, h + 0.1, s[2] - 0.09, s[2] + 0.09));
+      }
+    }
+  };
+  // Under the flights. The west lane's flight is low near the hall end, so its bed starts further in.
+  bed(1.8, ST.depth - 0.1, ST.lane + 0.1, 2 * ST.lane - 0.1, 0.3, 14);
+  // Plants stay under the flight above: its underside is 0.5 m below the tread line (FLOOR_H / 2 over 4.5 m).
+  bed(3.5, ST.depth - 0.1, 0.1, ST.lane - 0.1, 0.3, 7, (u) => ((u - ST.strip) * FLOOR_H) / 2 / (ST.depth - ST.strip) - 0.9);
+  // Glass fence: across the hall end of the east lane and along the atrium edge of the whole base.
+  rail(1.6, ST.lane, 0, 1.6, 2 * ST.lane, 0);
+  rail(ST.depth, 0, 0, ST.depth, 2 * ST.lane, 0);
+  // Round planter drum under the lower round landing (solid, so it is part of the collision).
+  const cu = ST.depth + 1.4;
+  const cv = ST.nose;
+  const ring = (r: number) =>
+    Array.from({ length: 14 }, (_, i): [number, number] => {
+      const q = P(cu + r * Math.sin((i / 14) * 2 * Math.PI), cv + r * Math.cos((i / 14) * 2 * Math.PI), 0);
+      return [q[0], q[2]];
+    });
+  addTo(geo("stairs"), slabGeo(ring(1.7), 0, 0.9));
+  addTo(stones, slabGeo(ring(1.5), 0.9, 0.97));
+  for (let i = 0; i < 9; i++) {
+    const a = rnd() * 2 * Math.PI;
+    const r = rnd() * 1.2;
+    const q = P(cu + r * Math.sin(a), cv + r * Math.cos(a), 0);
+    addTo(plants, pyramidGeo(q[0], 0.97, q[2], 0.2 + rnd() * 0.25, 0.6 + rnd() * 1.0));
+  }
+}
+
+for (const t of TOWERS) {
+  const stairs = geo("stairs");
+  const rails = geo("rails");
+  const P = (u: number, v: number, h: number) => towerPt(t, u, v, h);
+  const box = (u0: number, u1: number, v0: number, v1: number, h0: number, h1: number) => {
+    const a = P(u0, v0, h0);
+    const b = P(u1, v1, h1);
+    addTo(stairs, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1]), Math.min(a[2], b[2]), Math.max(a[2], b[2])));
+  };
+  /** Glass rail between two points of the tower frame; heights are where it stands (it rises RAIL_H above). */
+  const rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: number) => {
+    const a = P(u0, v0, h0);
+    const b = P(u1, v1, h1);
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1;
+    const n: V3 = [(b[2] - a[2]) / len, 0, -(b[0] - a[0]) / len];
+    rails.quad(a, b, [b[0], b[1] + RAIL_H, b[2]], [a[0], a[1] + RAIL_H, a[2]], n);
+  };
+  const flight = (lane: number, uS: number, hS: number, uE: number, hE: number, steps: number) => {
+    const dir = Math.sign(uE - uS);
+    const tread = Math.abs(uE - uS) / steps;
+    const rise = (hE - hS) / steps;
+    const v0 = lane * ST.lane;
+    const v1 = v0 + ST.lane;
+    for (let k = 0; k < steps; k++) {
+      const ua = uS + dir * k * tread;
+      const top = hS + (k + 1) * rise;
+      box(ua, ua + dir * tread, v0, v1, top - ST.tread, top);
+    }
+    for (const v of [v0, v1]) rail(uS, v, hS + rise, uE, v, hE);
+    // Dark steel stringer down the middle of the flight, under the treads (open risers, like the photos).
+    const vc = v0 + ST.lane / 2;
+    const w = 0.18;
+    const top0 = hS + rise;
+    const under = ST.tread + 0.42;
+    const prism: V3[] = [
+      P(uS, vc - w, top0 - ST.tread), P(uE, vc - w, hE - ST.tread), P(uE, vc - w, hE - under), P(uS, vc - w, top0 - under),
+      P(uS, vc + w, top0 - ST.tread), P(uE, vc + w, hE - ST.tread), P(uE, vc + w, hE - under), P(uS, vc + w, top0 - under),
+    ];
+    addTo(geo("steel"), prismGeo(prism));
+  };
+  /** Round landing sticking out from the atrium end (u = depth) over the lanes starting at v0. */
+  const round = (v0: number, h: number) => {
+    const w = 2 * ST.nose;
+    const vm = v0 + ST.nose;
+    const straight = ST.depth + 0.5;
+    const poly: [number, number][] = [[ST.depth, v0], [ST.depth, v0 + w]];
+    for (let a = 0; a <= 8; a++) {
+      const th = (a / 8) * Math.PI;
+      poly.push([straight + ST.nose * Math.sin(th), vm + ST.nose * Math.cos(th)]);
+    }
+    const xz = poly.map(([u, v]): [number, number] => {
+      const q = P(u, v, 0);
+      return [q[0], q[2]];
+    });
+    addTo(stairs, slabGeo(xz, h - ST.slab, h));
+    for (let i = 1; i < poly.length; i++) {
+      const [u0, w0] = poly[i];
+      const [u1, w1] = poly[(i + 1) % poly.length];
+      rail(u0, w0, h, u1, w1, h); // every edge but the first (the one the flights meet)
+    }
+  };
+
+  // Same on every floor: up the west lane to the round landing, back down the east lane to the hall end.
+  for (let fi = 0; fi < 2; fi++) {
+    const base = fi * FLOOR_H;
+    flight(0, ST.strip, base, ST.depth, base + FLOOR_H / 2, 15);
+    round(0, base + FLOOR_H / 2);
+    flight(1, ST.depth, base + FLOOR_H / 2, ST.strip, base + FLOOR_H, 15);
+  }
+  garden(t, P, rail);
+  // Floor 3 has no flight up from the west lane: rail its edge so nobody walks into the stairwell.
+  rail(ST.strip, 0, 2 * FLOOR_H, ST.strip, ST.lane, 2 * FLOOR_H);
+}
 
 // Spawn points used by src/engine/runtime.ts must be walkable cells.
 for (const [fi, x, y] of [[0, 72, 28], [1, 48, 100], [2, 48, 100]] as const) {
@@ -396,17 +641,19 @@ function boxGeo(x0: number, x1: number, y0: number, y1: number, z0: number, z1: 
     [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]],
     [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [0, 0, -1]],
   ];
-  for (const [a, b, c, d, n] of faces) {
-    const cross = [
-      (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
-      (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
-      (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
-    ];
-    const facing = cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0;
-    if (facing) g.quad(a, b, c, d, n);
-    else g.quad(a, d, c, b, n);
-  }
+  for (const [a, b, c, d, n] of faces) facedQuad(g, a, b, c, d, n);
   return g;
+}
+
+/** A quad wound so its front side faces along n, whichever way the corners were given. */
+function facedQuad(g: Geo, a: V3, b: V3, c: V3, d: V3, n: V3) {
+  const cross = [
+    (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+    (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
+  ];
+  if (cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0) g.quad(a, b, c, d, n);
+  else g.quad(a, d, c, b, n);
 }
 
 const doorNodes = doorData.doors.map((d) => {
@@ -451,6 +698,10 @@ const MATERIALS: Record<string, { color: [number, number, number, number]; rough
   walls: { color: [0.55, 0.53, 0.5, 1], rough: 0.95 },
   glass: { color: [0.5, 0.65, 0.8, 0.25], rough: 0.1, blend: true },
   rails: { color: [0.5, 0.65, 0.8, 0.3], rough: 0.1, blend: true },
+  stairs: { color: [0.74, 0.73, 0.71, 1], rough: 0.8 },
+  steel: { color: [0.1, 0.1, 0.12, 1], rough: 0.5 },
+  garden: { color: [0.16, 0.34, 0.15, 1], rough: 1 },
+  stone: { color: [0.42, 0.43, 0.45, 1], rough: 1 },
 };
 
 const doc = new Document();

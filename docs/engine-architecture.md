@@ -5,7 +5,7 @@ Next.js (App Router) + TypeScript, static export. The game engine is plain Three
 ## Layout
 
 - `src/app/` — Next.js UI. `page.tsx` renders `GameLoader`, which loads `GameCanvas` client-side only (`ssr: false`), since the engine needs `window` and WebGL. `GameCanvas` mounts the engine and shows the menu/hint overlay.
-- `src/engine/` — framework-free TypeScript. Today: `runtime.ts` (renderer, loop, first-person movement and look, test scene). Planned modules, mirroring the reference:
+- `src/engine/` — framework-free TypeScript. Today: `runtime.ts` (renderer, loop, first-person movement and look, test scene). The player's height follows the ground: a downward ray against the floor and stair meshes (step up 0.5 m, otherwise gravity), and the floor index is derived from that height. Planned modules, mirroring the reference:
   - `input.ts` (keyboard, mouse, touch), `audio.ts`, `sanity.ts`, `lighting.ts` (baked plus flashlight with charge), `quality.ts` (presets, `?quality=`)
   - `levels/` (registry, lazy loading; the mall and the garage as separate levels)
   - `world/` (GLB loading, `three-mesh-bvh` collision, garage chunk generator)
