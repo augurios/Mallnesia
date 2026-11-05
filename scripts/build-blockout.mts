@@ -6,6 +6,8 @@
 // then emit floor, ceiling and wall quads along the borders, merging runs of equal edges.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { Document, NodeIO } from "@gltf-transform/core";
+import { EXTMeshoptCompression } from "@gltf-transform/extensions";
+import { MeshoptEncoder } from "meshoptimizer";
 import * as THREE from "three";
 import { MeshBVH } from "three-mesh-bvh";
 
@@ -1099,11 +1101,38 @@ const MATERIALS: Record<string, { color: [number, number, number, number]; rough
   gravel: { color: hex("#837d72"), rough: 0.9 }, // river-stone beds (pattern added in materials.ts)
 };
 
+// Each material's geometry is cut into chunks (storey x square of CHUNK_SIZE meters) so the renderer can
+// skip the ones outside the view. A triangle goes to the chunk that holds its centroid. Every chunk keeps
+// the material's name as its node name: the runtime picks meshes (colliders, ground) by that name.
+const CHUNK_SIZE = Number(process.env.CHUNK_SIZE ?? 48);
+function chunks(g: Geo): Geo[] {
+  const parts = new Map<string, { geo: Geo; remap: Map<number, number> }>();
+  for (let t = 0; t < g.idx.length; t += 3) {
+    const tri = [g.idx[t], g.idx[t + 1], g.idx[t + 2]];
+    const c = [0, 1, 2].map((k) => (g.pos[tri[0] * 3 + k] + g.pos[tri[1] * 3 + k] + g.pos[tri[2] * 3 + k]) / 3);
+    const key = `${Math.floor(c[1] / FLOOR_H)}:${Math.floor(c[0] / CHUNK_SIZE)}:${Math.floor(c[2] / CHUNK_SIZE)}`;
+    let part = parts.get(key);
+    if (!part) parts.set(key, (part = { geo: new Geo(), remap: new Map() }));
+    for (const v of tri) {
+      let n = part.remap.get(v);
+      if (n === undefined) {
+        n = part.geo.pos.length / 3;
+        part.remap.set(v, n);
+        part.geo.pos.push(g.pos[v * 3], g.pos[v * 3 + 1], g.pos[v * 3 + 2]);
+        part.geo.nrm.push(g.nrm[v * 3], g.nrm[v * 3 + 1], g.nrm[v * 3 + 2]);
+      }
+      part.geo.idx.push(n);
+    }
+  }
+  return [...parts.values()].map((p) => p.geo);
+}
+
 const doc = new Document();
 const buffer = doc.createBuffer();
 const scene = doc.createScene("mall_blockout");
 let triangles = 0;
-for (const [name, g] of Object.entries(geos)) {
+let nodes = 0;
+for (const [name, whole] of Object.entries(geos)) {
   const m = MATERIALS[name];
   const mat = doc
     .createMaterial(name)
@@ -1112,15 +1141,18 @@ for (const [name, g] of Object.entries(geos)) {
     .setMetallicFactor(0)
     .setDoubleSided(!!m.blend || !!m.double)
     .setAlphaMode(m.blend ? "BLEND" : "OPAQUE");
-  const prim = doc
-    .createPrimitive()
-    .setMaterial(mat)
-    .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(new Float32Array(g.pos)).setBuffer(buffer))
-    .setAttribute("NORMAL", doc.createAccessor().setType("VEC3").setArray(new Float32Array(g.nrm)).setBuffer(buffer))
-    .setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(g.idx)).setBuffer(buffer));
-  const mesh = doc.createMesh(name).addPrimitive(prim);
-  scene.addChild(doc.createNode(name).setMesh(mesh));
-  triangles += g.idx.length / 3;
+  for (const g of chunks(whole)) {
+    const prim = doc
+      .createPrimitive()
+      .setMaterial(mat)
+      .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(new Float32Array(g.pos)).setBuffer(buffer))
+      .setAttribute("NORMAL", doc.createAccessor().setType("VEC3").setArray(new Float32Array(g.nrm)).setBuffer(buffer))
+      .setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(g.idx)).setBuffer(buffer));
+    const mesh = doc.createMesh(name).addPrimitive(prim);
+    scene.addChild(doc.createNode(name).setMesh(mesh));
+    triangles += g.idx.length / 3;
+    nodes++;
+  }
 }
 
 // Secret doors: same material as the walls, so a closed door disappears into them.
@@ -1161,7 +1193,11 @@ for (const { d, y0, half, sx, sz } of doorNodes) {
 }
 
 mkdirSync("public/models", { recursive: true });
-const bytes = await new NodeIO().writeBinary(doc);
+// Meshopt compression of the vertex data only (no quantization): the runtime builds its collision BVH from
+// these positions, so they have to stay plain floats. The runtime needs the meshopt decoder to read it.
+await MeshoptEncoder.ready;
+doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.FILTER });
+const bytes = await new NodeIO().registerExtensions([EXTMeshoptCompression]).registerDependencies({ "meshopt.encoder": MeshoptEncoder }).writeBinary(doc);
 writeFileSync(OUT, bytes);
-console.log(`wrote ${OUT}: ${(bytes.byteLength / 1024).toFixed(0)} KB, ${triangles} triangles`);
+console.log(`wrote ${OUT}: ${(bytes.byteLength / 1024).toFixed(0)} KB, ${triangles} triangles, ${nodes} chunks`);
 console.log("walkable cells per floor:", stats.walkable.join(", "));

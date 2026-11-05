@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { MeshBVH } from "three-mesh-bvh";
 import { createAudio } from "./audio";
@@ -131,23 +132,25 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let bvh: MeshBVH | null = null;
   // Ground: floor slabs and stair treads, raycast downward to find what the player stands on.
   let groundBvh: MeshBVH | null = null;
-  new GLTFLoader().load(BLOCKOUT_URL, (gltf) => {
+  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(BLOCKOUT_URL, (gltf) => {
     const parts: THREE.BufferGeometry[] = [];
     const ground: THREE.BufferGeometry[] = [];
     gltf.scene.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
-      if (o.name.startsWith("floor") || o.name === "stairs") {
+      // Chunks of one material share its name, but the loader makes node names unique (walls, walls_1, ...).
+      const kind = (o.material as THREE.Material).name;
+      if (kind.startsWith("floor") || kind === "stairs") {
         const g = (o.geometry as THREE.BufferGeometry).clone();
         g.deleteAttribute("normal");
         ground.push(g);
       }
-      if (o.name === "barrier") o.visible = false; // collision only
-      if (COLLIDERS.includes(o.name)) {
+      if (kind === "barrier") o.visible = false; // collision only
+      if (COLLIDERS.includes(kind)) {
         const g = (o.geometry as THREE.BufferGeometry).clone();
         g.deleteAttribute("normal");
         parts.push(g);
       }
-      if (o.name === "glass" || o.name === "rails") o.renderOrder = 1;
+      if (kind === "glass" || kind === "rails") o.renderOrder = 1;
     });
     scene.add(gltf.scene);
     blockout = gltf.scene;

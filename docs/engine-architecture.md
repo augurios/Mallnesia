@@ -20,3 +20,9 @@ Next.js (App Router) + TypeScript, static export. The game engine is plain Three
 - `npm run dev` — dev server
 - `npm run lint`, `npx tsc --noEmit` — checks
 - `npm run build` — static export to `out/` (relative asset URLs, so it can sit in a subfolder)
+
+## Optimization plan (running name)
+
+Order: (1) chunk and compress the blockout, (2) split the builder into modules and add automated walk/screenshot checks, (3) kit pieces and placement JSON, (4) exterior panorama and baked vertex AO, (5) area streaming. Layers: shell, collision, kit pieces, area decoration, hero areas, garage. Split by what a part is, not by floor.
+
+**Step 1 (done): chunks and compression.** `scripts/build-blockout.mts` cuts each material's geometry into chunks (storey x 48 m square, `CHUNK_SIZE` env to try other sizes; triangle goes to the chunk holding its centroid), so three.js frustum culling can skip them. About 277 chunks. Every chunk node keeps the material name, because the runtime picks colliders and ground by mesh name. The GLB is written with `EXT_meshopt_compression` (3.5 MB to about 1 MB). Positions stay plain float32 on purpose: the collision BVH is built from them. Normals are quantized, and the runtime drops them for collision anyway. `GLTFLoader` needs `MeshoptDecoder` (set in `runtime.ts`).
