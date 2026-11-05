@@ -49,6 +49,8 @@ const STEP_UP = 0.5; // the player climbs ledges up to this high (stair risers a
 const SNAP_DOWN = 0.4; // and follows the ground down this far without falling
 const GRAVITY = 18;
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
+// Meshes of the blockout the player collides with. Keep in sync with COLLIDERS in scripts/build-blockout.mts.
+const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel"];
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
@@ -130,7 +132,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         g.deleteAttribute("normal");
         ground.push(g);
       }
-      if (o.name === "walls" || o.name === "glass" || o.name === "rails" || o.name === "stairs") {
+      if (COLLIDERS.includes(o.name)) {
         const g = (o.geometry as THREE.BufferGeometry).clone();
         g.deleteAttribute("normal");
         parts.push(g);

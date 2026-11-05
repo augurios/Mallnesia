@@ -19,6 +19,8 @@ const FLOOR_H = 5;
 const CEIL_H = 3.5;
 const ROOF_Y = 20;
 const RAIL_H = 1.1;
+// Meshes the player collides with (walls, glass, rails, stairs and their steel and columns). Keep in sync with src/engine/runtime.ts.
+const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel"];
 
 type Box = { id: string; kind: string; x0: number; x1: number; y0: number; y1: number };
 type Poly = { id: string; kind: string; points: [number, number][] };
@@ -120,7 +122,7 @@ interface Edge {
   dir: Dir; // side of the cell the wall sits on; the wall faces into the cell
   i: number;
   j: number;
-  mat: "walls" | "glass" | "rails";
+  mat: "walls" | "glass" | "rails" | "elev";
   y0: number;
   h: number;
 }
@@ -302,39 +304,50 @@ floors.forEach((f, fi) => {
             if (open && !isOpenCeiling(f, fi, i + di, j + dj) && nk !== "void")
               edges.push({ dir: d, i, j, mat: "walls", y0: y0 + CEIL_H, h: ROOF_Y - y0 - CEIL_H });
           };
-          const shaftH = floorNo === 3 ? CEIL_H : FLOOR_H; // a tower is one tall room, no slab between floors
           if (nc === WALK) {
             if (!zone && isZone(nk)) {
               // A hall (or the atrium floor) beside a stair tower. The hall-end landing is a doorway on
               // every floor; along the flights it is glass rail (the base is open, see the garden).
               // From the atrium floor the flights are walked around, not entered (their sides block).
               if (nk === "stair_landing" || k === "void") lintel();
-              else edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
+              else {
+                edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
+                // Floor 3: the flights go on up to the sealed floor 4 landing; the open-ceiling hall is walled off above it.
+                if (floorNo === 3 && open) edges.push({ dir: d, i, j, mat: "walls", y0: y0 + FLOOR_H, h: ROOF_Y - y0 - FLOOR_H });
+              }
             } else lintel();
             continue;
           }
-          const wallH = k === "stairzone" ? shaftH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
+          // A tower is one tall room, no slab between floors; on floor 3 it goes on up to the sealed floor 4 (y 15 to 18.5).
+          const towerH = floorNo === 3 ? FLOOR_H + CEIL_H : FLOOR_H;
+          const wallH = k === "stairzone" || (k === "stair_landing" && floorNo === 3) ? towerH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
           if (nc === HOLE) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (k === "garage" && nc === EMPTY) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (nc === EMPTY && isOutside(i + di, j + dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
           else if (nk === "restaurant") edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
-          else edges.push({ dir: d, i, j, mat: "walls", y0, h: wallH });
+          else edges.push({ dir: d, i, j, mat: nk === "elevator" ? "elev" : "walls", y0, h: wallH });
         } else {
           // HOLE cell: walls face into the atrium from solid or outside neighbours, full floor height
           // (the top floor continues up to the truss roof).
           if (nc === HOLE || nc === WALK) continue;
           const h = floorNo === 3 ? ROOF_Y - y0 : FLOOR_H;
           const glass = nc === EMPTY && isOutside(i + di, j + dj);
-          edges.push({ dir: d, i, j, mat: glass ? "glass" : "walls", y0, h });
+          edges.push({ dir: d, i, j, mat: glass ? "glass" : nk === "elevator" ? "elev" : "walls", y0, h });
         }
       }
     }
   }
   wallRuns(edges);
 
-  // Stair towers are open up through the floors: cap them on floor 3.
+  // Stair towers are open up through the floors. On floor 3 they go on to a sealed floor 4 landing (a slab
+  // at y 15 over the hall-end strip) and are capped at 18.5, leaving room for an expansion.
   if (floorNo === 3)
-    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) if (f.kind[j * NX + i] === "stairzone") flatRun("ceilings", i, i + 1, j, y0 + CEIL_H, false);
+    for (let j = 0; j < NY; j++)
+      for (let i = 0; i < NX; i++) {
+        const k = f.kind[j * NX + i];
+        if (k === "stairzone" || k === "stair_landing") flatRun("ceilings", i, i + 1, j, y0 + FLOOR_H + CEIL_H, false);
+        if (k === "stair_landing") flatRun("floors", i, i + 1, j, y0 + FLOOR_H, true);
+      }
 
   // Roof over the atriums and the open-ceiling halls (top floor).
   if (floorNo === 3) {
@@ -362,7 +375,7 @@ function addTo(target: Geo, g: Geo) {
 }
 
 /** Convex polygon (x, z points) extruded from y0 up to y1. */
-function slabGeo(pts: [number, number][], y0: number, y1: number): Geo {
+function slabGeo(pts: [number, number][], y0: number, y1: number, sides?: Geo, bottom = true): Geo {
   const g = new Geo();
   const n = pts.length;
   const cx = pts.reduce((a, p) => a + p[0], 0) / n;
@@ -371,7 +384,7 @@ function slabGeo(pts: [number, number][], y0: number, y1: number): Geo {
   const bot = pts.map(([x, z]): V3 => [x, y0, z]);
   for (let i = 1; i < n - 1; i++) {
     facedQuad(g, top[0], top[i], top[i + 1], top[i + 1], [0, 1, 0]);
-    facedQuad(g, bot[0], bot[i], bot[i + 1], bot[i + 1], [0, -1, 0]);
+    if (bottom) facedQuad(g, bot[0], bot[i], bot[i + 1], bot[i + 1], [0, -1, 0]);
   }
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
@@ -384,7 +397,7 @@ function slabGeo(pts: [number, number][], y0: number, y1: number): Geo {
       nx = -nx;
       nz = -nz;
     }
-    facedQuad(g, bot[i], bot[j], top[j], top[i], [nx, 0, nz]);
+    facedQuad(sides ?? g, bot[i], bot[j], top[j], top[i], [nx, 0, nz]);
   }
   return g;
 }
@@ -410,18 +423,25 @@ function prismGeo(p: V3[]): Geo {
   return g;
 }
 
-/** Four-sided pyramid (a stylised plant): square base of half-width r at y0, apex h above. */
-function pyramidGeo(cx: number, y0: number, cz: number, r: number, h: number): Geo {
+/** Four-sided pyramid (a plant blade): square base of half-width r at y0, apex h above, leaning (lx, lz). */
+function pyramidGeo(cx: number, y0: number, cz: number, r: number, h: number, lx = 0, lz = 0): Geo {
   const g = new Geo();
   const base: V3[] = [[cx - r, y0, cz - r], [cx + r, y0, cz - r], [cx + r, y0, cz + r], [cx - r, y0, cz + r]];
-  const apex: V3 = [cx, y0 + h, cz];
+  const apex: V3 = [cx + lx, y0 + h, cz + lz];
+  const c = [cx + lx / 4, y0 + h / 4, cz + lz / 4];
   for (let i = 0; i < 4; i++) {
     const a = base[i];
     const b = base[(i + 1) % 4];
-    const mx = (a[0] + b[0]) / 2 - cx;
-    const mz = (a[2] + b[2]) / 2 - cz;
-    const len = Math.hypot(mx, mz, h * 0.5) || 1;
-    facedQuad(g, a, b, apex, apex, [mx / len, (h * 0.5) / len, mz / len]);
+    let n: V3 = [
+      (b[1] - a[1]) * (apex[2] - a[2]) - (b[2] - a[2]) * (apex[1] - a[1]),
+      (b[2] - a[2]) * (apex[0] - a[0]) - (b[0] - a[0]) * (apex[2] - a[2]),
+      (b[0] - a[0]) * (apex[1] - a[1]) - (b[1] - a[1]) * (apex[0] - a[0]),
+    ];
+    const len = Math.hypot(...n) || 1;
+    n = [n[0] / len, n[1] / len, n[2] / len];
+    const fc = [(a[0] + b[0] + apex[0]) / 3, (a[1] + b[1] + apex[1]) / 3, (a[2] + b[2] + apex[2]) / 3];
+    if (n[0] * (fc[0] - c[0]) + n[1] * (fc[1] - c[1]) + n[2] * (fc[2] - c[2]) < 0) n = [-n[0], -n[1], -n[2]];
+    facedQuad(g, a, b, apex, apex, n);
   }
   return g;
 }
@@ -435,20 +455,35 @@ type Rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: num
 function garden(t: Tower, P: (u: number, v: number, h: number) => V3, rail: Rail) {
   let seed = t.hall === "S" ? 7 : 19;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const plants = geo("garden");
   const stones = geo("stone");
+  /** A tuft of long leaves (tropical plant) rooted at (x, y, z), at most maxH tall. */
+  const tuft = (x: number, y: number, z: number, size: number, maxH: number) => {
+    const leaves = 5 + Math.floor(rnd() * 4);
+    for (let i = 0; i < leaves; i++) {
+      const a = rnd() * 2 * Math.PI;
+      const h = Math.min(size * (0.6 + rnd() * 0.6), maxH);
+      const lean = h * (0.25 + rnd() * 0.5);
+      addTo(geo(rnd() < 0.4 ? "garden_dark" : "garden"), pyramidGeo(x, y, z, 0.03 + rnd() * 0.05, h, Math.cos(a) * lean, Math.sin(a) * lean));
+    }
+  };
+  /** A river stone: a low rounded plate. */
+  const pebble = (x: number, y: number, z: number) => {
+    const r = 0.07 + rnd() * 0.14;
+    const pts = Array.from({ length: 6 }, (_, i): [number, number] => [x + r * Math.cos((i / 6) * 2 * Math.PI), z + r * 0.75 * Math.sin((i / 6) * 2 * Math.PI)]);
+    addTo(stones, slabGeo(pts, y, y + 0.04 + rnd() * 0.07, undefined, false));
+  };
   const bed = (u0: number, u1: number, v0: number, v1: number, h: number, count: number, clear: (u: number) => number = () => 9) => {
     const a = P(u0, v0, 0);
     const b = P(u1, v1, 0);
     addTo(stones, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), 0, h, Math.min(a[2], b[2]), Math.max(a[2], b[2])));
+    for (let i = 0; i < ((u1 - u0) * (v1 - v0)) * 3; i++) {
+      const q = P(u0 + 0.1 + rnd() * (u1 - u0 - 0.2), v0 + 0.1 + rnd() * (v1 - v0 - 0.2), h);
+      pebble(q[0], h, q[2]);
+    }
     for (let i = 0; i < count; i++) {
       const u = u0 + 0.3 + rnd() * (u1 - u0 - 0.6);
       const q = P(u, v0 + 0.3 + rnd() * (v1 - v0 - 0.6), h);
-      addTo(plants, pyramidGeo(q[0], h, q[2], 0.2 + rnd() * 0.3, Math.min(0.5 + rnd() * 0.9, Math.max(0.2, clear(u)))));
-      if (i % 3 === 0) {
-        const s = P(u0 + 0.2 + rnd() * (u1 - u0 - 0.4), v0 + 0.2 + rnd() * (v1 - v0 - 0.4), h);
-        addTo(stones, boxGeo(s[0] - 0.12, s[0] + 0.12, h, h + 0.1, s[2] - 0.09, s[2] + 0.09));
-      }
+      tuft(q[0], h, q[2], 0.7 + rnd() * 0.9, Math.max(0.2, clear(u)));
     }
   };
   // Under the flights. The west lane's flight is low near the hall end, so its bed starts further in.
@@ -467,12 +502,18 @@ function garden(t: Tower, P: (u: number, v: number, h: number) => V3, rail: Rail
       return [q[0], q[2]];
     });
   addTo(geo("stairs"), slabGeo(ring(1.7), 0, 0.9));
-  addTo(stones, slabGeo(ring(1.5), 0.9, 0.97));
-  for (let i = 0; i < 9; i++) {
+  addTo(geo("stone"), slabGeo(ring(1.5), 0.9, 0.97));
+  for (let i = 0; i < 90; i++) {
     const a = rnd() * 2 * Math.PI;
-    const r = rnd() * 1.2;
+    const r = Math.sqrt(rnd()) * 1.45;
     const q = P(cu + r * Math.sin(a), cv + r * Math.cos(a), 0);
-    addTo(plants, pyramidGeo(q[0], 0.97, q[2], 0.2 + rnd() * 0.25, 0.6 + rnd() * 1.0));
+    pebble(q[0], 0.97, q[2]);
+  }
+  for (let i = 0; i < 7; i++) {
+    const a = rnd() * 2 * Math.PI;
+    const r = rnd() * 1.1;
+    const q = P(cu + r * Math.sin(a), cv + r * Math.cos(a), 0);
+    tuft(q[0], 0.97, q[2], 1 + rnd() * 1.2, 1.4);
   }
 }
 
@@ -480,10 +521,10 @@ for (const t of TOWERS) {
   const stairs = geo("stairs");
   const rails = geo("rails");
   const P = (u: number, v: number, h: number) => towerPt(t, u, v, h);
-  const box = (u0: number, u1: number, v0: number, v1: number, h0: number, h1: number) => {
+  const box = (u0: number, u1: number, v0: number, v1: number, h0: number, h1: number, target: Geo = stairs) => {
     const a = P(u0, v0, h0);
     const b = P(u1, v1, h1);
-    addTo(stairs, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1]), Math.min(a[2], b[2]), Math.max(a[2], b[2])));
+    addTo(target, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1]), Math.min(a[2], b[2]), Math.max(a[2], b[2])));
   };
   /** Glass rail between two points of the tower frame; heights are where it stands (it rises RAIL_H above). */
   const rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: number) => {
@@ -504,9 +545,10 @@ for (const t of TOWERS) {
       const top = hS + (k + 1) * rise;
       box(ua, ua + dir * tread, v0, v1, top - ST.tread, top);
     }
-    for (const v of [v0, v1]) rail(uS, v, hS + rise, uE, v, hE);
+    // Inset 4 cm so a rail never shares a plane with a wall, a hall rail or the next lane's rail (z-fighting).
+    for (const v of [v0 + 0.04, v1 - 0.04]) rail(uS, v, hS + rise, uE, v, hE);
     // Dark steel stringer down the middle of the flight, under the treads (open risers, like the photos).
-    const vc = v0 + ST.lane / 2;
+    const vc = lane === 0 ? v0 + 0.55 : v1 - 0.55; // off to the outer side of the lane, like the photos
     const w = 0.18;
     const top0 = hS + rise;
     const under = ST.tread + 0.42;
@@ -530,7 +572,13 @@ for (const t of TOWERS) {
       const q = P(u, v, 0);
       return [q[0], q[2]];
     });
-    addTo(stairs, slabGeo(xz, h - ST.slab, h));
+    addTo(stairs, slabGeo(xz, h - ST.slab, h, geo("fascia"))); // white top and underside, grey edge band
+    for (const lv of [v0 + 2, v0 + 4]) {
+      // Recessed ceiling lights (off): two pale discs under the landing.
+      const lamp = P(ST.depth + 1.6, lv, 0);
+      const disc = Array.from({ length: 8 }, (_, i): [number, number] => [lamp[0] + 0.22 * Math.cos((i / 8) * 2 * Math.PI), lamp[2] + 0.22 * Math.sin((i / 8) * 2 * Math.PI)]);
+      addTo(geo("lamp"), slabGeo(disc, h - ST.slab - 0.03, h - ST.slab));
+    }
     for (let i = 1; i < poly.length; i++) {
       const [u0, w0] = poly[i];
       const [u1, w1] = poly[(i + 1) % poly.length];
@@ -539,15 +587,34 @@ for (const t of TOWERS) {
   };
 
   // Same on every floor: up the west lane to the round landing, back down the east lane to the hall end.
-  for (let fi = 0; fi < 2; fi++) {
+  // The third set goes from floor 3 up to a future floor 4 (y 15), sealed by a steel gate across its foot on floor 3.
+  for (let fi = 0; fi < 3; fi++) {
     const base = fi * FLOOR_H;
     flight(0, ST.strip, base, ST.depth, base + FLOOR_H / 2, 15);
     round(0, base + FLOOR_H / 2);
     flight(1, ST.depth, base + FLOOR_H / 2, ST.strip, base + FLOOR_H, 15);
   }
+  // Only the west lane (the flight going up) is closed; the east lane is where the flight from floor 2 arrives.
+  // It stands just on the hall side of the flight's first tread and stringer, and 2 cm in from the lane edges, so no face shares a plane with them (z-fighting).
+  box(ST.strip - 0.12, ST.strip, 0.02, ST.lane - 0.02, 2 * FLOOR_H, 2 * FLOOR_H + CEIL_H, geo("steel"));
   garden(t, P, rail);
-  // Floor 3 has no flight up from the west lane: rail its edge so nobody walks into the stairwell.
-  rail(ST.strip, 0, 2 * FLOOR_H, ST.strip, ST.lane, 2 * FLOOR_H);
+  // Big grey column through the round landings, at their west corner (photos: stairs_northern-tower).
+  const col = P(ST.depth + 0.3, 0.45, 0);
+  const ringXZ = Array.from({ length: 12 }, (_, i): [number, number] => [col[0] + 0.3 * Math.cos((i / 12) * 2 * Math.PI), col[2] + 0.3 * Math.sin((i / 12) * 2 * Math.PI)]);
+  addTo(geo("column"), slabGeo(ringXZ, 0, 3 * FLOOR_H));
+}
+
+// Elevator shafts: dark glass faces (the "elev" material, set where the walls are built) with grey piers
+// between and beside the two shafts, as in the photos. The piers stand just in front of the atrium face.
+for (const id of ["a_elevators", "b_elevators"]) {
+  const b = plans[0].boxes.find((q) => q.id === id)!;
+  const south = b.y0 > 100 ? true : false; // north tower: the atrium is to the south
+  const yFace = south ? b.y0 : b.y1;
+  for (const [x0, x1] of [[b.x0, b.x0 + 0.5], [(b.x0 + b.x1) / 2 - 0.35, (b.x0 + b.x1) / 2 + 0.35], [b.x1 - 0.5, b.x1]]) {
+    const z0 = south ? -yFace : -yFace - 0.35;
+    const z1 = south ? -yFace + 0.35 : -yFace;
+    addTo(geo("column"), boxGeo(x0, x1, 0, ROOF_Y - 0.1, Math.min(z0, z1), Math.max(z0, z1)));
+  }
 }
 
 // Spawn points used by src/engine/runtime.ts must be walkable cells.
@@ -566,7 +633,7 @@ if (process.env.BLOCKOUT_DEBUG) {
   const colliderGeo = new THREE.BufferGeometry();
   const cp: number[] = [];
   const ci: number[] = [];
-  for (const name of ["walls", "glass", "rails"]) {
+  for (const name of COLLIDERS) {
     const g = geos[name];
     if (!g) continue;
     const base = cp.length / 3;
@@ -700,7 +767,12 @@ const MATERIALS: Record<string, { color: [number, number, number, number]; rough
   rails: { color: [0.5, 0.65, 0.8, 0.3], rough: 0.1, blend: true },
   stairs: { color: [0.74, 0.73, 0.71, 1], rough: 0.8 },
   steel: { color: [0.1, 0.1, 0.12, 1], rough: 0.5 },
+  fascia: { color: [0.34, 0.3, 0.33, 1], rough: 0.8 },
+  lamp: { color: [0.92, 0.92, 0.88, 1], rough: 0.6 },
+  column: { color: [0.46, 0.44, 0.48, 1], rough: 0.7 },
+  elev: { color: [0.03, 0.03, 0.04, 1], rough: 0.25 },
   garden: { color: [0.16, 0.34, 0.15, 1], rough: 1 },
+  garden_dark: { color: [0.09, 0.22, 0.1, 1], rough: 1 },
   stone: { color: [0.42, 0.43, 0.45, 1], rough: 1 },
 };
 
