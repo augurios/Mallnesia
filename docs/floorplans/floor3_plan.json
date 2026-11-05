@@ -706,6 +706,24 @@
    "kind": "hall"
   },
   {
+   "id": "bridge_strip_w",
+   "label": "Floor 3 hall over the west beam, between the bridge's west columns",
+   "x0": 51,
+   "x1": 53.5,
+   "y0": 135,
+   "y1": 148.5,
+   "kind": "hall"
+  },
+  {
+   "id": "bridge_strip_e",
+   "label": "Floor 3 hall over the east beam, between the bridge's east columns",
+   "x0": 75.5,
+   "x1": 78,
+   "y0": 135,
+   "y1": 148.5,
+   "kind": "hall"
+  },
+  {
    "id": "atrium_b_ext_e",
    "label": "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column",
    "x0": 72,

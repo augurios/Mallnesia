@@ -239,6 +239,9 @@ def floor_items(floor):
         # the west and east halls widen over the north corners of Atrium B, down to the bridge's north columns
         # (the box office counter that stood here was cut)
         items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B, held by the bridge's north-west column", ("box", (51, 57, 148.5, 153)), "hall"))
+        # the floor 3 floor over the white beams between the column pairs, joining the extensions (glass rails around)
+        items.append(("bridge_strip_w", "Floor 3 hall over the west beam, between the bridge's west columns", ("box", (51, 53.5, 135, 148.5)), "hall"))
+        items.append(("bridge_strip_e", "Floor 3 hall over the east beam, between the bridge's east columns", ("box", (75.5, 78, 135, 148.5)), "hall"))
         items.append(("atrium_b_ext_e", "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column", ("box", (72, 78, 148.5, 153)), "hall"))
     return items
 

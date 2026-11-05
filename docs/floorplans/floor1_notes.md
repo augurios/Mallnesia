@@ -268,3 +268,7 @@ From `atrium_third-floor-looking-down.jpg` and `atrium_upper-floors-from-ground.
 ## Floor 3 north hall: low ceiling (decided by Augusto)
 
 The north hall (y 159 to 165) in front of the cinemas keeps a normal low ceiling (3.5 m) along its whole length. The open-to-the-roof range of the floor 3 halls now stops at y 159 (`OPEN_Y` in `scripts/blockout/shell.mts`), so the hall no longer opens up to the truss where it passes the atrium, and the ceiling no longer steps up there. This replaces the earlier "ceiling steps up" note under "Floor 3: halls open to the roof". Where the open halls (west and east halls, the tower's hall end) meet the north hall, a lintel wall closes the gap above the doorway.
+
+## Floor 3 over the bridge columns (decided by Augusto)
+
+The space between the column tops on floor 3 is hall floor: two strips, `bridge_strip_w` (x 51 to 53.5) and `bridge_strip_e` (x 75.5 to 78), both y 135 to 148.5. Each runs along the white beam joining its pair of columns (the beam stops at the side of the hoods) and joins the floor 3 extension to the north. Glass rails run around the open sides (the atrium side, and the south end), the same as the rest of the floor 3 atrium edge. The hoods stand just outside the rail. My reading of "between the columns": the strip between each pair of columns and the hall; the span across the atrium between the west and east pairs stays open.
