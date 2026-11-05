@@ -20,7 +20,7 @@ const CEIL_H = 3.5;
 const ROOF_Y = 20;
 const RAIL_H = 1.1;
 // Meshes the player collides with (walls, glass, rails, stairs and their steel and columns). Keep in sync with src/engine/runtime.ts.
-const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel"];
+const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel", "planter"];
 
 type Box = { id: string; kind: string; x0: number; x1: number; y0: number; y1: number };
 type Poly = { id: string; kind: string; points: [number, number][] };
@@ -94,6 +94,22 @@ class Geo {
   quad(a: V3, b: V3, c: V3, d: V3, n: V3) {
     const base = this.pos.length / 3;
     for (const p of [a, b, c, d]) {
+      this.pos.push(...p);
+      this.nrm.push(...n);
+    }
+    this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  /** Quad with a normal per corner (smooth shading), wound to face along the average normal. */
+  quadN(a: V3, b: V3, c: V3, d: V3, na: V3, nb: V3, nc: V3, nd: V3) {
+    const cross = [
+      (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+      (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+      (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
+    ];
+    const facing = [0, 1, 2].reduce((acc, k) => acc + cross[k] * (na[k] + nb[k] + nc[k] + nd[k]), 0) > 0;
+    const corners: [V3, V3][] = facing ? [[a, na], [b, nb], [c, nc], [d, nd]] : [[a, na], [d, nd], [c, nc], [b, nb]];
+    const base = this.pos.length / 3;
+    for (const [p, n] of corners) {
       this.pos.push(...p);
       this.nrm.push(...n);
     }
@@ -423,97 +439,302 @@ function prismGeo(p: V3[]): Geo {
   return g;
 }
 
-/** Four-sided pyramid (a plant blade): square base of half-width r at y0, apex h above, leaning (lx, lz). */
-function pyramidGeo(cx: number, y0: number, cz: number, r: number, h: number, lx = 0, lz = 0): Geo {
+/**
+ * Surface of revolution around a vertical axis, smooth around the circumference and crisp along the
+ * profile. `profile` is (radius, height) points going up the outside and then inward across the top.
+ */
+function latheGeo(cx: number, cz: number, profile: [number, number][], seg: number): Geo {
   const g = new Geo();
-  const base: V3[] = [[cx - r, y0, cz - r], [cx + r, y0, cz - r], [cx + r, y0, cz + r], [cx - r, y0, cz + r]];
-  const apex: V3 = [cx + lx, y0 + h, cz + lz];
-  const c = [cx + lx / 4, y0 + h / 4, cz + lz / 4];
-  for (let i = 0; i < 4; i++) {
-    const a = base[i];
-    const b = base[(i + 1) % 4];
-    let n: V3 = [
-      (b[1] - a[1]) * (apex[2] - a[2]) - (b[2] - a[2]) * (apex[1] - a[1]),
-      (b[2] - a[2]) * (apex[0] - a[0]) - (b[0] - a[0]) * (apex[2] - a[2]),
-      (b[0] - a[0]) * (apex[1] - a[1]) - (b[1] - a[1]) * (apex[0] - a[0]),
+  for (let i = 0; i + 1 < profile.length; i++) {
+    const [r0, y0] = profile[i];
+    const [r1, y1] = profile[i + 1];
+    const len = Math.hypot(y1 - y0, r1 - r0) || 1;
+    const nr = (y1 - y0) / len;
+    const ny = -(r1 - r0) / len;
+    for (let j = 0; j < seg; j++) {
+      const t0 = (j / seg) * 2 * Math.PI;
+      const t1 = ((j + 1) / seg) * 2 * Math.PI;
+      const pt = (r: number, y: number, t: number): V3 => [cx + r * Math.cos(t), y, cz + r * Math.sin(t)];
+      const nm = (t: number): V3 => [nr * Math.cos(t), ny, nr * Math.sin(t)];
+      g.quadN(pt(r0, y0, t0), pt(r0, y0, t1), pt(r1, y1, t1), pt(r1, y1, t0), nm(t0), nm(t1), nm(t1), nm(t0));
+    }
+  }
+  return g;
+}
+
+/**
+ * Like latheGeo, but around any closed outline instead of a circle. `outline` is (x, z) points; `profile`
+ * is (offset, height) with positive offsets growing outward from the outline. Smooth around, crisp along
+ * the profile, so it works for a rounded D as well as a circle.
+ */
+function sweepGeo(outline: [number, number][], profile: [number, number][]): Geo {
+  const g = new Geo();
+  const n = outline.length;
+  const cx = outline.reduce((a, q) => a + q[0], 0) / n;
+  const cz = outline.reduce((a, q) => a + q[1], 0) / n;
+  // outward unit normal at each outline point: the two edge normals averaged (smooth around the curve)
+  const out: [number, number, number][] = outline.map((q, i) => {
+    const a = outline[(i + n - 1) % n];
+    const b = outline[(i + 1) % n];
+    let nx = b[1] - a[1];
+    let nz = -(b[0] - a[0]);
+    const len = Math.hypot(nx, nz) || 1;
+    nx /= len;
+    nz /= len;
+    if (nx * (q[0] - cx) + nz * (q[1] - cz) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    // miter: push further at sharp corners so the offset stays parallel to the edges
+    const e = [b[0] - q[0], b[1] - q[1]];
+    const el = Math.hypot(e[0], e[1]) || 1;
+    const en: [number, number] = [e[1] / el, -e[0] / el];
+    const sgn = en[0] * (q[0] - cx) + en[1] * (q[1] - cz) < 0 ? -1 : 1;
+    const k = Math.max(0.5, nx * en[0] * sgn + nz * en[1] * sgn);
+    return [nx, nz, 1 / k];
+  });
+  for (let i = 0; i + 1 < profile.length; i++) {
+    const [d0, y0] = profile[i];
+    const [d1, y1] = profile[i + 1];
+    const len = Math.hypot(y1 - y0, d1 - d0) || 1;
+    const nr = (y1 - y0) / len;
+    const ny = -(d1 - d0) / len;
+    for (let j = 0; j < n; j++) {
+      const k = (j + 1) % n;
+      const pt = (idx: number, d: number, y: number): V3 => [outline[idx][0] + out[idx][0] * d * out[idx][2], y, outline[idx][1] + out[idx][1] * d * out[idx][2]];
+      const nm = (idx: number): V3 => [out[idx][0] * nr, ny, out[idx][1] * nr];
+      g.quadN(pt(j, d0, y0), pt(k, d0, y0), pt(k, d1, y1), pt(j, d1, y1), nm(j), nm(k), nm(k), nm(j));
+    }
+  }
+  return g;
+}
+
+/** A faceted rock: the top half of a roughened ellipsoid, flat-shaded like a low-poly boulder. */
+function rockGeo(cx: number, cy: number, cz: number, rx: number, ry: number, rz: number, rnd: () => number): Geo {
+  const g = new Geo();
+  const seg = 7;
+  const rings = 3;
+  const jit = () => 0.8 + rnd() * 0.35;
+  const pts: V3[][] = [];
+  for (let k = 0; k <= rings; k++) {
+    const phi = (k / rings) * (Math.PI / 2);
+    const row: V3[] = [];
+    const count = k === 0 ? 1 : seg;
+    for (let j = 0; j < count; j++) {
+      const th = (j / seg) * 2 * Math.PI;
+      const q = jit();
+      row.push([cx + rx * q * Math.sin(phi) * Math.cos(th), cy + ry * q * Math.cos(phi), cz + rz * q * Math.sin(phi) * Math.sin(th)]);
+    }
+    pts.push(row);
+  }
+  const out = (a: V3, b: V3, c: V3, d: V3) => {
+    const n: V3 = [
+      (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+      (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+      (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
     ];
     const len = Math.hypot(...n) || 1;
-    n = [n[0] / len, n[1] / len, n[2] / len];
-    const fc = [(a[0] + b[0] + apex[0]) / 3, (a[1] + b[1] + apex[1]) / 3, (a[2] + b[2] + apex[2]) / 3];
-    if (n[0] * (fc[0] - c[0]) + n[1] * (fc[1] - c[1]) + n[2] * (fc[2] - c[2]) < 0) n = [-n[0], -n[1], -n[2]];
-    facedQuad(g, a, b, apex, apex, n);
-  }
+    const fc = [(a[0] + b[0] + c[0] + d[0]) / 4 - cx, (a[1] + b[1] + c[1] + d[1]) / 4 - cy, (a[2] + b[2] + c[2] + d[2]) / 4 - cz];
+    const sign = n[0] * fc[0] + n[1] * fc[1] + n[2] * fc[2] < 0 ? -1 : 1;
+    facedQuad(g, a, b, c, d, [(sign * n[0]) / len, (sign * n[1]) / len, (sign * n[2]) / len]);
+  };
+  for (let j = 0; j < seg; j++) out(pts[0][0], pts[1][j], pts[1][(j + 1) % seg], pts[1][(j + 1) % seg]);
+  for (let k = 1; k < rings; k++)
+    for (let j = 0; j < seg; j++) out(pts[k][j], pts[k][(j + 1) % seg], pts[k + 1][(j + 1) % seg], pts[k + 1][j]);
   return g;
 }
 
 type Rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: number) => void;
 
 /**
- * The garden at the foot of the stairs (see the photos): planter beds with plants and river stones under
- * the flights, behind a glass fence, and a round planter drum under the lower round landing.
+ * The garden at the foot of the stairs (see the photos): rounded beds of river-stone gravel with rocks and
+ * leafy plants under the flights, behind a glass fence, and a round planter drum under the lower round
+ * landing. Leaves are curved tapering ribbons; the gravel is a shader pattern (see materials.ts).
  */
 function garden(t: Tower, P: (u: number, v: number, h: number) => V3, rail: Rail) {
   let seed = t.hall === "S" ? 7 : 19;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const stones = geo("stone");
-  /** A tuft of long leaves (tropical plant) rooted at (x, y, z), at most maxH tall. */
+  const between = (a: number, b: number) => a + rnd() * (b - a);
+  const rocks = geo("stone");
+  const leaves = () => geo(rnd() < 0.35 ? "garden_dark" : "garden");
+
+  /** One leaf: a ribbon that rises, arches over by `lean` and tapers to a point. Never taller than maxH. */
+  const leaf = (x: number, y: number, z: number, angle: number, len: number, width: number, lean: number, maxH: number, target: Geo) => {
+    const rise = (tt: number) => tt - 0.6 * lean * tt * tt;
+    let top = 0;
+    for (let k = 1; k <= 20; k++) top = Math.max(top, rise(k / 20));
+    const length = Math.min(len, maxH / top);
+    const dx = Math.cos(angle);
+    const dz = Math.sin(angle);
+    const segs = 4;
+    let prev: [V3, V3] | null = null;
+    for (let k = 0; k <= segs; k++) {
+      const tt = k / segs;
+      const reach = length * lean * tt * (0.5 + 0.5 * tt);
+      const c: V3 = [x + dx * reach, y + length * rise(tt), z + dz * reach];
+      const w = width * 0.5 * Math.pow(1 - tt, 0.7) * (k === 0 ? 0.6 : 1);
+      const pair: [V3, V3] = [[c[0] + dz * w, c[1], c[2] - dx * w], [c[0] - dz * w, c[1], c[2] + dx * w]];
+      if (prev) {
+        const e1: V3 = [pair[0][0] - prev[0][0], pair[0][1] - prev[0][1], pair[0][2] - prev[0][2]];
+        const e2: V3 = [prev[1][0] - prev[0][0], prev[1][1] - prev[0][1], prev[1][2] - prev[0][2]];
+        let n: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+        const len2 = Math.hypot(...n) || 1;
+        n = n[1] < 0 ? [-n[0] / len2, -n[1] / len2, -n[2] / len2] : [n[0] / len2, n[1] / len2, n[2] / len2];
+        target.quad(prev[0], prev[1], pair[1], pair[0], n);
+      }
+      prev = pair;
+    }
+  };
+  /** A clump of long arching leaves (phormium, dracaena...). */
   const tuft = (x: number, y: number, z: number, size: number, maxH: number) => {
-    const leaves = 5 + Math.floor(rnd() * 4);
-    for (let i = 0; i < leaves; i++) {
-      const a = rnd() * 2 * Math.PI;
-      const h = Math.min(size * (0.6 + rnd() * 0.6), maxH);
-      const lean = h * (0.25 + rnd() * 0.5);
-      addTo(geo(rnd() < 0.4 ? "garden_dark" : "garden"), pyramidGeo(x, y, z, 0.03 + rnd() * 0.05, h, Math.cos(a) * lean, Math.sin(a) * lean));
-    }
+    const count = 9 + Math.floor(rnd() * 5);
+    for (let i = 0; i < count; i++) leaf(x, y, z, rnd() * 2 * Math.PI, size * between(0.7, 1.3), between(0.07, 0.13), between(0.2, 0.85), maxH, leaves());
   };
-  /** A river stone: a low rounded plate. */
-  const pebble = (x: number, y: number, z: number) => {
-    const r = 0.07 + rnd() * 0.14;
-    const pts = Array.from({ length: 6 }, (_, i): [number, number] => [x + r * Math.cos((i / 6) * 2 * Math.PI), z + r * 0.75 * Math.sin((i / 6) * 2 * Math.PI)]);
-    addTo(stones, slabGeo(pts, y, y + 0.04 + rnd() * 0.07, undefined, false));
+  /** Low dense bush: many short leaves. */
+  const bush = (x: number, y: number, z: number, size: number, maxH: number) => {
+    for (let i = 0; i < 16; i++) leaf(x, y, z, rnd() * 2 * Math.PI, size * between(0.5, 1), between(0.05, 0.09), between(0.3, 0.9), maxH, leaves());
   };
-  const bed = (u0: number, u1: number, v0: number, v1: number, h: number, count: number, clear: (u: number) => number = () => 9) => {
-    const a = P(u0, v0, 0);
-    const b = P(u1, v1, 0);
-    addTo(stones, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), 0, h, Math.min(a[2], b[2]), Math.max(a[2], b[2])));
-    for (let i = 0; i < ((u1 - u0) * (v1 - v0)) * 3; i++) {
-      const q = P(u0 + 0.1 + rnd() * (u1 - u0 - 0.2), v0 + 0.1 + rnd() * (v1 - v0 - 0.2), h);
-      pebble(q[0], h, q[2]);
-    }
+  /** Broad-leaf plant: stalks topped with large oval leaves (alocasia, philodendron...). */
+  const broadleaf = (x: number, y: number, z: number, size: number, maxH: number) => {
+    const count = 3 + Math.floor(rnd() * 3);
     for (let i = 0; i < count; i++) {
-      const u = u0 + 0.3 + rnd() * (u1 - u0 - 0.6);
-      const q = P(u, v0 + 0.3 + rnd() * (v1 - v0 - 0.6), h);
-      tuft(q[0], h, q[2], 0.7 + rnd() * 0.9, Math.max(0.2, clear(u)));
+      const a = rnd() * 2 * Math.PI;
+      const h = Math.min(size * between(0.55, 0.9), maxH);
+      const lean = between(0.15, 0.4);
+      const tip: V3 = [x + Math.cos(a) * h * lean * 0.5, y + h, z + Math.sin(a) * h * lean * 0.5];
+      leaf(x, y, z, a, h * 1.05, 0.03, lean, maxH, geo("garden_dark")); // the stalk
+      const bl = size * between(0.35, 0.55); // blade length and width
+      const bw = bl * between(0.55, 0.75);
+      const tilt = between(-0.2, 0.3);
+      const blade = geo("garden");
+      const ring: V3[] = Array.from({ length: 9 }, (_, k): V3 => {
+        const th = (k / 9) * 2 * Math.PI;
+        const lx = 0.5 * bl * (1 + Math.cos(th)) * 0.9; // from the stalk outward
+        const ly = 0.5 * bw * Math.sin(th) * (0.6 + 0.4 * Math.sin(th > Math.PI ? 0 : th));
+        return [tip[0] + Math.cos(a) * lx - Math.sin(a) * ly, tip[1] + tilt * lx - 0.15 * Math.abs(ly), tip[2] + Math.sin(a) * lx + Math.cos(a) * ly];
+      });
+      for (let k = 0; k < 9; k++) blade.quad(tip, ring[k], ring[(k + 1) % 9], ring[(k + 1) % 9], [0, 1, 0]);
     }
   };
-  // Under the flights. The west lane's flight is low near the hall end, so its bed starts further in.
-  bed(1.8, ST.depth - 0.1, ST.lane + 0.1, 2 * ST.lane - 0.1, 0.3, 14);
-  // Plants stay under the flight above: its underside is 0.5 m below the tread line (FLOOR_H / 2 over 4.5 m).
-  bed(3.5, ST.depth - 0.1, 0.1, ST.lane - 0.1, 0.3, 7, (u) => ((u - ST.strip) * FLOOR_H) / 2 / (ST.depth - ST.strip) - 0.9);
+  const rock = (u: number, v: number, h: number, size: number) => {
+    const q = P(u, v, h - 0.04);
+    addTo(rocks, rockGeo(q[0], q[1], q[2], size * between(0.9, 1.4), size * between(0.5, 0.8), size, rnd));
+  };
+  /** Rounded rectangle in the tower frame (u, v), as plan points. */
+  const rrect = (u0: number, u1: number, v0: number, v1: number, r: number): [number, number][] => {
+    const out: [number, number][] = [];
+    for (const [cu, cv, a0] of [[u1 - r, v1 - r, 0], [u0 + r, v1 - r, 0.5], [u0 + r, v0 + r, 1], [u1 - r, v0 + r, 1.5]] as const)
+      for (let k = 0; k <= 4; k++) {
+        const a = (a0 + k / 8) * Math.PI;
+        out.push([cu + r * Math.cos(a), cv + r * Math.sin(a)]);
+      }
+    return out.map(([u, v]): [number, number] => {
+      const q = P(u, v, 0);
+      return [q[0], q[2]];
+    });
+  };
+  const bed = (u0: number, u1: number, v0: number, v1: number, h: number, clear: (u: number) => number = () => 9) => {
+    // gravel top, planter-concrete sides
+    addTo(geo("gravel"), slabGeo(rrect(u0, u1, v0, v1, 0.25), 0, h, geo("planter"), false));
+    const free = (u: number) => Math.max(0.25, clear(u));
+    const inside = (m: number): [number, number] => [between(u0 + m, u1 - m), between(v0 + m, v1 - m)];
+    const area = (u1 - u0) * (v1 - v0);
+    for (let i = 0; i < Math.round(area * 0.7); i++) {
+      const [u, v] = inside(0.35);
+      rock(u, v, h, between(0.12, 0.38));
+    }
+    for (let i = 0; i < Math.round(area * 0.65); i++) {
+      const [u, v] = inside(0.4);
+      const q = P(u, v, h);
+      tuft(q[0], q[1], q[2], between(1.0, 1.7), free(u));
+    }
+    for (let i = 0; i < Math.round(area * 0.5); i++) {
+      const [u, v] = inside(0.35);
+      const q = P(u, v, h);
+      broadleaf(q[0], q[1], q[2], between(0.7, 1.2), free(u));
+    }
+    for (let i = 0; i < Math.round(area * 0.9); i++) {
+      const [u, v] = inside(0.3);
+      const q = P(u, v, h);
+      bush(q[0], q[1], q[2], between(0.3, 0.55), Math.min(0.5, free(u)));
+    }
+  };
+  // Under the flights. The west lane's flight is low near the hall end, so its bed starts further in, and
+  // plants stay under the flight above (its underside is 0.5 m below the tread line, over 4.5 m).
+  bed(1.8, ST.depth - 0.1, ST.lane + 0.1, 2 * ST.lane - 0.1, 0.3);
+  bed(3.5, ST.depth - 0.1, 0.1, ST.lane - 0.1, 0.3, (u) => ((u - ST.strip) * FLOOR_H) / 2 / (ST.depth - ST.strip) - 0.9);
   // Glass fence: across the hall end of the east lane and along the atrium edge of the whole base.
   rail(1.6, ST.lane, 0, 1.6, 2 * ST.lane, 0);
   rail(ST.depth, 0, 0, ST.depth, 2 * ST.lane, 0);
-  // Round planter drum under the lower round landing (solid, so it is part of the collision).
-  const cu = ST.depth + 1.4;
-  const cv = ST.nose;
-  const ring = (r: number) =>
-    Array.from({ length: 14 }, (_, i): [number, number] => {
-      const q = P(cu + r * Math.sin((i / 14) * 2 * Math.PI), cv + r * Math.cos((i / 14) * 2 * Math.PI), 0);
-      return [q[0], q[2]];
-    });
-  addTo(geo("stairs"), slabGeo(ring(1.7), 0, 0.9));
-  addTo(geo("stone"), slabGeo(ring(1.5), 0.9, 0.97));
-  for (let i = 0; i < 90; i++) {
-    const a = rnd() * 2 * Math.PI;
-    const r = Math.sqrt(rnd()) * 1.45;
-    const q = P(cu + r * Math.sin(a), cv + r * Math.cos(a), 0);
-    pebble(q[0], 0.97, q[2]);
+
+  // D-shaped planter under the lower round landing, following its outline (the landing is two lanes wide:
+  // straight sides for 0.5 m past the flights, then a half circle of radius ST.nose). Smooth concrete with a
+  // lip and a gravel top, set 0.25 m in from the landing's edge.
+  const inset = 0.25;
+  const rr = ST.nose - inset; // radius of the planter's curve
+  const uS = ST.depth + 0.15; // straight side starts just past the glass fence
+  const uT = ST.depth + 0.5; // ...and meets the curve here
+  const vA = inset;
+  const vB = 2 * ST.nose - inset;
+  const vM = ST.nose;
+  const dBase: [number, number][] = []; // (u, v), counter-clockwise, south corners rounded
+  const rc = 0.2;
+  for (let k = 0; k <= 3; k++) dBase.push([uS + rc - rc * Math.cos((k / 3) * (Math.PI / 2)), vA + rc - rc * Math.sin((k / 3) * (Math.PI / 2))]);
+  dBase.push([uT, vA]);
+  for (let k = 1; k < 16; k++) {
+    const th = (k / 16) * Math.PI;
+    dBase.push([uT + rr * Math.sin(th), vM - rr * Math.cos(th)]);
+  }
+  dBase.push([uT, vB]);
+  for (let k = 0; k <= 3; k++) dBase.push([uS + rc - rc * Math.sin((k / 3) * (Math.PI / 2)), vB - rc + rc * Math.cos((k / 3) * (Math.PI / 2))]);
+  const outlineXZ = dBase.map(([u, v]): [number, number] => {
+    const q = P(u, v, 0);
+    return [q[0], q[2]];
+  });
+  addTo(geo("planter"), sweepGeo(outlineXZ, [[0, 0], [0.06, 0.06], [0.06, 0.82], [0.14, 0.86], [0.14, 0.98], [-0.1, 0.98]]));
+  // gravel: the same outline pulled in by the lip
+  const gravelXZ = outlineXZ.map(([x, z], i) => {
+    const prev = outlineXZ[(i + outlineXZ.length - 1) % outlineXZ.length];
+    const next = outlineXZ[(i + 1) % outlineXZ.length];
+    const cx = outlineXZ.reduce((acc, q) => acc + q[0], 0) / outlineXZ.length;
+    const cz = outlineXZ.reduce((acc, q) => acc + q[1], 0) / outlineXZ.length;
+    let nx = next[1] - prev[1];
+    let nz = -(next[0] - prev[0]);
+    const len = Math.hypot(nx, nz) || 1;
+    nx /= len;
+    nz /= len;
+    if (nx * (x - cx) + nz * (z - cz) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    return [x - nx * 0.1, z - nz * 0.1] as [number, number];
+  });
+  addTo(geo("gravel"), slabGeo(gravelXZ.slice().reverse(), 0.9, 0.97, geo("planter"), false));
+  const onPlanter = (margin: number): V3 => {
+    for (;;) {
+      const u = between(uS + margin, uT + rr - margin * 0.5);
+      const v = between(vA + margin, vB - margin);
+      if (u <= uT ? true : Math.hypot(u - uT, v - vM) <= rr - margin) {
+        const q = P(u, v, 0);
+        return [q[0], 0.97, q[2]];
+      }
+    }
+  };
+  for (let i = 0; i < 9; i++) {
+    const q = onPlanter(0.35);
+    tuft(q[0], q[1], q[2], between(0.8, 1.2), 1.0);
   }
   for (let i = 0; i < 7; i++) {
-    const a = rnd() * 2 * Math.PI;
-    const r = rnd() * 1.1;
-    const q = P(cu + r * Math.sin(a), cv + r * Math.cos(a), 0);
-    tuft(q[0], 0.97, q[2], 1 + rnd() * 1.2, 1.4);
+    const q = onPlanter(0.35);
+    broadleaf(q[0], q[1], q[2], between(0.6, 0.9), 1.0);
+  }
+  for (let i = 0; i < 9; i++) {
+    const q = onPlanter(0.3);
+    bush(q[0], q[1], q[2], between(0.3, 0.5), 0.45);
+  }
+  for (let i = 0; i < 9; i++) {
+    const q = onPlanter(0.35);
+    addTo(rocks, rockGeo(q[0], 0.93, q[2], between(0.12, 0.3), between(0.08, 0.18), between(0.1, 0.26), rnd));
   }
 }
 
@@ -599,9 +820,8 @@ for (const t of TOWERS) {
   box(ST.strip - 0.12, ST.strip, 0.02, ST.lane - 0.02, 2 * FLOOR_H, 2 * FLOOR_H + CEIL_H, geo("steel"));
   garden(t, P, rail);
   // Big grey column through the round landings, at their west corner (photos: stairs_northern-tower).
-  const col = P(ST.depth + 0.3, 0.45, 0);
-  const ringXZ = Array.from({ length: 12 }, (_, i): [number, number] => [col[0] + 0.3 * Math.cos((i / 12) * 2 * Math.PI), col[2] + 0.3 * Math.sin((i / 12) * 2 * Math.PI)]);
-  addTo(geo("column"), slabGeo(ringXZ, 0, 3 * FLOOR_H));
+  const col = P(ST.depth + 0.3, -0.3, 0);
+  addTo(geo("column"), latheGeo(col[0], col[2], [[0.37, 0], [0.37, 0.14], [0.3, 0.17], [0.3, 3 * FLOOR_H - 0.2], [0.37, 3 * FLOOR_H - 0.15], [0.37, 3 * FLOOR_H]], 24));
 }
 
 // Elevator shafts: dark glass faces (the "elev" material, set where the walls are built) with grey piers
@@ -765,7 +985,7 @@ const hex = (h: string, alpha = 1): [number, number, number, number] => {
 // Base colors are the surfaces' own colors from docs/art_style_reference.md (muted, as photographed), not
 // the night: darkness comes from the lighting. Surface detail (tiles, plaster, panels) is added at run time
 // by src/engine/materials.ts, keyed by these material names.
-const MATERIALS: Record<string, { color: [number, number, number, number]; rough: number; blend?: boolean }> = {
+const MATERIALS: Record<string, { color: [number, number, number, number]; rough: number; blend?: boolean; double?: boolean }> = {
   floors: { color: hex("#b4b1a8"), rough: 0.3 }, // glossy off-white porcelain
   floor_atrium: { color: hex("#aaa79e"), rough: 0.3 },
   floor_bath: { color: hex("#7f8a88"), rough: 0.35 },
@@ -781,9 +1001,11 @@ const MATERIALS: Record<string, { color: [number, number, number, number]; rough
   lamp: { color: hex("#c9c9c2"), rough: 0.6 },
   column: { color: hex("#656363"), rough: 0.6 }, // painted mid-grey
   elev: { color: hex("#1b1a1a"), rough: 0.2 }, // black glass shafts
-  garden: { color: hex("#34502f"), rough: 1 },
-  garden_dark: { color: hex("#1f3a24"), rough: 1 },
-  stone: { color: hex("#6b6d70"), rough: 1 },
+  garden: { color: hex("#3c5b34"), rough: 0.8, double: true }, // leaves are one-sided ribbons
+  garden_dark: { color: hex("#223f27"), rough: 0.8, double: true },
+  stone: { color: hex("#555759"), rough: 0.9 }, // boulders
+  planter: { color: hex("#8d887e"), rough: 0.85 }, // concrete planters
+  gravel: { color: hex("#837d72"), rough: 0.9 }, // river-stone beds (pattern added in materials.ts)
 };
 
 const doc = new Document();
@@ -797,7 +1019,7 @@ for (const [name, g] of Object.entries(geos)) {
     .setBaseColorFactor(m.color)
     .setRoughnessFactor(m.rough)
     .setMetallicFactor(0)
-    .setDoubleSided(!!m.blend)
+    .setDoubleSided(!!m.blend || !!m.double)
     .setAlphaMode(m.blend ? "BLEND" : "OPAQUE");
   const prim = doc
     .createPrimitive()

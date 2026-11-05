@@ -6,7 +6,7 @@ import * as THREE from "three";
 // plaster grain, skirting and corner darkening on the walls, panel joints on the ceilings, stains on the
 // concrete. Roughness varies with the pattern so the flashlight picks out grout, inserts and polish.
 
-type Kind = "porcelain" | "porcelain45" | "tile" | "concrete" | "panels" | "plaster" | "stair";
+type Kind = "porcelain" | "porcelain45" | "tile" | "concrete" | "panels" | "plaster" | "stair" | "gravel" | "planter" | "foliage" | "rock";
 
 const KINDS: Record<string, Kind> = {
   floors: "porcelain",
@@ -17,6 +17,12 @@ const KINDS: Record<string, Kind> = {
   walls: "plaster",
   doors: "plaster", // the same pattern as the walls: a closed secret door has to vanish into them
   stairs: "stair",
+  column: "stair",
+  gravel: "gravel",
+  planter: "planter",
+  garden: "foliage",
+  garden_dark: "foliage",
+  stone: "rock",
 };
 
 const HEADER = /* glsl */ `
@@ -88,6 +94,40 @@ const COLOR: Record<Kind, string> = {
     float ao = mix(0.55, 1.0, smoothstep(0.0, 1.5, h)) * mix(0.72, 1.0, smoothstep(3.5, 2.6, h));
     diffuseColor.rgb *= ao;
   }`,
+  gravel: /* glsl */ `
+  {
+    // River-stone gravel: cells of rounded stones with their own brightness and tint, dark crevices between.
+    // Two scales of stones (pebbles and a few larger ones), each with its own size, brightness and tint.
+    float big = step(0.8, h12(floor(vWPos.xz * 3.0) + 5.1));
+    vec2 p = vWPos.xz * mix(20.0, 9.0, big); vec2 i = floor(p); float md = 8.0; vec2 mid = vec2(0.0);
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+      vec2 g = i + vec2(float(x), float(y));
+      vec2 d = g + vec2(h12(g), h12(g + 17.3)) * 0.9 - p;
+      float dd = dot(d, d);
+      if (dd < md) { md = dd; mid = g; }
+    }
+    float shade = 0.4 + 0.9 * h12(mid + 3.7);
+    vec3 tint = mix(vec3(1.0, 0.93, 0.84), vec3(0.8, 0.88, 1.0), h12(mid + 9.1));
+    float r0 = 0.3 + 0.25 * h12(mid + 21.7); // each stone has its own size
+    float rim = smoothstep(r0, r0 + 0.14, sqrt(md));
+    diffuseColor.rgb *= shade * tint * (1.0 - 0.7 * rim) * (0.85 + 0.3 * vnoise(vWPos * 5.0));
+    gGrout = rim;
+  }`,
+  planter: /* glsl */ `
+  {
+    // Cast concrete: mottled, with formwork lines every 30 cm and darker toward the ground.
+    float h = mod(vWPos.y + 0.001, 5.0);
+    float form = 1.0 - smoothstep(0.004, 0.012, abs(fract(vWPos.y / 0.3) - 0.5) * 0.3 - 0.145 + 0.0);
+    diffuseColor.rgb *= (0.8 + 0.4 * fbm(vWPos * 3.0)) * mix(0.62, 1.0, smoothstep(0.0, 0.35, h)) * (1.0 - 0.18 * form);
+  }`,
+  foliage: /* glsl */ `
+  {
+    diffuseColor.rgb *= 0.6 + 0.8 * vnoise(vWPos * 8.0);
+  }`,
+  rock: /* glsl */ `
+  {
+    diffuseColor.rgb *= (0.65 + 0.7 * fbm(vWPos * 7.0)) * mix(0.7, 1.0, vnoise(vWPos * 30.0));
+  }`,
   stair: /* glsl */ `
   {
     diffuseColor.rgb *= (0.86 + 0.28 * fbm(vWPos * 3.5)) * (0.9 + 0.1 * h13(floor(vWPos * 8.0)));
@@ -99,6 +139,7 @@ const ROUGHNESS: Partial<Record<Kind, string>> = {
   porcelain45: "roughnessFactor = mix(mix(0.26, 0.1, gBlack), 0.85, gGrout);",
   tile: "roughnessFactor = mix(0.3, 0.85, gGrout);",
   concrete: "roughnessFactor = mix(0.92, 0.55, gGrout);",
+  gravel: "roughnessFactor = mix(0.55, 0.95, gGrout);",
 };
 
 function patch(material: THREE.Material, kind: Kind) {
