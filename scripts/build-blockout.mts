@@ -374,6 +374,70 @@ if (process.env.BLOCKOUT_DEBUG) {
   });
 }
 
+// ---- secret-hallway doors ------------------------------------------------------------------------
+// Double doors from docs/floorplans/secret_doors.json. Each door is a root node ("door_<id>", extras
+// carry its placement) with one pivot node per leaf ("door_<id>_a/_b", extras.sign = which way +angle
+// swings it). src/engine/doors.ts animates the pivots. A lintel above the leaves goes into "walls".
+
+const DOOR_T = 0.06; // leaf thickness
+const SWING: Record<string, [number, number]> = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }; // (x, z) in three.js coords
+
+interface DoorDef { id: string; floor: number; x: number; y: number; axis: "x" | "y"; width: number; swing: string; leadsTo?: string }
+const doorData = JSON.parse(readFileSync(`${PLANS}/secret_doors.json`, "utf8")) as { height: number; doors: DoorDef[] };
+
+/** Box with six quads, wound to face outward. */
+function boxGeo(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number): Geo {
+  const g = new Geo();
+  const faces: [V3, V3, V3, V3, V3][] = [
+    [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [1, 0, 0]],
+    [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0]],
+    [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], [0, 1, 0]],
+    [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0]],
+    [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]],
+    [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [0, 0, -1]],
+  ];
+  for (const [a, b, c, d, n] of faces) {
+    const cross = [
+      (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+      (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+      (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
+    ];
+    const facing = cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0;
+    if (facing) g.quad(a, b, c, d, n);
+    else g.quad(a, d, c, b, n);
+  }
+  return g;
+}
+
+const doorNodes = doorData.doors.map((d) => {
+  const fi = d.floor - 1;
+  const half = d.width / 2;
+  const [sx, sz] = SWING[d.swing];
+  const y0 = fi * FLOOR_H;
+  // The door line must sit on walkable cells on both sides, or it is in the wrong place.
+  const along = d.axis === "x" ? [1, 0] : [0, 1];
+  const across = d.axis === "x" ? [0, 1] : [1, 0];
+  for (const off of [-half + CELL / 2, 0, half - CELL / 2])
+    for (const side of [-CELL, CELL]) {
+      const px = d.x + along[0] * off + across[0] * side;
+      const py = d.y + along[1] * off + across[1] * side;
+      if (at(floors[fi], Math.floor(px / CELL), Math.floor(py / CELL)) !== WALK)
+        console.warn(`door ${d.id}: (${px}, ${py}) is not walkable; check its position`);
+    }
+
+  // Lintel: closes the gap between the leaves and the dropped ceiling.
+  const lx = d.axis === "x" ? half : DOOR_T;
+  const lz = d.axis === "x" ? DOOR_T : half;
+  const lintel = boxGeo(d.x - lx, d.x + lx, y0 + doorData.height, y0 + CEIL_H, -d.y - lz, -d.y + lz);
+  const wg = geo("walls");
+  const base = wg.pos.length / 3;
+  wg.pos.push(...lintel.pos);
+  wg.nrm.push(...lintel.nrm);
+  for (const k of lintel.idx) wg.idx.push(base + k);
+
+  return { d, y0, half, sx, sz };
+});
+
 // ---- write GLB ---------------------------------------------------------------------------------
 
 const MATERIALS: Record<string, { color: [number, number, number, number]; rough: number; blend?: boolean }> = {
@@ -410,6 +474,43 @@ for (const [name, g] of Object.entries(geos)) {
   const mesh = doc.createMesh(name).addPrimitive(prim);
   scene.addChild(doc.createNode(name).setMesh(mesh));
   triangles += g.idx.length / 3;
+}
+
+// Secret doors: same material as the walls, so a closed door disappears into them.
+const doorMat = doc.createMaterial("doors").setBaseColorFactor(MATERIALS.walls.color).setRoughnessFactor(MATERIALS.walls.rough).setMetallicFactor(0);
+for (const { d, y0, half, sx, sz } of doorNodes) {
+  const root = doc
+    .createNode(`door_${d.id}`)
+    .setTranslation([d.x, y0, -d.y])
+    .setExtras({ door: d.id, floor: d.floor - 1, axis: d.axis, width: d.width, ...(d.leadsTo ? { leadsTo: d.leadsTo } : {}) });
+  // Leaf a hinges at the low end of the door line, leaf b at the high end; each reaches the centre.
+  const leaves = d.axis === "x"
+    ? [{ tag: "a", pivot: [-half, 0, 0], dir: [1, 0] }, { tag: "b", pivot: [half, 0, 0], dir: [-1, 0] }]
+    : [{ tag: "a", pivot: [0, 0, half], dir: [0, -1] }, { tag: "b", pivot: [0, 0, -half], dir: [0, 1] }];
+  for (const leaf of leaves) {
+    // At +90 degrees about y a leaf pointing along (dx, dz) ends up pointing along (dz, -dx).
+    const sign = leaf.dir[1] * sx - leaf.dir[0] * sz > 0 ? 1 : -1;
+    const len = half - 0.01;
+    const [ax0, ax1] = [Math.min(0, leaf.dir[0] * len), Math.max(0, leaf.dir[0] * len)];
+    const [az0, az1] = [Math.min(0, leaf.dir[1] * len), Math.max(0, leaf.dir[1] * len)];
+    const box = d.axis === "x"
+      ? boxGeo(ax0, ax1, 0, doorData.height, -DOOR_T / 2, DOOR_T / 2)
+      : boxGeo(-DOOR_T / 2, DOOR_T / 2, 0, doorData.height, az0, az1);
+    const prim = doc
+      .createPrimitive()
+      .setMaterial(doorMat)
+      .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(new Float32Array(box.pos)).setBuffer(buffer))
+      .setAttribute("NORMAL", doc.createAccessor().setType("VEC3").setArray(new Float32Array(box.nrm)).setBuffer(buffer))
+      .setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(box.idx)).setBuffer(buffer));
+    const pivot = doc
+      .createNode(`door_${d.id}_${leaf.tag}`)
+      .setTranslation(leaf.pivot as [number, number, number])
+      .setMesh(doc.createMesh(`door_${d.id}_${leaf.tag}`).addPrimitive(prim))
+      .setExtras({ leaf: true, sign });
+    root.addChild(pivot);
+    triangles += box.idx.length / 3;
+  }
+  scene.addChild(root);
 }
 
 mkdirSync("public/models", { recursive: true });

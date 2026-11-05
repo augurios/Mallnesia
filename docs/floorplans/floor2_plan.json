@@ -717,11 +717,11 @@
   },
   {
    "id": "secret_2_west",
-   "label": "Secret hallway (floor 2): ...north along the garage side to the NW bathrooms",
+   "label": "Secret hallway (floor 2): ...north along the garage side to the south end of the parking strip (y 84), where a door leads into the garage level",
    "x0": 12,
    "x1": 15,
    "y0": 4,
-   "y1": 174,
+   "y1": 84,
    "kind": "secret"
   },
   {

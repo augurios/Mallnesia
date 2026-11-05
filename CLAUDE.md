@@ -19,7 +19,7 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
 ## Key documents
 
 - `docs/El_Mall_Vivo_Design_Doc.pdf` — **legends reference.** 17 selected legends, each with what the legend says, the game mechanic it becomes, its area, and its priority (Vertical slice / Core / Later). This is the source of truth for game content. Read it before designing any area, threat, note, or mechanic.
-  - **Where they conflict, this file wins.** The PDF predates the decision to drop item pickup, inventory, and player-operated doors and drawers. Adapt these legend mechanics:
+  - **Where they conflict, this file wins.** The PDF predates the decision to drop item pickup, inventory, and player-operated doors (except the secret doors) and drawers. Adapt these legend mechanics:
     - Legend 8 (gym): physics props can still be pushed; the player just doesn't pick anything up.
     - Legend 9 (gray corridors): no keys or access cards; the mall opens sections itself.
     - Legend 16 (fifth floor): the weapons cache is a scene to look at, not an item to take.
@@ -51,8 +51,10 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **Sanity:** drained by darkness, apparitions, and the watchers. Low sanity increases hallucinations and makes the mall shift more (e.g., more wrong-floor elevator results).
 - **Light:** a flashlight with limited charge (equivalent of Amnesia's lantern oil). Charge drains while it is on (2 minutes for a full charge) and **recharges by itself while it is off** (90 seconds to refill; decided by Augusto, replacing lit areas and charging points). There are no battery pickups.
 - **Locked zones:** no keys or access cards. The mall opens and locks sections on its own, tied to story beats.
-- **Doors:** the player never opens or closes doors. The mall does, on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive.
-- **Interaction:** limited to hiding spots (including abandoned cars), readable notes, and security-room monitors. **No inventory and no item pickup.**
+- **Doors:** the mall opens and closes doors on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive. **The only doors the player can use are the secret-hallway doors** (below), with **E**; no other door is operable.
+  - **Where doors exist (decided):** only at the ends of the secret hallway on each floor (double service doors, 6 in total, placed in `docs/floorplans/secret_doors.json`). The floor 2 door at the south end of the parking strip is the entrance to the procedural garage level. Everywhere else is open or walled. The mall moves them only when the player isn't watching (`src/engine/doors.ts`).
+  - **Secret doors (decided):** closed, they use the wall material and blend into the wall. The player finds them by walking up to one (a "Presiona E para interactuar" prompt appears when close and facing it) or by seeing the mall open one; **E** opens or closes it. The garage door is **locked to the player**: only the mall opens it (pressing E gives a rattle and "No cede"), so the garage can be entered only when the mall allows it.
+- **Interaction (E):** limited to the secret doors, hiding spots (including abandoned cars), readable notes, and security-room monitors. **No inventory and no item pickup.**
 - **Security room:** monitors the player can use to scout other areas; the shadow can appear on the feeds. The player can also spot the guard here (see "The guard").
 - **Stealth:** the player survives by staying quiet, hidden, and out of sight. The flashlight must be off to avoid being noticed by a major threat. See "Failure".
 

@@ -81,3 +81,14 @@ body {
 .game-flashlight-fill.on {
   background: #e8d9a0;
 }
+
+.game-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  font-size: 15px;
+  color: #d8d2c0;
+  text-shadow: 0 0 6px #000;
+  pointer-events: none;
+}

@@ -12,6 +12,8 @@ export default function GameCanvas() {
   const [started, setStarted] = useState(false);
   const [quality, setQuality] = useState<QualityLevel>("high");
   const [status, setStatus] = useState<PlayerStatus | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -22,10 +24,16 @@ export default function GameCanvas() {
         if (isLocked) setStarted(true);
       },
       onStatus: setStatus,
+      onNotice: (key) => {
+        setNotice(es[key]);
+        if (noticeTimer.current) clearTimeout(noticeTimer.current);
+        noticeTimer.current = setTimeout(() => setNotice(null), 1800);
+      },
     });
     runtimeRef.current = runtime;
     setQuality(runtime.getQuality());
     return () => {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
       runtime.dispose();
       runtimeRef.current = null;
     };
@@ -46,12 +54,15 @@ export default function GameCanvas() {
           />
         </div>
       )}
+      {locked && status?.canInteract && <div className="game-prompt">{notice ?? es.interact}</div>}
+      {locked && !status?.canInteract && notice && <div className="game-prompt">{notice}</div>}
       {!locked && (
         <div className="game-hint" onClick={() => runtimeRef.current?.requestLock()}>
           <div>
             <h1>{started ? es.paused : es.clickToPlay}</h1>
             <p>{started ? es.resume : es.controls}</p>
             {!started && <p>{es.debugFloors}</p>}
+            {!started && <p>{es.debugDoors}</p>}
             <div className="game-quality" onClick={(e) => e.stopPropagation()}>
               <span>{es.quality}</span>
               {QUALITY_LEVELS.map((level) => (

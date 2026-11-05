@@ -216,7 +216,7 @@ def floor_items(floor):
         items = [it for it in items if it[0] != "secret_hall"]
         if floor == 2:
             items.append(("secret_2_south", "Secret hallway (floor 2): from the south-west end of the restaurants...", ("box", (12, 45, 1, 4)), "secret"))
-            items.append(("secret_2_west", "Secret hallway (floor 2): ...north along the garage side to the NW bathrooms", ("box", (12, 15, 4, 174)), "secret"))
+            items.append(("secret_2_west", "Secret hallway (floor 2): ...north along the garage side to the south end of the parking strip (y 84), where a door leads into the garage level", ("box", (12, 15, 4, 84)), "secret"))
         else:
             items.append(("secret_3_nw", "Secret hallway (floor 3): from the NW bathrooms, up through the top-left block", ("box", (15, 18, 174, 201)), "secret"))
             items.append(("secret_3_north", "Secret hallway (floor 3): east behind the cinema", ("box", (18, 111, 198, 201)), "secret"))

@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { MeshBVH } from "three-mesh-bvh";
+import { createAudio } from "./audio";
+import { Doors } from "./doors";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 
 export interface PlayerStatus {
@@ -12,11 +14,15 @@ export interface PlayerStatus {
   /** Flashlight charge, 0 to 1, and whether the light is on. */
   charge: number;
   flashlightOn: boolean;
+  /** A door the player could use right now ("Presiona E"). */
+  canInteract: boolean;
 }
 
 export interface RuntimeOptions {
   onLockChange?: (locked: boolean) => void;
   onStatus?: (status: PlayerStatus) => void;
+  /** A short-lived message for the HUD. */
+  onNotice?: (notice: "doorLocked") => void;
 }
 
 export interface Runtime {
@@ -92,6 +98,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let yaw = THREE.MathUtils.degToRad(num("yaw", 0));
   let pitch = THREE.MathUtils.degToRad(num("pitch", 0));
 
+  const audio = createAudio();
+  const doors = new Doors({
+    onCreak: (x, y, z) => audio.creak(x, y, z),
+    onSlam: (x, y, z) => audio.slam(x, y, z),
+    onLocked: (x, y, z) => {
+      audio.rattle(x, y, z);
+      options.onNotice?.("doorLocked");
+    },
+  });
+  doors.auto = params.get("doors") !== "off"; // debug: ?doors=off stops the mall moving doors by itself
+
   // Collision: walls, glass and railings merged into one BVH.
   let bvh: MeshBVH | null = null;
   new GLTFLoader().load(BLOCKOUT_URL, (gltf) => {
@@ -106,6 +123,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (o.name === "glass" || o.name === "rails") o.renderOrder = 1;
     });
     scene.add(gltf.scene);
+    doors.load(gltf.scene);
     if (parts.length) bvh = new MeshBVH(mergeGeometries(parts, false));
   }, undefined, (err) => console.error("Could not load the mall blockout", err));
 
@@ -117,6 +135,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (e.code === "KeyF" && !e.repeat) {
       if (flashOn) flashOn = false;
       else if (charge >= FLASH_MIN_ON) flashOn = true;
+    }
+    if (e.code === "KeyE" && !e.repeat && locked) {
+      const door = doors.usable(player.x, player.z, floor, yaw);
+      if (door) doors.use(door.id);
+    }
+    // Debug: force the nearest door on this floor open (even a locked one) or slam it shut.
+    const nearestDoor = e.code === "KeyO" || e.code === "KeyK" ? doors.nearest(player.x, player.z, floor) : null;
+    if (nearestDoor) {
+      if (e.code === "KeyO") doors.open(nearestDoor);
+      else doors.slam(nearestDoor);
     }
     const jump = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];
     if (jump !== undefined) {
@@ -186,6 +214,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
   }
 
+  const projView = new THREE.Matrix4();
   let last = performance.now();
   let charge = 1;
   let flashOn = true;
@@ -207,6 +236,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       player.z += (-Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * speed;
       collide();
     }
+    doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
 
     charge = flashOn ? Math.max(0, charge - FLASH_DRAIN * dt) : Math.min(1, charge + FLASH_RECHARGE * dt);
     if (charge === 0) flashOn = false;
@@ -214,17 +244,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     camera.position.set(player.x, floor * FLOOR_HEIGHT + EYE_HEIGHT, player.z);
     camera.rotation.set(pitch, yaw, 0);
+    camera.updateMatrixWorld();
+    doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    audio.setListener(player.x, floor * FLOOR_HEIGHT + EYE_HEIGHT, player.z, yaw);
     renderer.render(scene, camera);
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
-      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn });
+      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, canInteract: doors.usable(player.x, player.z, floor, yaw) !== null });
     }
   };
   tick();
 
   return {
     requestLock() {
+      audio.resume();
       renderer.domElement.requestPointerLock();
     },
     getQuality: () => quality,
@@ -241,6 +275,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("pointerlockchange", onLockChange);
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+      audio.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },
