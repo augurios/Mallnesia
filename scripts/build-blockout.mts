@@ -221,9 +221,9 @@ const floors: Floor[] = plans.map((p, i) => rasterize(p, i + 1));
 // same design standing free in the atrium against the cross-corridor: the rest of its 9 m box is atrium
 // again, its sides are glass, there is no sealed floor 4 set, and its top landing opens to the roof.
 const TOWERS = [
-  { id: "a_stairs", hall: "S", vOff: 0, sealed: true, seed: 7 },
-  { id: "b_stairs", hall: "N", vOff: 0, sealed: true, seed: 19 },
-  { id: "b_center_stair", hall: "S", vOff: 1.5, sealed: false, seed: 31 },
+  { id: "a_stairs", hall: "S", vOff: 0, sealed: true, noUp: false, seed: 7 },
+  { id: "b_stairs", hall: "N", vOff: 0, sealed: true, noUp: true, seed: 19 }, // noUp: no flight up to floor 4; floor 3 west lane is hall
+  { id: "b_center_stair", hall: "S", vOff: 1.5, sealed: false, noUp: false, seed: 31 },
 ].map((t) => ({ ...t, box: plans[0].boxes.find((b) => b.id === t.id)! }));
 type Tower = (typeof TOWERS)[number];
 const ST = { lane: 3, strip: 1.5, depth: 6, nose: 3, tread: 0.06, slab: 0.35 };
@@ -248,6 +248,12 @@ floors.forEach((f, fi) => {
         if (u >= ST.depth) continue;
         f.cls[j * NX + i] = WALK;
         f.kind[j * NX + i] = (u < ST.strip ? "stair_landing" : "stairzone") + (t.sealed ? "" : "_o");
+        if (t.noUp && fi === 2) {
+          // Floor 3 has no flight up: the hall end and the west lane are plain hall (open to the roof),
+          // and only the east lane stays a stairwell, open up to the roof, where the flight from floor 2 arrives.
+          const west = i < Math.round((t.box.x0 + t.vOff + ST.lane) / CELL);
+          f.kind[j * NX + i] = u < ST.strip || west ? "hall" : "stairzone_o";
+        }
       }
   }
 });
@@ -357,7 +363,9 @@ floors.forEach((f, fi) => {
               // every floor; along the flights it is glass rail (the base is open, see the garden).
               // From the atrium floor the flights are walked around, not entered (their sides block).
               if (nk === "stair_landing" || nk === "stair_landing_o" || k === "void") lintel();
-              else {
+              else if (floorNo === 3 && k === "hall" && nk === "stairzone_o" && dj !== 0) {
+                // Floor 3, no flight up: the hall end is open where the flight from floor 2 arrives.
+              } else {
                 edges.push({ dir: d, i, j, mat: floorNo > 1 ? "barrier" : "rails", y0, h: RAIL_H });
                 // Floor 3: the flights go on up to the sealed floor 4 landing; the open-ceiling hall is walled off above it.
                 if (floorNo === 3 && open && nk === "stairzone") edges.push({ dir: d, i, j, mat: "walls", y0: y0 + FLOOR_H, h: ROOF_Y - y0 - FLOOR_H });
@@ -367,7 +375,7 @@ floors.forEach((f, fi) => {
           }
           // A tower is one tall room, no slab between floors; on floor 3 it goes on up to the sealed floor 4 (y 15 to 18.5).
           const towerH = floorNo === 3 ? FLOOR_H + CEIL_H : FLOOR_H;
-          const wallH = k === "stairzone" || (k === "stair_landing" && floorNo === 3) ? towerH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
+          const wallH = k === "stairzone_o" && floorNo === 3 ? ROOF_Y - y0 : k === "stairzone" || (k === "stair_landing" && floorNo === 3) ? towerH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
           // Along a stair's open sides there is no floating pane of glass at floor level (it would hang in the
           // middle of the flights): the stair has its own balustrades, and an invisible barrier keeps people out.
           if (nc === HOLE) edges.push({ dir: d, i, j, mat: k === "stairzone" || k === "stairzone_o" ? "barrier" : "rails", y0, h: RAIL_H });
@@ -897,7 +905,7 @@ for (const t of TOWERS) {
 
   // Same on every floor: up the west lane to the round landing, back down the east lane to the hall end.
   // The third set goes from floor 3 up to a future floor 4 (y 15), sealed by a steel gate across its foot on floor 3.
-  for (let fi = 0; fi < (t.sealed ? 3 : 2); fi++) {
+  for (let fi = 0; fi < (t.sealed && !t.noUp ? 3 : 2); fi++) {
     const base = fi * FLOOR_H;
     flight(0, ST.strip, base, ST.depth, base + FLOOR_H / 2, 15);
     round(0, base + FLOOR_H / 2);
@@ -905,8 +913,8 @@ for (const t of TOWERS) {
   }
   // Only the west lane (the flight going up) is closed; the east lane is where the flight from floor 2 arrives.
   // It stands just on the hall side of the flight's first tread and stringer, and 2 cm in from the lane edges, so no face shares a plane with them (z-fighting).
-  if (t.sealed) box(ST.strip - 0.12, ST.strip, 0.02, ST.lane - 0.02, 2 * FLOOR_H, 2 * FLOOR_H + CEIL_H, geo("steel"));
-  else rail(ST.strip, 0, 2 * FLOOR_H, ST.strip, ST.lane, 2 * FLOOR_H); // the top: no flight up from the west lane
+  if (t.sealed && !t.noUp) box(ST.strip - 0.12, ST.strip, 0.02, ST.lane - 0.02, 2 * FLOOR_H, 2 * FLOOR_H + CEIL_H, geo("steel"));
+  else if (!t.noUp) rail(ST.strip, 0, 2 * FLOOR_H, ST.strip, ST.lane, 2 * FLOOR_H); // the top: no flight up from the west lane
   garden(t, P, rail);
   // Big grey column through the round landings, at their west corner (photos: stairs_northern-tower).
   const col = P(ST.depth + 0.3, -0.3, 0);

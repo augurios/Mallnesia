@@ -192,6 +192,11 @@ def floor_items(floor):
         items = north_floor2(items)
     if floor == 3:
         items = north_cinema(items)
+        # Atrium B north-west tower: no flight up to a floor 4. The west lane (x 51 to 54) is plain hall;
+        # the east lane keeps the stairs that arrive from floor 2.
+        items = [it for it in items if it[0] != "b_stairs"]
+        items.append(("b_stairs", "Stairs down (B, north tower), east lane; the west lane is hall", ("box", (54, 64.5, 153, 159)), "stairs"))
+        items.append(("b_stairs_hall", "Hall extension over the old up-stairs (west lane of the north tower)", ("box", (51, 54, 153, 159)), "hall"))
     for i, l, p, k in POLYS:
         if i == "south_area" and floor > 1:
             l, k = "Food court (seating)", "foodcourt"

@@ -364,15 +364,6 @@
    "kind": "elevator"
   },
   {
-   "id": "b_stairs",
-   "label": "Stairs (B, north tower, west half), on the north hall",
-   "x0": 51,
-   "x1": 64.5,
-   "y0": 153,
-   "y1": 159,
-   "kind": "stairs"
-  },
-  {
    "id": "b_center_stair",
    "label": "Center curved stair (B, S), on the cross-corridor",
    "x0": 60,
@@ -623,6 +614,24 @@
    "y0": 171,
    "y1": 189,
    "kind": "kiosk"
+  },
+  {
+   "id": "b_stairs",
+   "label": "Stairs down (B, north tower), east lane; the west lane is hall",
+   "x0": 54,
+   "x1": 64.5,
+   "y0": 153,
+   "y1": 159,
+   "kind": "stairs"
+  },
+  {
+   "id": "b_stairs_hall",
+   "label": "Hall extension over the old up-stairs (west lane of the north tower)",
+   "x0": 51,
+   "x1": 54,
+   "y0": 153,
+   "y1": 159,
+   "kind": "hall"
   },
   {
    "id": "int_elevator_w2n",
