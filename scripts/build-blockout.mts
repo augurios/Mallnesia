@@ -20,7 +20,7 @@ const CEIL_H = 3.5;
 const ROOF_Y = 20;
 const RAIL_H = 1.1;
 // Meshes the player collides with (walls, glass, rails, stairs and their steel and columns). Keep in sync with src/engine/runtime.ts.
-const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel", "planter"];
+const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel", "planter", "barrier"];
 
 type Box = { id: string; kind: string; x0: number; x1: number; y0: number; y1: number };
 type Poly = { id: string; kind: string; points: [number, number][] };
@@ -138,7 +138,7 @@ interface Edge {
   dir: Dir; // side of the cell the wall sits on; the wall faces into the cell
   i: number;
   j: number;
-  mat: "walls" | "glass" | "rails" | "elev";
+  mat: "walls" | "glass" | "rails" | "elev" | "barrier"; // barrier: collision only, not drawn
   y0: number;
   h: number;
 }
@@ -344,7 +344,7 @@ floors.forEach((f, fi) => {
               // From the atrium floor the flights are walked around, not entered (their sides block).
               if (nk === "stair_landing" || nk === "stair_landing_o" || k === "void") lintel();
               else {
-                edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
+                edges.push({ dir: d, i, j, mat: floorNo > 1 ? "barrier" : "rails", y0, h: RAIL_H });
                 // Floor 3: the flights go on up to the sealed floor 4 landing; the open-ceiling hall is walled off above it.
                 if (floorNo === 3 && open && nk === "stairzone") edges.push({ dir: d, i, j, mat: "walls", y0: y0 + FLOOR_H, h: ROOF_Y - y0 - FLOOR_H });
               }
@@ -354,7 +354,9 @@ floors.forEach((f, fi) => {
           // A tower is one tall room, no slab between floors; on floor 3 it goes on up to the sealed floor 4 (y 15 to 18.5).
           const towerH = floorNo === 3 ? FLOOR_H + CEIL_H : FLOOR_H;
           const wallH = k === "stairzone" || (k === "stair_landing" && floorNo === 3) ? towerH : nearVoid ? FLOOR_H : open ? ROOF_Y - y0 : CEIL_H;
-          if (nc === HOLE) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
+          // Along a stair's open sides there is no floating pane of glass at floor level (it would hang in the
+          // middle of the flights): the stair has its own balustrades, and an invisible barrier keeps people out.
+          if (nc === HOLE) edges.push({ dir: d, i, j, mat: k === "stairzone" || k === "stairzone_o" ? "barrier" : "rails", y0, h: RAIL_H });
           else if (k === "garage" && nc === EMPTY) edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
           else if (nc === EMPTY && isOutside(i + di, j + dj)) edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
           else if (nk === "restaurant") edges.push({ dir: d, i, j, mat: "glass", y0, h: wallH });
@@ -523,6 +525,31 @@ function sweepGeo(outline: [number, number][], profile: [number, number][]): Geo
       const nm = (idx: number): V3 => [out[idx][0] * nr, ny, out[idx][1] * nr];
       g.quadN(pt(j, d0, y0), pt(k, d0, y0), pt(k, d1, y1), pt(j, d1, y1), nm(j), nm(k), nm(k), nm(j));
     }
+  }
+  return g;
+}
+
+/** Thin round tube from a to b (smooth around), for handrails and posts. */
+function tubeGeo(a: V3, b: V3, r: number, sides = 6, capEnd = false): Geo {
+  const g = new Geo();
+  const d: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const len = Math.hypot(...d) || 1;
+  const dn: V3 = [d[0] / len, d[1] / len, d[2] / len];
+  const ref: V3 = Math.abs(dn[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  let e1: V3 = [dn[1] * ref[2] - dn[2] * ref[1], dn[2] * ref[0] - dn[0] * ref[2], dn[0] * ref[1] - dn[1] * ref[0]];
+  const l1 = Math.hypot(...e1) || 1;
+  e1 = [e1[0] / l1, e1[1] / l1, e1[2] / l1];
+  const e2: V3 = [dn[1] * e1[2] - dn[2] * e1[1], dn[2] * e1[0] - dn[0] * e1[2], dn[0] * e1[1] - dn[1] * e1[0]];
+  const ring = (k: number): V3 => {
+    const t = (k / sides) * 2 * Math.PI;
+    return [e1[0] * Math.cos(t) + e2[0] * Math.sin(t), e1[1] * Math.cos(t) + e2[1] * Math.sin(t), e1[2] * Math.cos(t) + e2[2] * Math.sin(t)];
+  };
+  for (let k = 0; k < sides; k++) {
+    const n0 = ring(k);
+    const n1 = ring(k + 1);
+    const at = (p: V3, n: V3): V3 => [p[0] + n[0] * r, p[1] + n[1] * r, p[2] + n[2] * r];
+    g.quadN(at(a, n0), at(a, n1), at(b, n1), at(b, n0), n0, n1, n1, n0);
+    if (capEnd) g.quadN(b, at(b, n0), at(b, n1), at(b, n1), dn, dn, dn, dn);
   }
   return g;
 }
@@ -771,12 +798,36 @@ for (const t of TOWERS) {
     addTo(target, boxGeo(Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1]), Math.min(a[2], b[2]), Math.max(a[2], b[2])));
   };
   /** Glass rail between two points of the tower frame; heights are where it stands (it rises RAIL_H above). */
-  const rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: number) => {
+  const middle = P(4, ST.lane, 0); // roughly the middle of the stair: "inside" for rails that do not say
+  /**
+   * Glass rail between two points of the tower frame; heights are where it stands (it rises RAIL_H above).
+   * `side` is the world (x, z) direction of the walking side; the stainless handrail is mounted on that side
+   * of the glass, bolted to it (as in the photos: no posts).
+   */
+  const rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: number, side?: [number, number]) => {
     const a = P(u0, v0, h0);
     const b = P(u1, v1, h1);
     const len = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1;
     const n: V3 = [(b[2] - a[2]) / len, 0, -(b[0] - a[0]) / len];
     rails.quad(a, b, [b[0], b[1] + RAIL_H, b[2]], [a[0], a[1] + RAIL_H, a[2]], n);
+    let sx = n[0];
+    let sz = n[2];
+    if (side) [sx, sz] = side;
+    else if (n[0] * (middle[0] - (a[0] + b[0]) / 2) + n[2] * (middle[2] - (a[2] + b[2]) / 2) < 0) {
+      sx = -sx;
+      sz = -sz;
+    }
+    const hh = RAIL_H - 0.1; // the handrail sits just below the top edge of the glass
+    const stand = 0.055; // how far it stands off the glass
+    const at = (p: V3, f: number, off: number): V3 => [p[0] + sx * off, p[1] + hh, p[2] + sz * off];
+    addTo(geo("chrome"), tubeGeo(at(a, 0, stand), at(b, 0, stand), 0.024, 6));
+    const bolts = Math.max(1, Math.round(len / 1.6));
+    for (let k = 0; k <= bolts; k++) {
+      const f = k / bolts;
+      const g: V3 = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+      addTo(geo("chrome"), tubeGeo(at(g, f, 0), at(g, f, 0.012), 0.03, 5, true)); // the bolt head on the glass
+      addTo(geo("chrome"), tubeGeo(at(g, f, 0.012), at(g, f, stand), 0.011, 4)); // the stand-off to the handrail
+    }
   };
   const flight = (lane: number, uS: number, hS: number, uE: number, hE: number, steps: number) => {
     const dir = Math.sign(uE - uS);
@@ -790,7 +841,7 @@ for (const t of TOWERS) {
       box(ua, ua + dir * tread, v0, v1, top - ST.tread, top);
     }
     // Inset 4 cm so a rail never shares a plane with a wall, a hall rail or the next lane's rail (z-fighting).
-    for (const v of [v0 + 0.04, v1 - 0.04]) rail(uS, v, hS + rise, uE, v, hE);
+    for (const [v, dir] of [[v0 + 0.04, 1], [v1 - 0.04, -1]] as const) rail(uS, v, hS + rise, uE, v, hE, [dir, 0]); // handrail on the lane side
     // Dark steel stringer down the middle of the flight, under the treads (open risers, like the photos).
     const vc = lane === 0 ? v0 + 0.55 : v1 - 0.55; // off to the outer side of the lane, like the photos
     const w = 0.18;
@@ -1021,6 +1072,8 @@ const MATERIALS: Record<string, { color: [number, number, number, number]; rough
   rails: { color: [0.5, 0.65, 0.8, 0.28], rough: 0.05, blend: true },
   stairs: { color: hex("#aca8a3"), rough: 0.7 },
   steel: { color: hex("#1d1d21"), rough: 0.45 },
+  chrome: { color: hex("#a4a7ac"), rough: 0.22 }, // stainless handrails and posts
+  barrier: { color: [1, 1, 1, 0], rough: 1, blend: true }, // never drawn: the runtime hides it, but it still collides
   fascia: { color: hex("#5b565a"), rough: 0.7 },
   lamp: { color: hex("#c9c9c2"), rough: 0.6 },
   column: { color: hex("#656363"), rough: 0.6 }, // painted mid-grey
