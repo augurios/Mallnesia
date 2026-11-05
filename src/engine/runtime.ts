@@ -1,12 +1,11 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { MeshBVH } from "three-mesh-bvh";
 import { createAudio } from "./audio";
 import { Doors } from "./doors";
 import { styleBlockout } from "./materials";
 import { createPost } from "./post";
+import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 
 export interface PlayerStatus {
@@ -40,20 +39,12 @@ const EYE_HEIGHT = 1.65;
 const WALK_SPEED = 3.2;
 const RUN_SPEED = 7;
 const LOOK_SPEED = 0.0022;
-const PLAYER_RADIUS = 0.35;
-const COLLIDER_HEIGHT = 1.0; // the collision sphere sits at chest height, so railings (1.1 m) block too
 const FLASH_INTENSITY = 60;
 const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
 const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
 const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
-const FLOOR_HEIGHT = 5; // keep in sync with scripts/build-blockout.mts
-const STEP_UP = 0.5; // the player climbs ledges up to this high (stair risers are 0.125)
-const SNAP_DOWN = 0.4; // and follows the ground down this far without falling
-const GRAVITY = 18;
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
-// Meshes of the blockout the player collides with. Keep in sync with COLLIDERS in scripts/build-blockout.mts.
-const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel", "planter", "barrier"];
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
@@ -112,7 +103,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   // `floor` is derived from the player's height each frame (see the tick); it starts from the spawn.
   let floor = Math.min(3, Math.max(1, Math.round(num("floor", 1)))) - 1;
   const player = new THREE.Vector3(num("x", SPAWNS[floor].x), floor * FLOOR_HEIGHT, -num("y", SPAWNS[floor].y));
-  let fallSpeed = 0;
+  const walk = new Walk(player);
   let eyeY = NaN; // smoothed camera height; NaN = snap to the player next frame
   let yaw = THREE.MathUtils.degToRad(num("yaw", 0));
   let pitch = THREE.MathUtils.degToRad(num("pitch", 0));
@@ -128,36 +119,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   });
   doors.auto = params.get("doors") !== "off"; // debug: ?doors=off stops the mall moving doors by itself
 
-  // Collision: walls, glass and railings merged into one BVH.
-  let bvh: MeshBVH | null = null;
-  // Ground: floor slabs and stair treads, raycast downward to find what the player stands on.
-  let groundBvh: MeshBVH | null = null;
   new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(BLOCKOUT_URL, (gltf) => {
-    const parts: THREE.BufferGeometry[] = [];
-    const ground: THREE.BufferGeometry[] = [];
     gltf.scene.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
-      // Chunks of one material share its name, but the loader makes node names unique (walls, walls_1, ...).
-      const kind = (o.material as THREE.Material).name;
-      if (kind.startsWith("floor") || kind === "stairs") {
-        const g = (o.geometry as THREE.BufferGeometry).clone();
-        g.deleteAttribute("normal");
-        ground.push(g);
-      }
+      const kind = (o.material as THREE.Material).name; // chunks share the material's name; node names are made unique
       if (kind === "barrier") o.visible = false; // collision only
-      if (COLLIDERS.includes(kind)) {
-        const g = (o.geometry as THREE.BufferGeometry).clone();
-        g.deleteAttribute("normal");
-        parts.push(g);
-      }
       if (kind === "glass" || kind === "rails") o.renderOrder = 1;
     });
     scene.add(gltf.scene);
     blockout = gltf.scene;
     styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
     doors.load(gltf.scene);
-    if (parts.length) bvh = new MeshBVH(mergeGeometries(parts, false));
-    if (ground.length) groundBvh = new MeshBVH(mergeGeometries(ground, false));
+    walk.load(gltf.scene);
   }, undefined, (err) => console.error("Could not load the mall blockout", err));
 
   const keys = new Set<string>();
@@ -183,7 +156,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (jump !== undefined) {
       floor = jump;
       player.set(SPAWNS[jump].x, jump * FLOOR_HEIGHT, -SPAWNS[jump].y);
-      fallSpeed = 0;
+      walk.fallSpeed = 0;
       eyeY = NaN;
     }
   };
@@ -214,66 +187,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   document.addEventListener("pointerlockchange", onLockChange);
   applyQuality();
 
-  const sphere = new THREE.Sphere();
-  const closest = new THREE.Vector3();
-  const push = new THREE.Vector3();
-
-  /** Push the player out of any wall within PLAYER_RADIUS, horizontally only. */
-  function collide() {
-    if (!bvh) return;
-    const baseY = player.y;
-    for (let pass = 0; pass < 3; pass++) {
-      sphere.center.set(player.x, baseY + COLLIDER_HEIGHT, player.z);
-      sphere.radius = PLAYER_RADIUS;
-      let moved = false;
-      bvh.shapecast({
-        intersectsBounds: (box) => box.intersectsSphere(sphere),
-        intersectsTriangle: (tri) => {
-          tri.closestPointToPoint(sphere.center, closest);
-          push.subVectors(sphere.center, closest);
-          // Ignore geometry on other floors: it must be within reach in 3D, not just horizontally.
-          const dy = push.y;
-          if (Math.abs(dy) >= PLAYER_RADIUS) return false;
-          push.y = 0;
-          const dist = push.length();
-          const reach = Math.sqrt(PLAYER_RADIUS * PLAYER_RADIUS - dy * dy);
-          if (dist >= reach || dist < 1e-6) return false;
-          push.multiplyScalar((reach - dist) / dist);
-          sphere.center.add(push);
-          player.x = sphere.center.x;
-          player.z = sphere.center.z;
-          moved = true;
-          return false;
-        },
-      });
-      if (!moved) break;
-    }
-  }
-
   const projView = new THREE.Matrix4();
-  const groundRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
-
-  /** Stands the player on the highest surface within step height, or lets them fall. */
-  function followGround(dt: number) {
-    if (!groundBvh) return;
-    groundRay.origin.set(player.x, player.y + STEP_UP, player.z);
-    const hit = groundBvh.raycastFirst(groundRay, THREE.FrontSide);
-    if (hit && hit.point.y >= player.y - SNAP_DOWN) {
-      player.y = hit.point.y;
-      fallSpeed = 0;
-      return;
-    }
-    fallSpeed += GRAVITY * dt;
-    player.y -= fallSpeed * dt;
-    if (hit && player.y < hit.point.y) {
-      player.y = hit.point.y;
-      fallSpeed = 0;
-    }
-    if (player.y < -3) {
-      player.y = floor * FLOOR_HEIGHT; // fell out of the world: back to the last floor
-      fallSpeed = 0;
-    }
-  }
 
   let last = performance.now();
   let charge = 1;
@@ -294,9 +208,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const speed = ((running ? RUN_SPEED : WALK_SPEED) * dt) / len;
       player.x += (-Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed;
       player.z += (-Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * speed;
-      collide();
+      walk.collide();
     }
-    followGround(dt);
+    walk.followGround(dt, floor);
     floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
     doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
 

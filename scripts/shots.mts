@@ -1,0 +1,62 @@
+// Screenshots of fixed views of the built game, for checking a change by eye. Needs a build first:
+//   npm run build && npm run shots        (writes shots/*.png; open them or compare with the last run)
+// Uses headless Chrome with software rendering, so the look is close to the game's but not identical to a real GPU.
+// CHROME=/path/to/chrome overrides the default macOS location.
+import { createServer } from "node:http";
+import { mkdirSync, readFileSync, existsSync, statSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { extname, join } from "node:path";
+import { plans } from "./blockout/grid.mts";
+
+const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const OUT_DIR = "out";
+const SHOTS = "shots";
+if (!existsSync(join(OUT_DIR, "index.html"))) throw new Error("no out/ folder: run npm run build first");
+if (!existsSync(CHROME)) throw new Error(`Chrome not found at ${CHROME}: set CHROME=/path/to/chrome`);
+
+const box = (id: string) => plans[0].boxes.find((b) => b.id === id)!;
+const a = box("a_stairs");
+const b = box("b_stairs");
+const c = box("b_center_stair");
+
+// floor is 1-3; x, y are plan meters; yaw 0 looks north, 90 west; pitch up is positive (degrees).
+const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; pitch: number }[] = [
+  { name: "spawn", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0 },
+  { name: "stairs_a_from_hall", floor: 1, x: a.x0 + 1.5, y: a.y0 - 4, yaw: 0, pitch: 12 },
+  { name: "stairs_b_from_hall", floor: 1, x: b.x0 + 1.5, y: b.y1 + 4, yaw: 180, pitch: 12 },
+  { name: "stairs_a_mid_flight", floor: 2, x: a.x0 + 4.5, y: a.y0 + 4, yaw: 0, pitch: -15 },
+  { name: "stairs_center_from_atrium", floor: 1, x: c.x0 + 3, y: c.y0 - 8, yaw: 0, pitch: 18 },
+  { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
+];
+
+const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".glb": "model/gltf-binary", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml" };
+const server = createServer((req, res) => {
+  let path = join(OUT_DIR, decodeURIComponent((req.url ?? "/").split("?")[0]));
+  if (existsSync(path) && statSync(path).isDirectory()) path = join(path, "index.html");
+  if (!existsSync(path)) {
+    res.writeHead(404).end();
+    return;
+  }
+  res.writeHead(200, { "content-type": TYPES[extname(path)] ?? "application/octet-stream" }).end(readFileSync(path));
+});
+await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+const port = (server.address() as { port: number }).port;
+
+mkdirSync(SHOTS, { recursive: true });
+for (const v of VIEWS) {
+  const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}`;
+  const file = `${SHOTS}/${v.name}.png`;
+  // Async, not spawnSync: the server above lives in this process and has to answer Chrome while it waits.
+  const code = await new Promise<number | null>((done) => {
+    const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1280,720", "--virtual-time-budget=15000", `--screenshot=${file}`, url], { stdio: "ignore" });
+    const timer = setTimeout(() => chrome.kill(), 90_000);
+    chrome.on("exit", (c) => {
+      clearTimeout(timer);
+      done(c);
+    });
+  });
+  const ok = code === 0 && existsSync(file);
+  console.log(`${ok ? "ok  " : "FAIL"} ${file}`);
+  if (!ok) process.exitCode = 1;
+}
+server.close();

@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 // Surface detail for the blockout, added to the GLB's plain materials at run time. Everything is a function
 // of world position (no UVs, no texture files), keyed by the material names set in
-// scripts/build-blockout.mts. The point is to break up flat color: tile grids and inserts on the floors,
+// scripts/blockout/palette.mts. The point is to break up flat color: tile grids and inserts on the floors,
 // plaster grain, skirting and corner darkening on the walls, panel joints on the ceilings, stains on the
 // concrete. Roughness varies with the pattern so the flashlight picks out grout, inserts and polish.
 

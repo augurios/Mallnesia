@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 // The mall opens, closes and slams its own doors; the player never touches them. Doors come from the
-// blockout GLB (see scripts/build-blockout.mts): a root node per door with one pivot node per leaf.
+// blockout GLB (see scripts/blockout/doors.mts): a root node per door with one pivot node per leaf.
 
 const OPEN_ANGLE = THREE.MathUtils.degToRad(100);
 const SLOW_SPEED = 1 / 2.4; // fraction of the swing per second
