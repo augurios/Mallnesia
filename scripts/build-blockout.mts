@@ -214,24 +214,40 @@ const floors: Floor[] = plans.map((p, i) => rasterize(p, i + 1));
 // from the hall end on every floor. Per floor: a flight up the west lane to a round landing over the
 // atrium (half a floor up), then a flight back down the east lane, arriving at the next floor's hall end.
 // The rest of the box (v 6 to 13.5) stays a solid core beside the elevators.
+// A third stair, the center one in Atrium B (reference photo stairs_center-curved-from-third-floor), is the
+// same design standing free in the atrium against the cross-corridor: the rest of its 9 m box is atrium
+// again, its sides are glass, there is no sealed floor 4 set, and its top landing opens to the roof.
 const TOWERS = [
-  { id: "a_stairs", hall: "S" },
-  { id: "b_stairs", hall: "N" },
+  { id: "a_stairs", hall: "S", vOff: 0, sealed: true, seed: 7 },
+  { id: "b_stairs", hall: "N", vOff: 0, sealed: true, seed: 19 },
+  { id: "b_center_stair", hall: "S", vOff: 1.5, sealed: false, seed: 31 },
 ].map((t) => ({ ...t, box: plans[0].boxes.find((b) => b.id === t.id)! }));
 type Tower = (typeof TOWERS)[number];
 const ST = { lane: 3, strip: 1.5, depth: 6, nose: 3, tread: 0.06, slab: 0.35 };
-const isZone = (k: string) => k === "stairzone" || k === "stair_landing";
+const ZONE_KINDS = new Set(["stairzone", "stair_landing", "stairzone_o", "stair_landing_o"]); // _o: free-standing (open) stair
+const isZone = (k: string) => ZONE_KINDS.has(k);
 /** Tower frame to a three.js point: u toward the atrium from the hall end, v east, h up. */
-const towerPt = (t: Tower, u: number, v: number, h: number): V3 => [t.box.x0 + v, h, -(t.hall === "S" ? t.box.y0 + u : t.box.y1 - u)];
-for (const f of floors)
-  for (const t of TOWERS)
-    for (let j = Math.round(t.box.y0 / CELL); j < Math.round(t.box.y1 / CELL); j++)
-      for (let i = Math.round(t.box.x0 / CELL); i < Math.round((t.box.x0 + 2 * ST.lane) / CELL); i++) {
+const towerPt = (t: Tower, u: number, v: number, h: number): V3 => [t.box.x0 + t.vOff + v, h, -(t.hall === "S" ? t.box.y0 + u : t.box.y1 - u)];
+floors.forEach((f, fi) => {
+  for (const t of TOWERS) {
+    const j0 = Math.round(t.box.y0 / CELL);
+    const j1 = Math.round(t.box.y1 / CELL);
+    if (!t.sealed)
+      for (let j = j0; j < j1; j++)
+        for (let i = Math.round(t.box.x0 / CELL); i < Math.round(t.box.x1 / CELL); i++) {
+          f.cls[j * NX + i] = fi === 0 ? WALK : HOLE; // atrium again
+          f.kind[j * NX + i] = "void";
+        }
+    for (let j = j0; j < j1; j++)
+      for (let i = Math.round((t.box.x0 + t.vOff) / CELL); i < Math.round((t.box.x0 + t.vOff + 2 * ST.lane) / CELL); i++) {
         const yc = (j + 0.5) * CELL;
         const u = t.hall === "S" ? yc - t.box.y0 : t.box.y1 - yc;
+        if (u >= ST.depth) continue;
         f.cls[j * NX + i] = WALK;
-        f.kind[j * NX + i] = u < ST.strip ? "stair_landing" : "stairzone";
+        f.kind[j * NX + i] = (u < ST.strip ? "stair_landing" : "stairzone") + (t.sealed ? "" : "_o");
       }
+  }
+});
 
 const at = (f: Floor, i: number, j: number) => (i < 0 || j < 0 || i >= NX || j >= NY ? EMPTY : f.cls[j * NX + i]);
 const kindAt = (f: Floor, i: number, j: number) => (i < 0 || j < 0 || i >= NX || j >= NY ? "" : f.kind[j * NX + i]);
@@ -292,10 +308,11 @@ floors.forEach((f, fi) => {
       if (c === WALK) {
         const k = f.kind[j * NX + i];
         mat = k === "void" ? "floor_atrium" : k === "bath" ? "floor_bath" : k === "garage" ? "floor_garage" : "floors";
-        if (k === "stairzone" && fi > 0) mat = ""; // open volume: floor only at the base, where the garden is
+        if ((k === "stairzone" || k === "stairzone_o") && fi > 0) mat = ""; // open volume: floor only at the base, where the garden is
         stats.walkable[fi]++;
       }
-      const open = mat !== "" && (isOpenCeiling(f, fi, i, j) || (i < NX && f.kind[j * NX + i] === "stairzone"));
+      const kk = i < NX ? f.kind[j * NX + i] : "";
+      const open = mat !== "" && (isOpenCeiling(f, fi, i, j) || kk === "stairzone" || kk === "stairzone_o" || (kk === "stair_landing_o" && fi === 2));
       if (mat !== runMat || open !== runOpen || mat === "") {
         flush(i);
         if (mat) runStart = i;
@@ -325,11 +342,11 @@ floors.forEach((f, fi) => {
               // A hall (or the atrium floor) beside a stair tower. The hall-end landing is a doorway on
               // every floor; along the flights it is glass rail (the base is open, see the garden).
               // From the atrium floor the flights are walked around, not entered (their sides block).
-              if (nk === "stair_landing" || k === "void") lintel();
+              if (nk === "stair_landing" || nk === "stair_landing_o" || k === "void") lintel();
               else {
                 edges.push({ dir: d, i, j, mat: "rails", y0, h: RAIL_H });
                 // Floor 3: the flights go on up to the sealed floor 4 landing; the open-ceiling hall is walled off above it.
-                if (floorNo === 3 && open) edges.push({ dir: d, i, j, mat: "walls", y0: y0 + FLOOR_H, h: ROOF_Y - y0 - FLOOR_H });
+                if (floorNo === 3 && open && nk === "stairzone") edges.push({ dir: d, i, j, mat: "walls", y0: y0 + FLOOR_H, h: ROOF_Y - y0 - FLOOR_H });
               }
             } else lintel();
             continue;
@@ -370,7 +387,8 @@ floors.forEach((f, fi) => {
     for (let j = 0; j < NY; j++) {
       let start = -1;
       for (let i = 0; i <= NX; i++) {
-        const hole = i < NX && (f.cls[j * NX + i] === HOLE || isOpenCeiling(f, fi, i, j));
+        const kind = i < NX ? f.kind[j * NX + i] : "";
+        const hole = i < NX && (f.cls[j * NX + i] === HOLE || isOpenCeiling(f, fi, i, j) || kind === "stairzone_o" || kind === "stair_landing_o");
         if (hole && start < 0) start = i;
         if (!hole && start >= 0) {
           flatRun("roof", start, i, j, ROOF_Y, false);
@@ -552,7 +570,7 @@ type Rail = (u0: number, v0: number, h0: number, u1: number, v1: number, h1: num
  * landing. Leaves are curved tapering ribbons; the gravel is a shader pattern (see materials.ts).
  */
 function garden(t: Tower, P: (u: number, v: number, h: number) => V3, rail: Rail) {
-  let seed = t.hall === "S" ? 7 : 19;
+  let seed = t.seed;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const between = (a: number, b: number) => a + rnd() * (b - a);
   const rocks = geo("stone");
@@ -666,6 +684,11 @@ function garden(t: Tower, P: (u: number, v: number, h: number) => V3, rail: Rail
   // Glass fence: across the hall end of the east lane and along the atrium edge of the whole base.
   rail(1.6, ST.lane, 0, 1.6, 2 * ST.lane, 0);
   rail(ST.depth, 0, 0, ST.depth, 2 * ST.lane, 0);
+  if (!t.sealed) {
+    // Free-standing: the sides are open to the atrium floor too.
+    rail(ST.strip + 0.1, 0, 0, ST.depth, 0, 0);
+    rail(ST.strip + 0.1, 2 * ST.lane, 0, ST.depth, 2 * ST.lane, 0);
+  }
 
   // D-shaped planter under the lower round landing, following its outline (the landing is two lanes wide:
   // straight sides for 0.5 m past the flights, then a half circle of radius ST.nose). Smooth concrete with a
@@ -809,7 +832,7 @@ for (const t of TOWERS) {
 
   // Same on every floor: up the west lane to the round landing, back down the east lane to the hall end.
   // The third set goes from floor 3 up to a future floor 4 (y 15), sealed by a steel gate across its foot on floor 3.
-  for (let fi = 0; fi < 3; fi++) {
+  for (let fi = 0; fi < (t.sealed ? 3 : 2); fi++) {
     const base = fi * FLOOR_H;
     flight(0, ST.strip, base, ST.depth, base + FLOOR_H / 2, 15);
     round(0, base + FLOOR_H / 2);
@@ -817,7 +840,8 @@ for (const t of TOWERS) {
   }
   // Only the west lane (the flight going up) is closed; the east lane is where the flight from floor 2 arrives.
   // It stands just on the hall side of the flight's first tread and stringer, and 2 cm in from the lane edges, so no face shares a plane with them (z-fighting).
-  box(ST.strip - 0.12, ST.strip, 0.02, ST.lane - 0.02, 2 * FLOOR_H, 2 * FLOOR_H + CEIL_H, geo("steel"));
+  if (t.sealed) box(ST.strip - 0.12, ST.strip, 0.02, ST.lane - 0.02, 2 * FLOOR_H, 2 * FLOOR_H + CEIL_H, geo("steel"));
+  else rail(ST.strip, 0, 2 * FLOOR_H, ST.strip, ST.lane, 2 * FLOOR_H); // the top: no flight up from the west lane
   garden(t, P, rail);
   // Big grey column through the round landings, at their west corner (photos: stairs_northern-tower).
   const col = P(ST.depth + 0.3, -0.3, 0);
