@@ -701,7 +701,7 @@
    "label": "West hall extension over the NW corner of Atrium B, held by the bridge's north-west column",
    "x0": 51,
    "x1": 57,
-   "y0": 142.5,
+   "y0": 148.5,
    "y1": 153,
    "kind": "hall"
   },
@@ -710,7 +710,7 @@
    "label": "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column",
    "x0": 72,
    "x1": 78,
-   "y0": 142.5,
+   "y0": 148.5,
    "y1": 153,
    "kind": "hall"
   }

@@ -232,14 +232,14 @@ def floor_items(floor):
         items.append(("main_entrance_kiosk", "Kiosk between the two main entrance doors", ("box", (75.5, 78.5, 8.5, 11.5)), "kiosk"))
         items.append(("bank", "Bank: first store east of the main entrance", ("box", (84, 96, 18, 27)), "shop"))
     if floor == 2:
-        # 6 m wide (grown north from y 135 to 138), no ceiling. The arc cut into its south edge between the
+        # 6 m wide (grown north from y 135 to 147), no ceiling. The arc cut into its south edge between the
         # columns (the inward D) and the four columns with balls are added by scripts/blockout/bridge.mts.
-        items.append(("atrium_b_bridge", "Bridge (cross corridor) over Atrium B, floor 2, open to the roof", ("box", (51, 78, 135, 141)), "bridge"))
+        items.append(("atrium_b_bridge", "Bridge (cross corridor) over Atrium B, floor 2, open to the roof", ("box", (51, 78, 135, 147)), "bridge"))
     if floor == 3:
         # the west and east halls widen over the north corners of Atrium B, down to the bridge's north columns
         # (the box office counter that stood here was cut)
-        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B, held by the bridge's north-west column", ("box", (51, 57, 142.5, 153)), "hall"))
-        items.append(("atrium_b_ext_e", "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column", ("box", (72, 78, 142.5, 153)), "hall"))
+        items.append(("boxoffice_floor", "West hall extension over the NW corner of Atrium B, held by the bridge's north-west column", ("box", (51, 57, 148.5, 153)), "hall"))
+        items.append(("atrium_b_ext_e", "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column", ("box", (72, 78, 148.5, 153)), "hall"))
     return items
 
 

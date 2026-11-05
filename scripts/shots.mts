@@ -31,6 +31,7 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
   { name: "bridge_from_ground", floor: 1, x: 73, y: 125, yaw: 25, pitch: 32, extra: "&ambient=30&fov=80" },
   { name: "bridge_hood_close", floor: 3, x: 49, y: 131, yaw: 300, pitch: -22, extra: "&ambient=30&fov=70" },
+  { name: "north_hall_f3", floor: 3, x: 48, y: 162, yaw: 90, pitch: 8, extra: "&ambient=30&fov=80" },
   { name: "bridge_deck", floor: 2, x: 48.5, y: 138, yaw: 270, pitch: 5, extra: "&ambient=30&fov=80" },
 ];
 

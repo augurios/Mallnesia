@@ -3,14 +3,14 @@ import { floors } from "./grid.mts";
 import { type V3, Geo, geo, addTo, latheGeo, boxGeo, prismGeo, tubeGeo } from "./geo.mts";
 
 // The floor 2 bridge over Atrium B (reference photos atrium_third-floor-looking-down and
-// atrium_upper-floors-from-ground). The plan holds its 6 m band (x 51 to 78, y 135 to 141). Between the two
+// atrium_upper-floors-from-ground). The plan holds its 6 m band (x 51 to 78, y 135 to 147). Between the two
 // south columns its south edge is an arc cut into the deck (an inward D), with a deep white beam under it
 // and angled glass panels on it. Four grey columns, two at each end, carry cork-brown balls at the floor 3
 // level, each held in a white C-shaped hood with a ridge along its top (see the hood below); a white beam
 // joins each pair just under the floor 3 level and carries the floor 3 extensions north of the bridge.
-const DECK = { x0: 51, x1: 78, y0: 135, y1: 141 };
+const DECK = { x0: 51, x1: 78, y0: 135, y1: 147 };
 const COL_X = [54, 75]; // the ends of the arc
-const COL_Y = [135, 141]; // the south and north edges of the deck
+const COL_Y = [135, 147]; // the south and north edges of the deck
 const SAG = 3; // how far the arc reaches into the deck (the middle stays 3 m wide)
 const HALF = (COL_X[1] - COL_X[0]) / 2;
 const ARC = { cx: (COL_X[0] + COL_X[1]) / 2, r: (HALF * HALF + SAG * SAG) / (2 * SAG) };
@@ -19,7 +19,7 @@ const DEPTH = 0.7; // the beam under the deck edge
 const LIP = 0.6; // its white top, over the stepped cell edge
 const BALL_R = 0.85;
 const BALL_Y = 2 * FLOOR_H; // the ball is level with the floor 3 floor
-const EXT_Y = 142.5; // south edge of the floor 3 extensions the north columns hold (boxoffice_floor, atrium_b_ext_e)
+const EXT_Y = 148.5; // south edge of the floor 3 extensions the north columns hold (boxoffice_floor, atrium_b_ext_e)
 
 /** Whether the cell (i, j) of floor 2 lies in the arc cut out of the bridge. */
 export function inBridgeCut(i: number, j: number): boolean {

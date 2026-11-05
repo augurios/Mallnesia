@@ -17,7 +17,7 @@ export const stats = { walkable: [0, 0, 0] };
 
 // Floor 3: the halls and bridges around the atriums have no dropped ceiling; they open up to the roof truss.
 export const OPEN_X = [45, 84];
-export const OPEN_Y = [45, 165];
+export const OPEN_Y = [45, 159]; // the north hall (y 159 to 165) keeps its low ceiling, in front of the cinemas
 export const isOpenCeiling = (f: Floor, fi: number, i: number, j: number) => {
   if (fi !== 2 || at(f, i, j) !== WALK || kindAt(f, i, j) !== "hall") return false;
   const x = (i + 0.5) * CELL;
