@@ -26,6 +26,9 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "stairs_b_from_hall", floor: 1, x: b.x0 + 1.5, y: b.y1 + 4, yaw: 180, pitch: 12 },
   { name: "stairs_a_mid_flight", floor: 2, x: a.x0 + 4.5, y: a.y0 + 4, yaw: 0, pitch: -15 },
   { name: "stairs_center_from_atrium", floor: 1, x: c.x0 + 3, y: c.y0 - 8, yaw: 0, pitch: 18 },
+  { name: "foodcourt_tables", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4 },
+  { name: "foodcourt_tables_floor3", floor: 3, x: 66, y: 22, yaw: 180, pitch: 4 },
+  { name: "chair_closeup", floor: 2, x: 64.4, y: 24.5, yaw: 231, pitch: -22, extra: "&ambient=30&fov=70" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

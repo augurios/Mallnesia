@@ -12,15 +12,15 @@
 //   walls    edge runs merged into wall quads         doors    the secret-hallway doors
 //   check    spawn check, reachability debug image    write    chunking, meshopt, GLB output
 import { buildShell } from "./blockout/shell.mts";
-import { paintTowers, buildTowers, buildElevatorPiers } from "./blockout/towers.mts";
+import { paintGrid } from "./blockout/paint.mts";
+import { buildTowers, buildElevatorPiers } from "./blockout/towers.mts";
 import { checkSpawns, debugReachability } from "./blockout/check.mts";
-import { paintBridge, buildBridge } from "./blockout/bridge.mts";
+import { buildBridge } from "./blockout/bridge.mts";
 import { buildDoors } from "./blockout/doors.mts";
 import { writeGlb } from "./blockout/write.mts";
 
 // The order matters: it is the order of the triangles in the file.
-paintTowers();
-paintBridge();
+paintGrid();
 buildShell();
 buildTowers();
 buildElevatorPiers();

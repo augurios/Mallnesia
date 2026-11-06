@@ -35,6 +35,18 @@ export function chunks(g: Geo): Geo[] {
 }
 
 
+/** A glTF material from the palette entry of the same name. Shared with the kit pieces (scripts/kit/). */
+export function makeMaterial(doc: Document, name: string) {
+  const m = MATERIALS[name];
+  return doc
+    .createMaterial(name)
+    .setBaseColorFactor(m.color)
+    .setRoughnessFactor(m.rough)
+    .setMetallicFactor(0)
+    .setDoubleSided(!!m.blend || !!m.double)
+    .setAlphaMode(m.blend ? "BLEND" : "OPAQUE");
+}
+
 export async function writeGlb(doorNodes: ReturnType<typeof buildDoors>) {
 const doc = new Document();
 const buffer = doc.createBuffer();
@@ -42,14 +54,7 @@ const scene = doc.createScene("mall_blockout");
 let triangles = 0;
 let nodes = 0;
 for (const [name, whole] of Object.entries(geos)) {
-  const m = MATERIALS[name];
-  const mat = doc
-    .createMaterial(name)
-    .setBaseColorFactor(m.color)
-    .setRoughnessFactor(m.rough)
-    .setMetallicFactor(0)
-    .setDoubleSided(!!m.blend || !!m.double)
-    .setAlphaMode(m.blend ? "BLEND" : "OPAQUE");
+  const mat = makeMaterial(doc, name);
   for (const g of chunks(whole)) {
     const prim = doc
       .createPrimitive()

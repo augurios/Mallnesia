@@ -160,6 +160,7 @@ Not done yet, in the order I would do them: baked per-vertex lighting for the fe
 - **Decided (Augusto):** the game is set at night, mall closed, lights mostly off, little light mostly from outside, dark tones (see "Time of day: night").
 - **[decide]** Whether the exterior glow is baked or dynamic (engine test, early). Also which fixtures are "stuck on" in each area, since they double as flashlight recharge points.
 - **Decided (Augusto):** realistic low-poly, not PS1. This is the same approach as the base project (dirien/backrooms); see "How the base project gets its look".
+- **Decided (Augusto, 2026-11-05):** the graphic style is similar to the reference repo (dirien/backrooms), as described in "How the base project gets its look". Kit pieces (tables, chairs, benches, bins) are modelled from the reference photos: keep them low-poly but with the real silhouette and curvature, and plain palette colors. Example: food court chairs are curved one-piece molded red shells for one person (not benches) on grey tube legs, and the tables are white rectangles with a black edge on a black post and cross foot (`reference/photos/foodcourt_second-floor.jpg`).
 - **[decide]** Resolution budget for characters (guard, watchers).
 - **[decide]** Whether AI-generated assets are acceptable for the released game (check each service's licence terms first, and keep a record of what was generated where).
 

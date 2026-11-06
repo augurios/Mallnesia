@@ -2,16 +2,18 @@
 // ground code the game runs (src/engine/walk.ts). Run: npm run test:walk   (after npm run blockout)
 //
 //   1. the three stair sets can be climbed from floor 1 to floor 3 (the sealed set's gate holds);
-//   2. nothing lets the player walk off an atrium edge or stair side, or into a solid block.
+//   2. nothing lets the player walk off an atrium edge or stair side, or into a solid block;
+//   3. every placed prop (a table set) stops the player, from all four sides.
 // The second is the check that would have caught chunked meshes losing their collision.
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { Walk, FLOOR_HEIGHT } from "../src/engine/walk.ts";
+import { buildProps, type PropsManifest } from "../src/engine/props.ts";
 import { CELL, NX, NY, WALK, HOLE, SOLIDC, OUT } from "./blockout/config.mts";
 import { plans, floors, at, kindAt } from "./blockout/grid.mts";
-import { paintTowers } from "./blockout/towers.mts";
+import { paintGrid } from "./blockout/paint.mts";
 
 const SPEED = 3.2;
 const DT = 1 / 60;
@@ -21,9 +23,14 @@ const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(ab as ArrayBuffer, "");
 const player = new THREE.Vector3();
 const walk = new Walk(player);
-walk.load(gltf.scene);
+const manifest = JSON.parse(readFileSync("public/models/props.json", "utf8")) as PropsManifest;
+const props = await buildProps(manifest, async (url) => {
+  const file = readFileSync(url.replace("./", "public/"));
+  return (await new GLTFLoader().parseAsync(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer, "")).scene;
+});
+walk.load(gltf.scene, props.colliders);
 if (!walk.ready) throw new Error(`${OUT} has no collision or ground geometry`);
-paintTowers(); // the stair zones are painted into the grid by the builder before it emits geometry
+paintGrid(); // the same grid the builder emitted the GLB from
 
 const floorOf = () => Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
 const place = (x: number, y: number, h: number) => {
@@ -118,8 +125,9 @@ for (let fi = 0; fi < 3; fi++) {
         place(cx, cy, h);
         walk.collide();
         settle();
-        // A cell half inside a pier or column: the push-out puts the start somewhere a player can't be. Skip it.
-        if (at(f, Math.floor(player.x / CELL), Math.floor(-player.z / CELL)) !== WALK) {
+        // Beside a wall the push-out is about 10 cm (14 in a corner). A start that is pushed 20 cm or more, or out of walkable
+        // floor, was inside a pier or column stub (a cell half inside one), where a real player can't stand: skip it.
+        if (Math.hypot(player.x - cx, player.z + cy) > 0.2 || at(f, Math.floor(player.x / CELL), Math.floor(-player.z / CELL)) !== WALK) {
           skipped++;
           continue;
         }
@@ -138,6 +146,31 @@ for (const [what, list] of Object.entries(offending)) {
   for (const w of list.slice(0, 8)) console.log(`     ${w}`);
   if (list.length > 8) console.log(`     ... and ${list.length - 8} more`);
 }
+
+// ---- 3. props --------------------------------------------------------------------------------------
+let blocked = 0;
+let propTries = 0;
+const loose: string[] = [];
+for (const [name, flat] of Object.entries(manifest.instances))
+  for (let n = 0; n < flat.length; n += 4) {
+    const [px, py, pz] = [flat[n], flat[n + 1], flat[n + 2]];
+    for (let k = 0; k < 4; k++) {
+      const a = (k * Math.PI) / 2 + 0.3; // not square to the table: also covers its corners
+      const sx = px + Math.cos(a) * 2.2;
+      const sz = pz + Math.sin(a) * 2.2;
+      // a start that is not clear floor (a wall or pier close to the table) says nothing about the table
+      if (at(floors[Math.round(py / 5)], Math.floor(sx / CELL), Math.floor(-sz / CELL)) !== WALK) continue;
+      propTries++;
+      place(sx, -sz, py);
+      settle();
+      walkTo(px, -pz, 4);
+      const d = Math.hypot(player.x - px, player.z - pz);
+      if (d >= 0.9) blocked++;
+      else loose.push(`${name} at (${px}, ${-pz}) height ${py} from side ${k}: got to ${d.toFixed(2)} m of its centre`);
+    }
+  }
+check(propTries > 0 && blocked === propTries, `props: ${blocked} of ${propTries} approaches stopped`, `${Object.values(manifest.instances).reduce((t, f) => t + f.length / 4, 0)} instances`);
+for (const w of loose.slice(0, 8)) console.log(`     ${w}`);
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nall checks passed");
 process.exitCode = failures ? 1 : 0;

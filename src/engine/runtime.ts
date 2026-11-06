@@ -5,6 +5,7 @@ import { createAudio } from "./audio";
 import { Doors } from "./doors";
 import { styleBlockout } from "./materials";
 import { createPost } from "./post";
+import { loadProps } from "./props";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 
@@ -46,6 +47,7 @@ const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
+const PROPS_URL = "./models/props.json"; // built by scripts/build-props.mts
 
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
 // Debug keys 1/2/3 jump to these until stairs and elevators exist.
@@ -119,19 +121,33 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   });
   doors.auto = params.get("doors") !== "off"; // debug: ?doors=off stops the mall moving doors by itself
 
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(BLOCKOUT_URL, (gltf) => {
-    gltf.scene.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return;
-      const kind = (o.material as THREE.Material).name; // chunks share the material's name; node names are made unique
-      if (kind === "barrier") o.visible = false; // collision only
-      if (kind === "glass" || kind === "rails") o.renderOrder = 1;
-    });
-    scene.add(gltf.scene);
-    blockout = gltf.scene;
-    styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
-    doors.load(gltf.scene);
-    walk.load(gltf.scene);
-  }, undefined, (err) => console.error("Could not load the mall blockout", err));
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  void (async () => {
+    try {
+      // The props are optional: a missing or broken props file must not stop the mall from loading.
+      const [gltf, props] = await Promise.all([
+        loader.loadAsync(BLOCKOUT_URL),
+        loadProps(PROPS_URL, async (url) => (await loader.loadAsync(url)).scene).catch((err) => {
+          console.error("Could not load the props", err);
+          return null;
+        }),
+      ]);
+      gltf.scene.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        const kind = (o.material as THREE.Material).name; // chunks share the material's name; node names are made unique
+        if (kind === "barrier") o.visible = false; // collision only
+        if (kind === "glass" || kind === "rails") o.renderOrder = 1;
+      });
+      scene.add(gltf.scene);
+      if (props) scene.add(props.group);
+      blockout = gltf.scene;
+      styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
+      doors.load(gltf.scene);
+      walk.load(gltf.scene, props?.colliders);
+    } catch (err) {
+      console.error("Could not load the mall blockout", err);
+    }
+  })();
 
   const keys = new Set<string>();
   let locked = false;

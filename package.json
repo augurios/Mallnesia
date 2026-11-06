@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "blockout": "node scripts/build-blockout.mts",
-    "test:walk": "npm run blockout --silent && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-walk.mts",
-    "shots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/shots.mts"
+    "test:walk": "npm run assets --silent && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-walk.mts",
+    "shots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/shots.mts",
+    "props": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-props.mts",
+    "assets": "npm run blockout --silent && npm run props --silent"
   },
   "dependencies": {
     "next": "16.4.5",

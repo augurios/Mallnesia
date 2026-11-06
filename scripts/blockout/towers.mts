@@ -1,4 +1,5 @@
-import { CELL, NX, FLOOR_H, CEIL_H, ROOF_Y, RAIL_H, WALK, HOLE } from "./config.mts";
+import { readFileSync } from "node:fs";
+import { PLANS, CELL, NX, FLOOR_H, CEIL_H, ROOF_Y, RAIL_H, WALK, HOLE } from "./config.mts";
 import { plans, floors } from "./grid.mts";
 import { Geo, type V3, geo, addTo, slabGeo, prismGeo, latheGeo, sweepGeo, tubeGeo, rockGeo, boxGeo } from "./geo.mts";
 
@@ -16,11 +17,9 @@ import { Geo, type V3, geo, addTo, slabGeo, prismGeo, latheGeo, sweepGeo, tubeGe
 // A third stair, the center one in Atrium B (reference photo stairs_center-curved-from-third-floor), is the
 // same design standing free in the atrium against the cross-corridor: the rest of its 9 m box is atrium
 // again, its sides are glass, there is no sealed floor 4 set, and its top landing opens to the roof.
-export const TOWERS = [
-  { id: "a_stairs", hall: "S", vOff: 0, sealed: true, noUp: false, seed: 7 },
-  { id: "b_stairs", hall: "N", vOff: 0, sealed: true, noUp: true, seed: 19 }, // noUp: no flight up to floor 4; floor 3 west lane is hall
-  { id: "b_center_stair", hall: "S", vOff: 1.5, sealed: false, noUp: false, seed: 31 },
-].map((t) => ({ ...t, box: plans[0].boxes.find((b) => b.id === t.id)! }));
+type TowerDef = { id: string; hall: "S" | "N"; vOff: number; sealed: boolean; noUp: boolean; seed: number };
+const towerData = JSON.parse(readFileSync(`${PLANS}/towers.json`, "utf8")) as { towers: TowerDef[] };
+export const TOWERS = towerData.towers.map((t) => ({ ...t, box: plans[0].boxes.find((b) => b.id === t.id)! }));
 export type Tower = (typeof TOWERS)[number];
 export const ST = { lane: 3, strip: 1.5, depth: 6, nose: 3, tread: 0.06, slab: 0.35 };
 export const ZONE_KINDS = new Set(["stairzone", "stair_landing", "stairzone_o", "stair_landing_o"]); // _o: free-standing (open) stair

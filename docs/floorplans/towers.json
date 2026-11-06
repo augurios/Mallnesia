@@ -1,0 +1,8 @@
+{
+ "note": "The open stair towers of the blockout, read by scripts/blockout/towers.mts. 'id' is a box in floor1_plan.json (the stair's footprint). 'hall' is the side of the box the stair is entered from (S = the hall is to the south, N = to the north). 'vOff' shifts the stair east inside its box (m). 'sealed': the stair goes on up to a gated landing for a future floor 4 (a free-standing stair has none: its top opens to the roof). 'noUp': no flight up from floor 3 to that future floor. 'seed' drives the garden's plants and rocks, so the same value always gives the same garden.",
+ "towers": [
+  {"id": "a_stairs", "hall": "S", "vOff": 0, "sealed": true, "noUp": false, "seed": 7},
+  {"id": "b_stairs", "hall": "N", "vOff": 0, "sealed": true, "noUp": true, "seed": 19},
+  {"id": "b_center_stair", "hall": "S", "vOff": 1.5, "sealed": false, "noUp": false, "seed": 31}
+ ]
+}

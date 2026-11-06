@@ -35,9 +35,9 @@ export class Walk {
     this.player = player;
   }
 
-  /** Builds both BVHs from a loaded blockout scene. */
-  load(root: THREE.Object3D) {
-    const parts: THREE.BufferGeometry[] = [];
+  /** Builds both BVHs from a loaded blockout scene. `extra` are more colliders in world space (positions only), such as props. */
+  load(root: THREE.Object3D, extra: THREE.BufferGeometry[] = []) {
+    const parts: THREE.BufferGeometry[] = [...extra];
     const ground: THREE.BufferGeometry[] = [];
     const plain = (mesh: THREE.Mesh) => {
       const g = (mesh.geometry as THREE.BufferGeometry).clone();
