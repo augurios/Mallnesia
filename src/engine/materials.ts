@@ -26,6 +26,39 @@ const KINDS: Record<string, Kind> = {
   stone: "rock",
 };
 
+// Baked ambient occlusion (scripts/blockout/ao.mts): one pixel per 0.5 m plan cell, the floors stacked, 255 = open.
+// Floors and ceilings sample it by world position and dim only the ambient light, never the flashlight. Until
+// the map has loaded it is one white pixel, so nothing changes.
+const AO_CELL = 0.5;
+const AO_SIZE = { x: 300, y: 420, floors: 3 }; // keep in sync with scripts/blockout/config.mts
+const AO_STRENGTH: Partial<Record<Kind, number>> = { porcelain: 1, porcelain45: 1, tile: 1, concrete: 1, panels: 0.6 };
+const white = new THREE.DataTexture(new Uint8Array([255]), 1, 1, THREE.RedFormat);
+white.needsUpdate = true;
+const bakedAO = { value: white as THREE.Texture };
+
+/** Gives the floors and ceilings their baked occlusion map (or back the white one for null). */
+export function setBakedAO(texture: THREE.Texture | null) {
+  if (texture) {
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    texture.flipY = false; // image row f * 420 + j is floor f, plan row j
+    texture.needsUpdate = true;
+  }
+  bakedAO.value = texture ?? white;
+}
+
+const AO_FRAGMENT = (strength: number) => /* glsl */ `
+uniform sampler2D bakedAO;
+float aoAt() {
+  float f = clamp(floor(vWPos.y / 5.0 + 0.001), 0.0, ${(AO_SIZE.floors - 1).toFixed(1)});
+  vec2 c = vec2(vWPos.x, -vWPos.z) / ${AO_CELL.toFixed(2)};
+  vec2 uv = vec2(c.x / ${AO_SIZE.x.toFixed(1)}, (f * ${AO_SIZE.y.toFixed(1)} + clamp(c.y, 0.5, ${(AO_SIZE.y - 0.5).toFixed(1)})) / ${(AO_SIZE.y * AO_SIZE.floors).toFixed(1)});
+  return mix(1.0, texture2D(bakedAO, uv).r, ${strength.toFixed(2)});
+}
+`;
+
 const HEADER = /* glsl */ `
 varying vec3 vWPos;
 float gGrout = 0.0;
@@ -161,9 +194,15 @@ function patch(material: THREE.Material, kind: Kind) {
     // Floors and ceilings are double-sided: their back is a slab seen from the other floor.
     const back = BACK[kind];
     const color = back ? `if (!gl_FrontFacing) { diffuseColor.rgb = ${back}; } else ${COLOR[kind]}` : COLOR[kind];
+    const ao = AO_STRENGTH[kind];
     let frag = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\n${HEADER}`)
+      .replace("#include <common>", `#include <common>\n${HEADER}${ao ? AO_FRAGMENT(ao) : ""}`)
       .replace("#include <color_fragment>", `#include <color_fragment>\n${color}`);
+    if (ao) {
+      shader.uniforms.bakedAO = bakedAO;
+      frag = frag
+        .replace("#include <aomap_fragment>", `#include <aomap_fragment>\nif (gl_FrontFacing) { float ao = aoAt(); reflectedLight.indirectDiffuse *= ao; reflectedLight.indirectSpecular *= ao; }`);
+    }
     const rough = ROUGHNESS[kind];
     if (rough) frag = frag.replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${rough}`);
     shader.fragmentShader = frag;

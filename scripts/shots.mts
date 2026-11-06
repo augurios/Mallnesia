@@ -28,6 +28,9 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "stairs_center_from_atrium", floor: 1, x: c.x0 + 3, y: c.y0 - 8, yaw: 0, pitch: 18 },
   { name: "foodcourt_tables", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4 },
   { name: "foodcourt_tables_floor3", floor: 3, x: 66, y: 22, yaw: 180, pitch: 4 },
+  { name: "sky_foodcourt", floor: 2, x: 62, y: 6, yaw: 180, pitch: 3, extra: "&fov=80" },
+  { name: "sky_foodcourt_up", floor: 3, x: 62, y: 6, yaw: 180, pitch: 4, extra: "&fov=80" },
+  { name: "ao_hall", floor: 2, x: 80.5, y: 113, yaw: 90, pitch: -28, extra: "&ambient=2.4&fov=90&exposure=3" },
   { name: "chair_closeup", floor: 2, x: 64.4, y: 24.5, yaw: 231, pitch: -22, extra: "&ambient=30&fov=70" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
@@ -54,7 +57,9 @@ await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
 const port = (server.address() as { port: number }).port;
 
 mkdirSync(SHOTS, { recursive: true });
+const only = process.env.ONLY?.split(","); // e.g. ONLY=ao_hall,chair_closeup: just those views
 for (const v of VIEWS) {
+  if (only && !only.includes(v.name)) continue;
   const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}${v.extra ?? ""}`;
   const file = `${SHOTS}/${v.name}.png`;
   // Async, not spawnSync: the server above lives in this process and has to answer Chrome while it waits.

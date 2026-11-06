@@ -3,9 +3,10 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { createAudio } from "./audio";
 import { Doors } from "./doors";
-import { styleBlockout } from "./materials";
+import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps } from "./props";
+import { createSky } from "./sky";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 
@@ -47,6 +48,7 @@ const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
+const AO_URL = "./models/ao.png";
 const PROPS_URL = "./models/props.json"; // built by scripts/build-props.mts
 
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
@@ -66,6 +68,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x04060a); // near black with a blue tint: this is the night
   scene.fog = new THREE.Fog(0x04060a, 6, 70);
+  const sky = createSky(); // the night outside the glass; the fog does not touch it
+  scene.add(sky.mesh);
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 250); // vertical fov: 60 is about 92 degrees horizontal at 16:9
   camera.rotation.order = "YXZ";
@@ -125,13 +129,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   void (async () => {
     try {
       // The props are optional: a missing or broken props file must not stop the mall from loading.
-      const [gltf, props] = await Promise.all([
+      const [gltf, props, ao] = await Promise.all([
         loader.loadAsync(BLOCKOUT_URL),
         loadProps(PROPS_URL, async (url) => (await loader.loadAsync(url)).scene).catch((err) => {
           console.error("Could not load the props", err);
           return null;
         }),
+        new THREE.TextureLoader().loadAsync(AO_URL).catch((err) => {
+          console.error("Could not load the baked occlusion", err);
+          return null;
+        }),
       ]);
+      setBakedAO(ao); // before the first styled frame: the shader samples it
       gltf.scene.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
         const kind = (o.material as THREE.Material).name; // chunks share the material's name; node names are made unique
@@ -238,6 +247,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     camera.position.set(player.x, eyeY + EYE_HEIGHT, player.z);
     camera.rotation.set(pitch, yaw, 0);
     camera.updateMatrixWorld();
+    sky.follow(camera.position);
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     post.render(now / 1000);
@@ -269,6 +279,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       document.removeEventListener("pointerlockchange", onLockChange);
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
       audio.dispose();
+      sky.dispose();
       post.dispose();
       renderer.dispose();
       renderer.domElement.remove();

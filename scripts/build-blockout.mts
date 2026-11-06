@@ -11,12 +11,14 @@
 //   geo      geometry accumulator and primitives      towers   stair towers, gardens, elevator piers
 //   walls    edge runs merged into wall quads         doors    the secret-hallway doors
 //   check    spawn check, reachability debug image    write    chunking, meshopt, GLB output
+//   ao       baked ambient occlusion map (ao.png)
 import { buildShell } from "./blockout/shell.mts";
 import { paintGrid } from "./blockout/paint.mts";
 import { buildTowers, buildElevatorPiers } from "./blockout/towers.mts";
 import { checkSpawns, debugReachability } from "./blockout/check.mts";
 import { buildBridge } from "./blockout/bridge.mts";
 import { buildDoors } from "./blockout/doors.mts";
+import { bakeAO } from "./blockout/ao.mts";
 import { writeGlb } from "./blockout/write.mts";
 
 // The order matters: it is the order of the triangles in the file.
@@ -29,3 +31,4 @@ checkSpawns();
 debugReachability();
 const doorNodes = buildDoors();
 await writeGlb(doorNodes);
+bakeAO(); // a separate file next to the GLB: the floors and ceilings sample it by world position
