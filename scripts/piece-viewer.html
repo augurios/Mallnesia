@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <body style="margin:0;background:#30343a">
+    <!-- Used by scripts/piece-shots.mts: shows one kit piece with the game's surface styling, solid or as a wireframe.
+         ?m=<name>&wire=1&az=<degrees>&zoom=<1 = whole piece>&ty=<0..1, height looked at>&lamp=1 (dark, lit by a flashlight) -->
+    <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+      import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+      import { styleBlockout } from "/materials.js";
+      const q = new URLSearchParams(location.search);
+      const r = new THREE.WebGLRenderer({ antialias: true });
+      r.setSize(1000, 800);
+      r.toneMapping = THREE.ACESFilmicToneMapping;
+      document.body.append(r.domElement);
+      const s = new THREE.Scene();
+      s.background = new THREE.Color(0x30343a);
+      s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+      const lamp = q.get("lamp");
+      if (!lamp) {
+        const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+        sun.position.set(2, 3, 4);
+        s.add(sun);
+      } else s.environmentIntensity = 0.15;
+      const g = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`/public/models/kit/${q.get("m")}.glb`);
+      g.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        if (o.material.name === "barrier") o.visible = false; // the collider
+        else if (q.get("wire")) o.material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+        else o.material.side = THREE.DoubleSide;
+      });
+      if (!q.get("wire")) styleBlockout(g.scene, true);
+      s.add(g.scene);
+      const b = new THREE.Box3().setFromObject(g.scene);
+      const c = b.getCenter(new THREE.Vector3());
+      const sz = b.getSize(new THREE.Vector3());
+      const cam = new THREE.PerspectiveCamera(35, 1000 / 800, 0.01, 100);
+      const d = Math.max(sz.x, sz.y, sz.z) * 2.2 * parseFloat(q.get("zoom") || "1");
+      const az = (parseFloat(q.get("az") || "35") * Math.PI) / 180;
+      if (q.get("ty")) c.y = b.min.y + sz.y * parseFloat(q.get("ty"));
+      cam.position.set(c.x + Math.sin(az) * d, c.y + Math.max(sz.y * 0.3, 0.25) * Math.min(1, d), c.z + Math.cos(az) * d);
+      cam.lookAt(c);
+      if (lamp) {
+        // a flashlight held a little below and right of the eye, like the player's
+        const torch = new THREE.SpotLight(0xfff2dc, 6, 12, 0.45, 0.5, 1.6);
+        torch.position.copy(cam.position).add(new THREE.Vector3(0.15, -0.2, 0).applyQuaternion(cam.quaternion));
+        torch.target.position.copy(c);
+        s.add(torch, torch.target);
+      }
+      r.render(s, cam);
+    </script>
+  </body>
+</html>

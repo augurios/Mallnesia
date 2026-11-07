@@ -90,6 +90,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const post = createPost(renderer, scene, camera);
   let blockout: THREE.Object3D | null = null;
+  let propsGroup: THREE.Object3D | null = null;
   let quality: QualityLevel = isQualityLevel(urlQuality) ? urlQuality : loadQuality();
   const applyQuality = () => {
     const preset = QUALITY_PRESETS[quality];
@@ -98,6 +99,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     torch.distance = preset.torchDistance;
     post.setSettings({ bloom: preset.bloom, film: preset.film });
     if (blockout) styleBlockout(blockout, preset.detail);
+    if (propsGroup) styleBlockout(propsGroup, preset.detail);
     resize();
   };
 
@@ -151,6 +153,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (props) scene.add(props.group);
       blockout = gltf.scene;
       styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
+      if (props) {
+        propsGroup = props.group;
+        styleBlockout(props.group, QUALITY_PRESETS[quality].detail); // the kit pieces get the same surface detail
+      }
       doors.load(gltf.scene);
       walk.load(gltf.scene, props?.colliders);
     } catch (err) {

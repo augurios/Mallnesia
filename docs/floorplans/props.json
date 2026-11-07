@@ -1,7 +1,105 @@
 {
- "note": "Where the kit pieces (scripts/kit/pieces.mts) stand in the mall. Read by scripts/build-props.mts, which checks every instance against the floor grid and writes public/models/props.json for the game. Meters, x east, y north, floors 1 to 3. 'scatter' fills an area with a piece on a grid: 'area' is a polygon id in the floor plans (or 'box': [x0, y0, x1, y1]); 'spacing' is the grid step [x, y]; 'jitter' moves each one up to that many meters; 'turn' turns each up to that many degrees either way; 'skip' is the chance (0 to 1) of leaving a spot empty; 'aisle' is the clear walkable margin (m) required around a piece; 'seed' makes it repeat exactly. 'place' is one piece at a place: x, y, and 'rot' in degrees. Pieces that would stand on or too close to anything but open floor, or within 3 m of a secret door, are dropped and counted in the build output.",
+ "note": "Where the kit pieces (scripts/kit/pieces.mts) stand in the mall. Read by scripts/build-props.mts, which checks every instance against the floor grid and writes public/models/props.json for the game. Meters, x east, y north, floors 1 to 3. 'scatter' fills an area with a piece on a grid: 'area' is a polygon id in the floor plans (or 'box': [x0, y0, x1, y1]); 'spacing' is the grid step [x, y]; 'jitter' moves each one up to that many meters; 'turn' turns each up to that many degrees either way; 'skip' is the chance (0 to 1) of leaving a spot empty; 'aisle' is the clear walkable margin (m) required around a piece; 'seed' makes it repeat exactly. 'place' is one piece at a place: x, y, and 'rot' in degrees. Pieces that would stand on or too close to anything but open floor, or within 3 m of a secret door, are dropped and counted in the build output. A scatter rule with \"wall\": true puts wall pieces (bench, bin, planter, tray stand: back to the wall, front facing out) along the walls of the open floor: 'spacing' [d, d] is the least distance between two of them, 'max' how many per floor, 'kinds' which floor kinds count (default hall and foodcourt), 'box' or 'area' where to look. Candidates are picked in a seeded random order.",
  "scatter": [
-  {"piece": "table_set", "floors": [2, 3], "area": "south_area", "spacing": [5, 5], "jitter": 0.25, "turn": 12, "skip": 0.12, "aisle": 0.9, "seed": 11}
+  {
+   "piece": "table_set",
+   "floors": [
+    2,
+    3
+   ],
+   "area": "south_area",
+   "spacing": [
+    5,
+    5
+   ],
+   "jitter": 0.25,
+   "turn": 12,
+   "skip": 0.12,
+   "aisle": 0.9,
+   "seed": 11
+  },
+  {
+   "piece": "bench_red",
+   "floors": [
+    1,
+    2,
+    3
+   ],
+   "wall": true,
+   "box": [
+    0,
+    0,
+    150,
+    210
+   ],
+   "spacing": [
+    20,
+    20
+   ],
+   "max": 4,
+   "aisle": 0.9,
+   "seed": 21
+  },
+  {
+   "piece": "planter_plant",
+   "floors": [
+    1,
+    2,
+    3
+   ],
+   "wall": true,
+   "box": [
+    0,
+    0,
+    150,
+    210
+   ],
+   "spacing": [
+    22,
+    22
+   ],
+   "max": 4,
+   "aisle": 0.9,
+   "seed": 22
+  },
+  {
+   "piece": "trash_bin",
+   "floors": [
+    1,
+    2,
+    3
+   ],
+   "wall": true,
+   "box": [
+    0,
+    0,
+    150,
+    210
+   ],
+   "spacing": [
+    16,
+    16
+   ],
+   "max": 6,
+   "aisle": 0.8,
+   "seed": 23
+  },
+  {
+   "piece": "tray_stand",
+   "floors": [
+    2,
+    3
+   ],
+   "wall": true,
+   "area": "south_area",
+   "spacing": [
+    8,
+    8
+   ],
+   "max": 3,
+   "aisle": 0.9,
+   "seed": 24
+  }
  ],
  "place": []
 }

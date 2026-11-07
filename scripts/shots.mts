@@ -31,6 +31,10 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "sky_foodcourt", floor: 2, x: 62, y: 6, yaw: 180, pitch: 3, extra: "&fov=80" },
   { name: "sky_foodcourt_up", floor: 3, x: 62, y: 6, yaw: 180, pitch: 4, extra: "&fov=80" },
   { name: "ao_hall", floor: 2, x: 80.5, y: 113, yaw: 90, pitch: -28, extra: "&ambient=2.4&fov=90&exposure=3" },
+  { name: "piece_bench_red", floor: 2, x: 51.30, y: 170.25, yaw: 270, pitch: -12, extra: "&ambient=8&fov=70" },
+  { name: "piece_trash_bin", floor: 2, x: 51.33, y: 166.25, yaw: 270, pitch: -12, extra: "&ambient=8&fov=70" },
+  { name: "piece_planter_plant", floor: 2, x: 44.75, y: 162.31, yaw: 360, pitch: -12, extra: "&ambient=8&fov=70" },
+  { name: "piece_tray_stand", floor: 2, x: 59.74, y: 29.75, yaw: 90, pitch: -12, extra: "&ambient=8&fov=70" },
   { name: "chair_closeup", floor: 2, x: 64.4, y: 24.5, yaw: 231, pitch: -22, extra: "&ambient=30&fov=70" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look

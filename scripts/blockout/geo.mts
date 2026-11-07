@@ -4,6 +4,8 @@ export class Geo {
   pos: number[] = [];
   nrm: number[] = [];
   idx: number[] = [];
+  /** Optional second channel, two numbers per vertex (kit leaves: along, across). Missing values read as 0. */
+  uv?: number[];
   /** Quad with corners a,b,c,d (three.js coords), counter-clockwise seen from the normal side. */
   quad(a: V3, b: V3, c: V3, d: V3, n: V3) {
     const base = this.pos.length / 3;
@@ -14,7 +16,7 @@ export class Geo {
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
   /** Quad with a normal per corner (smooth shading), wound to face along the average normal. */
-  quadN(a: V3, b: V3, c: V3, d: V3, na: V3, nb: V3, nc: V3, nd: V3) {
+  quadN(a: V3, b: V3, c: V3, d: V3, na: V3, nb: V3, nc: V3, nd: V3, uv?: [number, number][]) {
     const cross = [
       (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
       (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
@@ -23,6 +25,11 @@ export class Geo {
     const facing = [0, 1, 2].reduce((acc, k) => acc + cross[k] * (na[k] + nb[k] + nc[k] + nd[k]), 0) > 0;
     const corners: [V3, V3][] = facing ? [[a, na], [b, nb], [c, nc], [d, nd]] : [[a, na], [d, nd], [c, nc], [b, nb]];
     const base = this.pos.length / 3;
+    if (uv) {
+      const t = (this.uv ??= []);
+      while (t.length < base * 2) t.push(0);
+      for (const k of facing ? [0, 1, 2, 3] : [0, 3, 2, 1]) t.push(...uv[k]);
+    }
     for (const [p, n] of corners) {
       this.pos.push(...p);
       this.nrm.push(...n);
@@ -47,6 +54,11 @@ export function flatRun(name: string, i0: number, i1: number, j: number, y: numb
 
 export function addTo(target: Geo, g: Geo) {
   const base = target.pos.length / 3;
+  if (g.uv || target.uv) {
+    const uv = (target.uv ??= []);
+    while (uv.length < base * 2) uv.push(0);
+    for (let k = 0; k < (g.pos.length / 3) * 2; k++) uv.push(g.uv?.[k] ?? 0);
+  }
   target.pos.push(...g.pos);
   target.nrm.push(...g.nrm);
   for (const k of g.idx) target.idx.push(base + k);

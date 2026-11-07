@@ -35,6 +35,7 @@ export const MATERIALS: Record<string, { color: [number, number, number, number]
   planter: { color: hex("#8d887e"), rough: 0.85 }, // concrete planters
   laminate: { color: hex("#d9d6cd"), rough: 0.4 }, // white table tops
   plastic: { color: hex("#c3281e"), rough: 0.3, double: true }, // red molded chair shells (one-sided surface)
+  vinyl: { color: hex("#a5231d"), rough: 0.45 }, // red padded benches
   chair_leg: { color: hex("#8f918a"), rough: 0.5 }, // painted grey tube legs
   gravel: { color: hex("#837d72"), rough: 0.9 }, // river-stone beds (pattern added in materials.ts)
 };

@@ -14,6 +14,7 @@ import { buildProps, type PropsManifest } from "../src/engine/props.ts";
 import { CELL, NX, NY, WALK, HOLE, SOLIDC, OUT } from "./blockout/config.mts";
 import { plans, floors, at, kindAt } from "./blockout/grid.mts";
 import { paintGrid } from "./blockout/paint.mts";
+import { PIECES } from "./kit/pieces.mts";
 
 const SPEED = 3.2;
 const DT = 1 / 60;
@@ -26,7 +27,7 @@ const walk = new Walk(player);
 const manifest = JSON.parse(readFileSync("public/models/props.json", "utf8")) as PropsManifest;
 const props = await buildProps(manifest, async (url) => {
   const file = readFileSync(url.replace("./", "public/"));
-  return (await new GLTFLoader().parseAsync(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer, "")).scene;
+  return (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer, "")).scene;
 });
 walk.load(gltf.scene, props.colliders);
 if (!walk.ready) throw new Error(`${OUT} has no collision or ground geometry`);
@@ -102,6 +103,21 @@ for (const s of stairs) {
   }
 }
 
+// A start inside a prop's collider is not a place a player can be: the push-out can go the wrong way, into the wall behind it.
+const insideProp = (x: number, y: number, floorY: number) =>
+  Object.entries(manifest.instances).some(([name, flat]) => {
+    const { hx, hz } = PIECES[name]().collider;
+    for (let n = 0; n < flat.length; n += 4) {
+      if (flat[n + 1] !== floorY) continue;
+      const dx = x - flat[n];
+      const dz = -y - flat[n + 2];
+      const c = Math.cos(flat[n + 3]);
+      const sn = Math.sin(flat[n + 3]);
+      if (Math.abs(dx * c - dz * sn) < hx && Math.abs(dx * sn + dz * c) < hz) return true; // yaw turns local x to (cos, -sin)
+    }
+    return false;
+  });
+
 // ---- 2. edges and solids ---------------------------------------------------------------------------
 const N4: [number, number][] = [[0, 1], [0, -1], [1, 0], [-1, 0]];
 const offending: Record<string, string[]> = { "walked off an edge": [], "walked into a solid": [] };
@@ -119,9 +135,10 @@ for (let fi = 0; fi < 3; fi++) {
         const nc = at(f, i + di, j + dj);
         if (nc !== HOLE && nc !== SOLIDC) continue;
         if (nc === HOLE && fi === 0) continue; // floor 1 has no holes, only atrium floor
-        tried++;
         const cx = (i + 0.5) * CELL;
         const cy = (j + 0.5) * CELL;
+        if (insideProp(cx, cy, h)) continue;
+        tried++;
         place(cx, cy, h);
         walk.collide();
         settle();
@@ -148,6 +165,7 @@ for (const [what, list] of Object.entries(offending)) {
 }
 
 // ---- 3. props --------------------------------------------------------------------------------------
+const colliders = Object.fromEntries(Object.entries(PIECES).map(([n, make]) => [n, make().collider]));
 let blocked = 0;
 let propTries = 0;
 const loose: string[] = [];
@@ -165,7 +183,8 @@ for (const [name, flat] of Object.entries(manifest.instances))
       settle();
       walkTo(px, -pz, 4);
       const d = Math.hypot(player.x - px, player.z - pz);
-      if (d >= 0.9) blocked++;
+      // the player's sphere stops against the collider box: its short half side plus the radius, less a margin for corners and the turn
+      if (d >= Math.min(colliders[name].hx, colliders[name].hz) + 0.35 - 0.15) blocked++;
       else loose.push(`${name} at (${px}, ${-pz}) height ${py} from side ${k}: got to ${d.toFixed(2)} m of its centre`);
     }
   }
