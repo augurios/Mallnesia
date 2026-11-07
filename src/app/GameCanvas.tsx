@@ -72,6 +72,7 @@ export default function GameCanvas() {
             <p>{started ? es.resume : es.controls}</p>
             {!started && <p>{es.debugFloors}</p>}
             {!started && <p>{es.debugDoors}</p>}
+            {!started && <p>{es.debugSanity}</p>}
             <div className="game-quality" onClick={(e) => e.stopPropagation()}>
               <span>{es.quality}</span>
               {QUALITY_LEVELS.map((level) => (

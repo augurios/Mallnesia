@@ -4,6 +4,7 @@ export const es = {
   controls: "WASD para moverse, Shift para correr, F para la linterna, E para interactuar, ratón para mirar, Esc para pausar",
   debugFloors: "1, 2, 3: saltar de piso (provisional)",
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
+  debugSanity: "Z / X: bajar / subir la cordura (provisional)",
   interact: "Presiona E para interactuar",
   doorLocked: "No cede",
   floor: "Piso",

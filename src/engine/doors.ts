@@ -51,6 +51,8 @@ export class Doors {
   private frustum = new THREE.Frustum();
   private point = new THREE.Vector3();
   auto = true;
+  /** Clock speed of the mall's own door changes: 1 is normal, more when sanity is low (set by the runtime). */
+  tempo = 1;
 
   constructor(private events: DoorEvents) {}
 
@@ -197,7 +199,7 @@ export class Doors {
       }
 
       if (!this.auto) continue;
-      d.timer -= dt;
+      d.timer -= dt * this.tempo;
       if (d.timer > 0 || d.angle !== d.target) continue;
       const near = Math.hypot(d.x - player.x, d.z - player.z);
       const seen = d.floor === floor && near < SEEN_DISTANCE && this.frustum.containsPoint(this.point.set(d.x, d.y, d.z));

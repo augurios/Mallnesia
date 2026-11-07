@@ -11,6 +11,7 @@
     "lint": "eslint",
     "blockout": "node scripts/build-blockout.mts",
     "test:walk": "npm run assets --silent && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-walk.mts",
+    "test:sanity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-sanity.mts",
     "shots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/shots.mts",
     "pieces": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/piece-shots.mts",
     "props": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-props.mts",

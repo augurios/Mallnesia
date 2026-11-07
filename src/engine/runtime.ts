@@ -6,6 +6,7 @@ import { Doors } from "./doors";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
+import { Sanity, stillLook } from "./sanity";
 import { createSky } from "./sky";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
@@ -96,6 +97,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   renderer.toneMappingExposure = parseFloat(params.get("exposure") ?? "") || 1.6; // debug: ?exposure=<number>
   const ambientLevel = parseFloat(params.get("ambient") ?? "");
+  const exploration = params.get("epx") === "1"; // debug: ?epx=1 is exploration mode: the flashlight never runs out
   const lodOverride = parseFloat(params.get("lod") ?? ""); // debug: ?lod=<meters> (0 draws every kit piece far, 999 near)
   // debug: ?stats=1 shows triangles and draw calls per frame (all passes) in the corner
   const stats = params.get("stats") ? document.createElement("div") : null;
@@ -143,6 +145,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let walked = 0; // meters, drives the head bob phase
   let bob = 0; // current head bob height, eased toward the target
 
+  const sanity = new Sanity();
+  const startSanity = parseFloat(params.get("sanity") ?? ""); // debug: ?sanity=<0 to 1> starts at that level
+  if (Number.isFinite(startSanity)) {
+    sanity.set(startSanity);
+    sanity.snap(); // shown at once, even before the first frame the player is in control of
+  }
   const audio = createAudio();
   const doors = new Doors({
     onCreak: (x, y, z) => audio.creak(x, y, z),
@@ -200,6 +208,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (flashOn) flashOn = false;
       else if (charge >= FLASH_MIN_ON) flashOn = true;
     }
+    if ((e.code === "KeyZ" || e.code === "KeyX") && !e.repeat) sanity.set(sanity.level + (e.code === "KeyX" ? 0.1 : -0.1)); // debug
     if (e.code === "KeyE" && !e.repeat && locked) {
       const door = doors.usable(player.x, player.z, floor, yaw);
       if (door) doors.use(door.id);
@@ -296,8 +305,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
     doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
 
-    charge = flashOn ? Math.max(0, charge - FLASH_DRAIN * dt) : Math.min(1, charge + FLASH_RECHARGE * dt);
+    charge = flashOn ? (exploration ? 1 : Math.max(0, charge - FLASH_DRAIN * dt)) : Math.min(1, charge + FLASH_RECHARGE * dt);
     if (charge === 0) flashOn = false;
+    sanity.update(dt, flashOn ? 1 : 0);
+    doors.tempo = sanity.shift;
+    post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
 
     eyeY = Number.isNaN(eyeY) ? player.y : eyeY + (player.y - eyeY) * (1 - Math.exp(-CAMERA_FOLLOW * dt));
@@ -319,7 +331,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
     post.render(now / 1000);
-    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls`;
+    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · cordura ${sanity.level.toFixed(2)}`;
 
     if (++statusTimer >= 10) {
       statusTimer = 1;

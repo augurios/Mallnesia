@@ -39,6 +39,12 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   // kit piece LOD: the triangle counter on, near everywhere against the normal switch (?lod=999 vs the preset)
   { name: "lod_foodcourt_near", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&stats=1&lod=999&ambient=8" },
   { name: "lod_foodcourt", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&stats=1&ambient=8" },
+  // the sanity tiers (?sanity= shows a level at once): calm, wobble, aberration, tunnel and ghost, the end
+  { name: "sanity_100", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=1&ambient=8" },
+  { name: "sanity_55", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0.55&ambient=8" },
+  { name: "sanity_35", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0.35&ambient=8" },
+  { name: "sanity_15", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0.15&ambient=8" },
+  { name: "sanity_0", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0&ambient=8" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
