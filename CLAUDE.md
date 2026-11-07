@@ -30,7 +30,7 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
 
 ## Task tracking
 
-- **Trello board (decided):** we track work on the Trello board named **"Mallnesia"**, reached through the Trello connector. Look up its board and list IDs by name when needed. Propose card and list changes to Augusto before making big ones.
+- **Trello board (decided):** we track work on the Trello board named **"Mallnesia"**, reached through the Trello connector. Look up its board and list IDs by name when needed. Propose card and list changes to Augusto before making big ones. **One card per system or feature (decided):** keep cards focused. When a card covers several things, split it into one card each when work starts; never bundle.
 
 ## Central premise
 
