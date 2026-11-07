@@ -25,6 +25,7 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
     - Legend 16 (fifth floor): the weapons cache is a scene to look at, not an item to take.
     - Legend 17 (laughing-drug photo): examined where it lies, not picked up. Not yet redesigned (Later).
 - `docs/art_style_reference.md` — the look. **Kit pieces (tables, chairs, benches, bins, planters, stands) must follow its "Kit piece detail standard": the level of the reference repo's props (`console-table.glb`, `house-phone.glb`, `grandfather-clock.glb`): rounded real profiles, ornament (moldings, framed panels, beads), hardware, and a textured, worn surface (baked wear: chipped edges, grime in creases, dents). Never stacks of plain boxes and never clean plain surfaces. Augusto has asked for this twice.**
+- **New models (decided):** before building a kit piece or prop from scratch, check [Poly Haven](https://polyhaven.com) (CC0, API at `api.polyhaven.com`) for one that fits; build it ourselves only if nothing does. Propose the candidate to Augusto before importing. Imported files are committed (not generated), keep the source noted, and need a far version and collider like the generated pieces.
 - `docs/engine-architecture.md` — the engine module map (Next.js + TypeScript, plain Three.js). The original base project's CLAUDE.md is not in this repo.
 
 ## Central premise
