@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createRuntime, type PlayerStatus, type Runtime } from "@/engine/runtime";
 import { QUALITY_LEVELS, type QualityLevel } from "@/engine/quality";
+import { SENSITIVITY_MAX, SENSITIVITY_MIN, SENSITIVITY_STEP, type ViewSettings } from "@/engine/view";
 import { es } from "@/strings/es-CR";
 
 export default function GameCanvas() {
@@ -12,6 +13,7 @@ export default function GameCanvas() {
   const [locked, setLocked] = useState(false);
   const [started, setStarted] = useState(false);
   const [quality, setQuality] = useState<QualityLevel>("high");
+  const [view, setView] = useState<ViewSettings>({ sensitivity: 1, motion: true });
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,12 +35,18 @@ export default function GameCanvas() {
     });
     runtimeRef.current = runtime;
     setQuality(runtime.getQuality());
+    setView(runtime.getView());
     return () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
       runtime.dispose();
       runtimeRef.current = null;
     };
   }, []);
+
+  const changeView = (next: ViewSettings) => {
+    runtimeRef.current?.setView(next);
+    setView(runtimeRef.current?.getView() ?? next);
+  };
 
   return (
     <div className="game-root" ref={rootRef} data-hud={hudOff ? "off" : undefined}>
@@ -76,6 +84,27 @@ export default function GameCanvas() {
                   }}
                 >
                   {es.qualityLevels[level]}
+                </button>
+              ))}
+            </div>
+            <div className="game-quality" onClick={(e) => e.stopPropagation()}>
+              <label htmlFor="game-sensitivity">{es.sensitivity}</label>
+              <input
+                id="game-sensitivity"
+                type="range"
+                min={SENSITIVITY_MIN}
+                max={SENSITIVITY_MAX}
+                step={SENSITIVITY_STEP}
+                value={view.sensitivity}
+                onChange={(e) => changeView({ ...view, sensitivity: parseFloat(e.target.value) })}
+              />
+              <span className="game-value">{view.sensitivity.toFixed(1)}</span>
+            </div>
+            <div className="game-quality" onClick={(e) => e.stopPropagation()}>
+              <span>{es.cameraMotion}</span>
+              {[true, false].map((motion) => (
+                <button key={String(motion)} className={view.motion === motion ? "on" : undefined} onClick={() => changeView({ ...view, motion })}>
+                  {motion ? es.on : es.off}
                 </button>
               ))}
             </div>

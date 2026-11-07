@@ -12,4 +12,8 @@ export const es = {
   resume: "Continuar",
   quality: "Calidad gráfica",
   qualityLevels: { low: "Baja", medium: "Media", high: "Alta" },
+  sensitivity: "Sensibilidad del ratón",
+  cameraMotion: "Movimiento de cámara",
+  on: "Sí",
+  off: "No",
 } as const;

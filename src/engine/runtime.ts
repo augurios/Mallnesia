@@ -9,6 +9,7 @@ import { loadProps, type Props } from "./props";
 import { createSky } from "./sky";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
+import { loadView, normalizeView, saveView, type ViewSettings } from "./view";
 
 export interface PlayerStatus {
   floor: number;
@@ -34,13 +35,26 @@ export interface Runtime {
   getQuality(): QualityLevel;
   /** Applies a preset right away and remembers it for next time. */
   setQuality(level: QualityLevel): void;
+  getView(): ViewSettings;
+  /** Applies view settings right away and remembers them for next time. */
+  setView(view: ViewSettings): void;
   dispose(): void;
 }
 
 const EYE_HEIGHT = 1.65;
 const WALK_SPEED = 3.2;
 const RUN_SPEED = 7;
-const LOOK_SPEED = 0.0022;
+const LOOK_SPEED = 0.002; // radians per mouse count, times the sensitivity setting
+const ACCEL = 12; // how fast the walk speed eases in and out (1/s): about 0.1 s to reach it, never a jolt
+const FOV = 80; // vertical degrees: about 107 horizontal at 16:9. A narrow view is a main cause of motion sickness
+const RUN_FOV = 85; // widens a little while running (camera effects only)
+const FOV_EASE = 6; // 1/s
+const BOB_FREQ = 3.6; // head bob phase per meter walked
+const BOB_WALK = 0.018; // head bob height in meters (camera effects only)
+const BOB_RUN = 0.045;
+const BOB_EASE = 8; // the bob fades in and out instead of snapping when the player starts or stops (1/s)
+const MAX_DT = 0.05; // a long frame moves the player at most this much time, so a hitch never teleports the view
+const MOUSE_SPIKE = 400; // counts in one event: more is the browser glitching (seen in Chrome), not a hand
 const FLASH_INTENSITY = 60;
 const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
 const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
@@ -71,12 +85,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const sky = createSky(); // the night outside the glass; the fog does not touch it
   scene.add(sky.mesh);
 
-  const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 250); // vertical fov: 60 is about 92 degrees horizontal at 16:9
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 250);
   camera.rotation.order = "YXZ";
 
   const params = new URLSearchParams(window.location.search);
   const urlQuality = params.get("quality"); // debug: ?quality=low|medium|high (not saved)
-  camera.fov = parseFloat(params.get("fov") ?? "") || camera.fov; // debug: ?fov=<vertical degrees>
+  const baseFov = parseFloat(params.get("fov") ?? "") || FOV; // debug: ?fov=<vertical degrees>
+  camera.fov = baseFov;
+  let view = loadView();
 
   renderer.toneMappingExposure = parseFloat(params.get("exposure") ?? "") || 1.6; // debug: ?exposure=<number>
   const ambientLevel = parseFloat(params.get("ambient") ?? "");
@@ -123,6 +139,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let eyeY = NaN; // smoothed camera height; NaN = snap to the player next frame
   let yaw = THREE.MathUtils.degToRad(num("yaw", 0));
   let pitch = THREE.MathUtils.degToRad(num("pitch", 0));
+  const velocity = new THREE.Vector2(); // horizontal, x and three.js z, meters per second
+  let walked = 0; // meters, drives the head bob phase
+  let bob = 0; // current head bob height, eased toward the target
 
   const audio = createAudio();
   const doors = new Doors({
@@ -196,18 +215,28 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       floor = jump;
       player.set(SPAWNS[jump].x, jump * FLOOR_HEIGHT, -SPAWNS[jump].y);
       walk.fallSpeed = 0;
+      velocity.set(0, 0);
       eyeY = NaN;
     }
   };
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
+  let skipMouse = true; // the first event after locking can carry the jump of the cursor being recentred
   const onMouseMove = (e: MouseEvent) => {
     if (!locked) return;
-    yaw -= e.movementX * LOOK_SPEED;
-    pitch = Math.max(-1.4, Math.min(1.4, pitch - e.movementY * LOOK_SPEED));
+    if (skipMouse) {
+      skipMouse = false;
+      return;
+    }
+    if (Math.abs(e.movementX) > MOUSE_SPIKE || Math.abs(e.movementY) > MOUSE_SPIKE) return;
+    const speed = LOOK_SPEED * view.sensitivity;
+    yaw -= e.movementX * speed;
+    pitch = Math.max(-1.4, Math.min(1.4, pitch - e.movementY * speed));
   };
   const onLockChange = () => {
     locked = document.pointerLockElement === renderer.domElement;
-    if (!locked) keys.clear();
+    skipMouse = true;
+    keys.clear();
+    velocity.set(0, 0); // resume from standing still, never mid-stride
     options.onLockChange?.(locked);
   };
   const resize = () => {
@@ -236,19 +265,33 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const tick = () => {
     frame = requestAnimationFrame(tick);
     const now = performance.now();
-    const dt = locked ? Math.min((now - last) / 1000, 0.1) : 0; // paused while the pointer is free
+    const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
     last = now;
 
-    const forward = (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0);
+    // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
+    const forward = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-    if (forward || strafe) {
-      const len = Math.hypot(forward, strafe);
-      const running = keys.has("ShiftLeft") || keys.has("ShiftRight");
-      const speed = ((running ? RUN_SPEED : WALK_SPEED) * dt) / len;
-      player.x += (-Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed;
-      player.z += (-Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * speed;
+    const moving = forward !== 0 || strafe !== 0;
+    const running = moving && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
+    let targetX = 0;
+    let targetZ = 0;
+    if (moving) {
+      const speed = (running ? RUN_SPEED : WALK_SPEED) / Math.hypot(forward, strafe);
+      targetX = (-Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed;
+      targetZ = (-Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * speed;
+    }
+    const ease = 1 - Math.exp(-ACCEL * dt);
+    velocity.x += (targetX - velocity.x) * ease;
+    velocity.y += (targetZ - velocity.y) * ease;
+    if (!moving && velocity.lengthSq() < 1e-4) velocity.set(0, 0);
+    const startX = player.x;
+    const startZ = player.z;
+    if (velocity.x || velocity.y) {
+      player.x += velocity.x * dt;
+      player.z += velocity.y * dt;
       walk.collide();
     }
+    walked += Math.hypot(player.x - startX, player.z - startZ);
     walk.followGround(dt, floor);
     floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
     doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
@@ -258,8 +301,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
 
     eyeY = Number.isNaN(eyeY) ? player.y : eyeY + (player.y - eyeY) * (1 - Math.exp(-CAMERA_FOLLOW * dt));
-    camera.position.set(player.x, eyeY + EYE_HEIGHT, player.z);
+    // Camera effects: a small head bob that fades with speed, and a slight widening while running.
+    const bobTarget = view.motion && moving && walk.fallSpeed === 0 ? (running ? BOB_RUN : BOB_WALK) : 0;
+    bob += (bobTarget - bob) * (1 - Math.exp(-BOB_EASE * dt));
+    camera.position.set(player.x, eyeY + EYE_HEIGHT + Math.sin(walked * BOB_FREQ) * bob, player.z);
     camera.rotation.set(pitch, yaw, 0);
+    const fovTarget = view.motion && running && velocity.lengthSq() > WALK_SPEED * WALK_SPEED ? baseFov + RUN_FOV - FOV : baseFov;
+    if (Math.abs(camera.fov - fovTarget) > 0.01) {
+      camera.fov += (fovTarget - camera.fov) * (1 - Math.exp(-FOV_EASE * dt));
+      camera.updateProjectionMatrix();
+    }
     camera.updateMatrixWorld();
     sky.follow(camera.position);
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
@@ -287,6 +338,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       quality = level;
       saveQuality(level);
       applyQuality();
+    },
+    getView: () => ({ ...view }),
+    setView(next) {
+      view = normalizeView(next);
+      saveView(view);
+      if (!view.motion && camera.fov !== baseFov) {
+        camera.fov = baseFov;
+        camera.updateProjectionMatrix();
+      }
     },
     dispose() {
       cancelAnimationFrame(frame);

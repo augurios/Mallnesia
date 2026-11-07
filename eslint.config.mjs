@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local copy of the architecture reference (gitignored, not our code):
+    "backrooms-main/**",
   ]),
 ]);
 

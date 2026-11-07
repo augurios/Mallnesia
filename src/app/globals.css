@@ -54,6 +54,22 @@ body {
   border-color: #e8d9a0;
 }
 
+.game-quality + .game-quality {
+  margin-top: 12px;
+}
+
+.game-quality input[type="range"] {
+  width: 160px;
+  accent-color: #e8d9a0;
+  cursor: pointer;
+}
+
+.game-value {
+  min-width: 2.5em;
+  color: #aaa;
+  font-variant-numeric: tabular-nums;
+}
+
 .game-status {
   position: absolute;
   top: 8px;
