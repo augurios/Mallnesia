@@ -28,6 +28,10 @@ A first-person, browser-based horror game inspired by *Amnesia: The Dark Descent
 - **New models (decided):** before building a kit piece or prop from scratch, check [Poly Haven](https://polyhaven.com) (CC0, API at `api.polyhaven.com`) for one that fits; build it ourselves only if nothing does. Propose the candidate to Augusto before importing. Imported files are committed (not generated), keep the source noted, and need a far version and collider like the generated pieces.
 - `docs/engine-architecture.md` — the engine module map (Next.js + TypeScript, plain Three.js). The original base project's CLAUDE.md is not in this repo.
 
+## Task tracking
+
+- **Trello board (decided):** we track work on the Trello board named **"Mallnesia"**, reached through the Trello connector. Look up its board and list IDs by name when needed. Propose card and list changes to Augusto before making big ones.
+
 ## Central premise
 
 **The mall is alive.** It has absorbed so much tragedy that it became a living thing: it changes the number of floors, moves its exits, and shows each visitor something different. This is the game's true antagonist and the justification for every unusual mechanic (shifting layout, wrong-floor elevators, the unreachable exit, the procedural garage). Every other threat is one of its manifestations. Keep new content consistent with this premise.
