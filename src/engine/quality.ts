@@ -7,6 +7,9 @@ export interface QualityPreset {
   fogFar: number;
   /** Flashlight reach in meters. */
   torchDistance: number;
+  /** Kit pieces farther than this (meters) are drawn in their far version (built with 1 cm error, see
+   *  scripts/build-props.mts: under a pixel past about 8 m at 720p, 12 m at 1440p). */
+  lodDistance: number;
   /** Procedural surface detail (tiles, plaster, concrete grain). The costliest per-pixel work. */
   detail: boolean;
   /** Bloom around bright highlights. */
@@ -18,9 +21,9 @@ export interface QualityPreset {
 export const QUALITY_LEVELS: QualityLevel[] = ["low", "medium", "high"];
 
 export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
-  low: { maxPixelRatio: 0.75, fogFar: 40, torchDistance: 25, detail: false, bloom: false, film: false },
-  medium: { maxPixelRatio: 1, fogFar: 55, torchDistance: 32, detail: true, bloom: false, film: true },
-  high: { maxPixelRatio: 2, fogFar: 70, torchDistance: 40, detail: true, bloom: true, film: true },
+  low: { maxPixelRatio: 0.75, fogFar: 40, torchDistance: 25, lodDistance: 6, detail: false, bloom: false, film: false },
+  medium: { maxPixelRatio: 1, fogFar: 55, torchDistance: 32, lodDistance: 8, detail: true, bloom: false, film: true },
+  high: { maxPixelRatio: 2, fogFar: 70, torchDistance: 40, lodDistance: 12, detail: true, bloom: true, film: true },
 };
 
 const STORAGE_KEY = "elmallvivo.quality";

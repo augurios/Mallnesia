@@ -1,6 +1,10 @@
 // Builds the kit piece files and the placement list the game reads.
 // Run: npm run props   (writes public/models/kit/<piece>.glb and public/models/props.json)
 //
+// Each piece file holds the piece (one node per material), its far version (the same materials, nodes named
+// "<material>_far", see scripts/kit/lod.mts) and a "collider" node. src/engine/props.ts picks near or far per
+// instance by distance; a file without "_far" nodes is drawn near at every distance.
+//
 // docs/floorplans/props.json says where pieces go; this checks each instance against the floor grid (it must
 // stand on open floor with the aisle the rule asks for, away from secret doors) and bakes the survivors into
 // public/models/props.json as flat arrays of [x, y, z, yaw] per piece, with y = the floor's height.
@@ -17,10 +21,14 @@ import { makeMaterial } from "./blockout/write.mts";
 import { boxGeo, type Geo } from "./blockout/geo.mts";
 import { PIECES } from "./kit/pieces.mts";
 import { bakeWear, refine } from "./kit/wear.mts";
+import { simplified } from "./kit/lod.mts";
 
 const OUT_DIR = "public/models";
 const KIT_DIR = `${OUT_DIR}/kit`;
 const REFINE = 0.3; // longest edge on a kit piece before the wear bake (meters)
+// The far version's error (meters). Keep in step with LOD distances in src/engine/quality.ts: 1 cm is under a
+// pixel past about 8 m at 720p.
+const FAR_ERROR = 0.01;
 
 type Scatter = { piece: string; floors: number[]; area?: string; box?: [number, number, number, number]; spacing: [number, number]; jitter?: number; turn?: number; skip?: number; aisle?: number; seed: number; wall?: boolean; max?: number; kinds?: string[] };
 type Place = { piece: string; floor: number; x: number; y: number; rot?: number; aisle?: number };
@@ -37,10 +45,12 @@ for (const [name, piece] of Object.entries(pieces)) {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const scene = doc.createScene(name);
+  const materials = new Map<string, ReturnType<typeof makeMaterial>>(); // near and far share one per material
   const add = (nodeName: string, material: string, g: Geo, wear?: number[]) => {
+    if (!materials.has(material)) materials.set(material, makeMaterial(doc, material));
     const prim = doc
       .createPrimitive()
-      .setMaterial(makeMaterial(doc, material))
+      .setMaterial(materials.get(material)!)
       .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(new Float32Array(g.pos)).setBuffer(buffer))
       .setAttribute("NORMAL", doc.createAccessor().setType("VEC3").setArray(new Float32Array(g.nrm)).setBuffer(buffer))
       .setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(g.idx)).setBuffer(buffer));
@@ -60,6 +70,13 @@ for (const [name, piece] of Object.entries(pieces)) {
     piece.parts[m] = parts[k];
     add(m, m, parts[k], wear[k]);
   });
+  let farTris = 0;
+  for (const [k, m] of names.entries()) {
+    const far = await simplified(parts[k], wear[k], FAR_ERROR);
+    if (!far) continue; // the whole part is smaller than the error: the far version leaves it out
+    add(`${m}_far`, m, far.g, far.wear);
+    farTris += far.g.idx.length / 3;
+  }
   const { hx, hz, h } = piece.collider;
   add("collider", "barrier", boxGeo(-hx, hx, 0, h, -hz, hz)); // the runtime keeps it for collision and never draws it
   // Vertices are shared between neighbouring quads (the generators emit four per quad), then meshopt-compressed
@@ -69,7 +86,7 @@ for (const [name, piece] of Object.entries(pieces)) {
   const bytes = await new NodeIO().registerExtensions([EXTMeshoptCompression]).registerDependencies({ "meshopt.encoder": MeshoptEncoder }).writeBinary(doc);
   writeFileSync(`${KIT_DIR}/${name}.glb`, bytes);
   const tris = Object.values(piece.parts).reduce((t, g) => t + g.idx.length / 3, 0);
-  console.log(`kit ${name}: ${(bytes.byteLength / 1024).toFixed(1)} KB, ${tris} triangles`);
+  console.log(`kit ${name}: ${(bytes.byteLength / 1024).toFixed(1)} KB, ${tris} triangles, far ${farTris}`);
 }
 
 // ---- placement --------------------------------------------------------------------------------------

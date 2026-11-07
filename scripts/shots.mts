@@ -36,6 +36,9 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "piece_planter_plant", floor: 2, x: 44.75, y: 162.31, yaw: 360, pitch: -12, extra: "&ambient=8&fov=70" },
   { name: "piece_tray_stand", floor: 2, x: 59.74, y: 29.75, yaw: 90, pitch: -12, extra: "&ambient=8&fov=70" },
   { name: "chair_closeup", floor: 2, x: 64.4, y: 24.5, yaw: 231, pitch: -22, extra: "&ambient=30&fov=70" },
+  // kit piece LOD: the triangle counter on, near everywhere against the normal switch (?lod=999 vs the preset)
+  { name: "lod_foodcourt_near", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&stats=1&lod=999&ambient=8" },
+  { name: "lod_foodcourt", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&stats=1&ambient=8" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

@@ -5,7 +5,7 @@ import { createAudio } from "./audio";
 import { Doors } from "./doors";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
-import { loadProps } from "./props";
+import { loadProps, type Props } from "./props";
 import { createSky } from "./sky";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
@@ -80,6 +80,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   renderer.toneMappingExposure = parseFloat(params.get("exposure") ?? "") || 1.6; // debug: ?exposure=<number>
   const ambientLevel = parseFloat(params.get("ambient") ?? "");
+  const lodOverride = parseFloat(params.get("lod") ?? ""); // debug: ?lod=<meters> (0 draws every kit piece far, 999 near)
+  // debug: ?stats=1 shows triangles and draw calls per frame (all passes) in the corner
+  const stats = params.get("stats") ? document.createElement("div") : null;
+  if (stats) {
+    stats.style.cssText = "position:absolute;left:8px;bottom:8px;z-index:10;font:12px monospace;color:#9f9;background:#000a;padding:2px 6px;pointer-events:none";
+    root.append(stats);
+    renderer.info.autoReset = false; // the post passes render several times a frame: count them all
+  }
   // Faint cool sky glow from above, darker blue-grey bounce from below (art doc: never pure black).
   scene.add(new THREE.HemisphereLight(0x4a5a78, 0x10141c, Number.isFinite(ambientLevel) ? ambientLevel : 2.4)); // debug: ?ambient=<intensity>
   const torch = new THREE.SpotLight(0xfff2d0, FLASH_INTENSITY, 40, Math.PI / 5, 0.4);
@@ -90,7 +98,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const post = createPost(renderer, scene, camera);
   let blockout: THREE.Object3D | null = null;
-  let propsGroup: THREE.Object3D | null = null;
+  let props: Props | null = null;
   let quality: QualityLevel = isQualityLevel(urlQuality) ? urlQuality : loadQuality();
   const applyQuality = () => {
     const preset = QUALITY_PRESETS[quality];
@@ -99,7 +107,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     torch.distance = preset.torchDistance;
     post.setSettings({ bloom: preset.bloom, film: preset.film });
     if (blockout) styleBlockout(blockout, preset.detail);
-    if (propsGroup) styleBlockout(propsGroup, preset.detail);
+    if (props) styleBlockout(props.group, preset.detail);
     resize();
   };
 
@@ -131,7 +139,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   void (async () => {
     try {
       // The props are optional: a missing or broken props file must not stop the mall from loading.
-      const [gltf, props, ao] = await Promise.all([
+      const [gltf, loadedProps, ao] = await Promise.all([
         loader.loadAsync(BLOCKOUT_URL),
         loadProps(PROPS_URL, async (url) => (await loader.loadAsync(url)).scene).catch((err) => {
           console.error("Could not load the props", err);
@@ -150,15 +158,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         if (kind === "glass" || kind === "rails") o.renderOrder = 1;
       });
       scene.add(gltf.scene);
-      if (props) scene.add(props.group);
       blockout = gltf.scene;
       styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
-      if (props) {
-        propsGroup = props.group;
-        styleBlockout(props.group, QUALITY_PRESETS[quality].detail); // the kit pieces get the same surface detail
+      if (loadedProps) {
+        scene.add(loadedProps.group);
+        styleBlockout(loadedProps.group, QUALITY_PRESETS[quality].detail); // the kit pieces get the same surface detail
+        props = loadedProps;
       }
       doors.load(gltf.scene);
-      walk.load(gltf.scene, props?.colliders);
+      walk.load(gltf.scene, loadedProps?.colliders);
     } catch (err) {
       console.error("Could not load the mall blockout", err);
     }
@@ -255,8 +263,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     camera.updateMatrixWorld();
     sky.follow(camera.position);
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const preset = QUALITY_PRESETS[quality];
+    props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
+    if (stats) renderer.info.reset();
     post.render(now / 1000);
+    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls`;
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
@@ -289,6 +301,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       post.dispose();
       renderer.dispose();
       renderer.domElement.remove();
+      stats?.remove();
     },
   };
 }

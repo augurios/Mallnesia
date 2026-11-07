@@ -2,7 +2,8 @@
 <html>
   <body style="margin:0;background:#30343a">
     <!-- Used by scripts/piece-shots.mts: shows one kit piece with the game's surface styling, solid or as a wireframe.
-         ?m=<name>&wire=1&az=<degrees>&zoom=<1 = whole piece>&ty=<0..1, height looked at>&lamp=1 (dark, lit by a flashlight) -->
+         ?m=<name>&wire=1&az=<degrees>&zoom=<1 = whole piece>&ty=<0..1, height looked at>&lamp=1 (dark, lit by a flashlight)
+         &far=1 (the far version: the "_far" nodes instead of the near ones) -->
     <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
     <script type="module">
       import * as THREE from "three";
@@ -28,6 +29,7 @@
       g.scene.traverse((o) => {
         if (!o.isMesh) return;
         if (o.material.name === "barrier") o.visible = false; // the collider
+        else if (o.name.endsWith("_far") !== !!q.get("far")) o.visible = false; // near or far, never both
         else if (q.get("wire")) o.material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
         else o.material.side = THREE.DoubleSide;
       });

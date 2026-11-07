@@ -31,8 +31,9 @@ mkdirSync(SHOTS, { recursive: true });
 const only = process.env.ONLY?.split(",");
 for (const name of Object.keys(PIECES)) {
   if (only && !only.includes(name)) continue;
-  // solid, wireframe, from behind, and a close-up in a flashlight beam (how the player meets it)
-  for (const [suffix, query] of [["solid", ""], ["wire", "&wire=1"], ["solid_back", "&az=215"], ["close", "&lamp=1&zoom=0.45&ty=0.75&az=50"]] as const) {
+  // solid, wireframe, from behind, a close-up in a flashlight beam (how the player meets it), and the far version
+  // (the one drawn past the LOD distance: compare it with "solid" for shape, not for small detail)
+  for (const [suffix, query] of [["solid", ""], ["wire", "&wire=1"], ["solid_back", "&az=215"], ["close", "&lamp=1&zoom=0.45&ty=0.75&az=50"], ["far", "&far=1"], ["far_wire", "&far=1&wire=1"]] as const) {
     const file = `${SHOTS}/kit_${name}_${suffix}.png`;
     const code = await new Promise<number | null>((done) => {
       const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1000,800", "--virtual-time-budget=8000", `--screenshot=${file}`, `http://127.0.0.1:${port}/?m=${name}${query}`], { stdio: "ignore" });
