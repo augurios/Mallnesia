@@ -72,6 +72,8 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   // the watchers: four looks (the last in a guard-like uniform), standing where the player looks (?watchersat=x,y,look); watchers=off so no more come
   { name: "watchers_lit", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=70,28,shopper&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "watchers_guardlike", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=72,28,guardlike&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
+  // a note on the floor at the start (notes.ts), seen from 2 m
+  { name: "note_floor", floor: 1, x: 66, y: 22, yaw: 0, pitch: -35, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=4" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

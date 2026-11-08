@@ -150,6 +150,33 @@ body {
   z-index: 5; /* above the black of a fail */
 }
 
+.game-note {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%) rotate(-0.6deg);
+  width: min(86vw, 420px);
+  padding: 22px 26px;
+  background: #d9d2b8;
+  color: #2a2418;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.75);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.45;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.game-note h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
+.game-note p {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
 .game-subtitle {
   position: absolute;
   left: 50%;
@@ -166,6 +193,7 @@ body {
   z-index: 5;
 }
 
+.game-root[data-hud="off"] .game-note,
 .game-root[data-hud="off"] .game-subtitle,
 .game-root[data-hud="off"] .game-hint,
 .game-root[data-hud="off"] .game-status,

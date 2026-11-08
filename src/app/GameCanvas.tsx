@@ -17,6 +17,7 @@ export default function GameCanvas() {
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
+  const [note, setNote] = useState<{ title: string; body: string[] } | null>(null);
   // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
   const hold = typeof window !== "undefined" ? parseFloat(new URLSearchParams(window.location.search).get("loading") ?? "") : NaN;
   const [load, setLoad] = useState<{ progress: number; ready: boolean; error: boolean }>({ progress: 0, ready: false, error: false });
@@ -34,6 +35,7 @@ export default function GameCanvas() {
       },
       onStatus: setStatus,
       onSubtitle: setSubtitle,
+      onNote: setNote,
       onLoad: setLoad,
       onQualityChange: (level) => {
         setQuality(level);
@@ -96,6 +98,14 @@ export default function GameCanvas() {
             className={status.flashlightOn ? "game-flashlight-fill on" : "game-flashlight-fill"}
             style={{ width: `${Math.round(status.charge * 100)}%` }}
           />
+        </div>
+      )}
+      {locked && note && (
+        <div className="game-note" role="dialog" aria-label={note.title}>
+          <h2>{note.title}</h2>
+          {note.body.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
         </div>
       )}
       {locked && subtitle && <div className="game-subtitle">{subtitle}</div>}

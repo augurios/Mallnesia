@@ -8,13 +8,25 @@ export const es = {
   debugFloors: "1, 2, 3: saltar de piso (provisional)",
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
   debugSanity: "Z / X: bajar / subir la cordura (provisional)",
-  prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir" },
+  prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir", read: "Presiona E para leer", close: "Presiona E para cerrar" },
   doorLocked: "No cede",
   checkpoint: "Punto de control",
   // The guard's opening (he is a real, ordinary worker). Words for Augusto to review.
   guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Termino mi ronda y vuelvo. Mejor que ya no lo encuentre aquí."],
   garageDone: "La línea se corta. Estás otra vez en el piso de los parqueos.",
   debugGarage: "P: entrar o salir del parqueo (provisional); ?garageseed=random cambia el parqueo",
+  // The notes. DRAFT WORDS for Augusto to rewrite: they follow the content guidelines (a fictional mall, no real names or
+  // crimes) and hint each exit's rule. Keyed by the ids in src/engine/notes.ts.
+  notes: {
+    cierre: { title: "Aviso a los visitantes", body: ["Por disposición de la administración, el centro comercial cierra hoy a las 6:00 p. m.", "Se ruega a los visitantes dirigirse a la salida principal con calma.", "Gracias por su comprensión."] },
+    ronda: { title: "Hoja de ronda", body: ["TURNO DE NOCHE. Ronda del guarda:", "8:00 Comidas. 8:30 Atrio. 9:00 Escalera del parqueo.", "(A lápiz) El orden cambió otra vez. Yo no lo cambié."] },
+    obra: { title: "Cuaderno de obra", body: ["Aquí todo era cafetal. Lo arrancaron en una semana.", "Empezamos a colar sin los permisos. El ingeniero dijo que eso se arreglaba después.", "Los cimientos van más hondos de lo que dice el plano."] },
+    peon: { title: "Nota a lápiz", body: ["El día del colado, un peón se quedó abajo.", "Nadie lo dijo en voz alta. El concreto tampoco.", "Desde entonces el edificio no se queda quieto."] },
+    puerta: { title: "Papel doblado", body: ["La puerta grande se ve desde la baranda. Se ve.", "Pero el camino que baja siempre lleva a otro lado.", "A la salida de adelante se llega por atrás: hay que subir cuando todo dice bajar."] },
+    parqueo: { title: "Recado", body: ["Si en el parqueo suena el teléfono, contesten.", "No se queden mirando los letreros: esos números no son de aquí.", "Sigan el timbre."] },
+    servicio: { title: "Nota de mantenimiento", body: ["Los pasillos grises abren en orden, uno detrás del otro.", "No fuercen ninguno. Esperen a que el edificio los deje pasar.", "La última puerta no se toca."] },
+    miradas: { title: "Mensaje en una servilleta", body: ["Si alguien se queda mirando, mírelo de frente.", "Mientras usted lo ve, no se mueve.", "Nunca le dé la espalda para ver si lo siguen."] },
+  } as Record<string, { title: string; body: string[] }>,
   caught: "Algo te alcanzó",
   debugFaint: "G: desmayarse ahora (provisional)",
   debugShadow: "H: llamar a la sombra (provisional); ?shadow=off la desactiva",
