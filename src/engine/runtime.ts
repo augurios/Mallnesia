@@ -395,7 +395,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const level = shadow.state === "absent" ? 0 : Math.max(0, 1 - shadow.distanceTo(sense) / 45) * shadow.fade;
       shadowSound.update(shadow.x, floor * FLOOR_HEIGHT + 1.2, -shadow.y, level, shadow.hunting);
     }
-    if (shadow) shadowView.update(shadow, now / 1000);
+    if (shadow) shadowView.update(shadow, now / 1000, camera);
     sanity.update(dt, flashOn ? 1 : 0);
     doors.tempo = sanity.shift;
     post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
