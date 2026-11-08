@@ -47,5 +47,6 @@ next-env.d.ts
 /public/models/mall_blockout.glb
 /public/models/ao.png
 /public/models/props.json
+/public/models/nav.json
 /public/models/kit/
 /backrooms-main

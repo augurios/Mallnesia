@@ -1,6 +1,13 @@
 // Placeholder sound: everything is synthesized with Web Audio, no files. Positional, so a slam
 // down a hall sounds like it comes from that hall. Swap for recorded samples later.
 
+/** The shadow's voice: a low rumble and a breathy hiss that follow it. Silent until `update` gives it a level above 0. */
+export interface ShadowSound {
+  /** World position in meters, how present it is (0 to 1), and whether it is hunting (louder, higher, faster). */
+  update(x: number, y: number, z: number, level: number, hunting: boolean): void;
+  dispose(): void;
+}
+
 export interface Audio {
   /** Call from a user gesture (the click that locks the pointer); browsers keep audio suspended until then. */
   resume(): void;
@@ -10,6 +17,10 @@ export interface Audio {
   slam(x: number, y: number, z: number): void;
   /** A locked door being tried. */
   rattle(x: number, y: number, z: number): void;
+  /** Starts the shadow's continuous voice (call once; the returned handle is moved every frame). */
+  shadow(): ShadowSound;
+  /** A low hit, in the head, for the moment the shadow notices the player. */
+  sting(): void;
   dispose(): void;
 }
 
@@ -143,6 +154,101 @@ export function createAudio(): Audio {
         src.start(t + at);
         src.stop(t + at + 0.08);
       }
+    },
+    shadow() {
+      let nodes: { out: PannerNode; rumbleGain: GainNode; hissGain: GainNode; rumbleFilter: BiquadFilterNode; sources: AudioScheduledSourceNode[] } | null = null;
+      const build = (c: AudioContext) => {
+        const out = panner(c, 0, 0, 0);
+        out.refDistance = 5; // carries farther than a door: it is a presence, not a noise
+        const loop = (filter: BiquadFilterNode) => {
+          const src = c.createBufferSource();
+          src.buffer = noiseBuffer(c);
+          src.loop = true;
+          src.connect(filter);
+          src.start();
+          return src;
+        };
+        const rumbleFilter = c.createBiquadFilter();
+        rumbleFilter.type = "lowpass";
+        rumbleFilter.frequency.value = 130;
+        const rumbleGain = c.createGain();
+        rumbleGain.gain.value = 0;
+        rumbleFilter.connect(rumbleGain).connect(out);
+        const hissFilter = c.createBiquadFilter();
+        hissFilter.type = "bandpass";
+        hissFilter.frequency.value = 1100;
+        hissFilter.Q.value = 5;
+        const hissGain = c.createGain();
+        hissGain.gain.value = 0;
+        const breath = c.createGain(); // the breath swells and falls on a slow wave
+        breath.gain.value = 0;
+        const lfo = c.createOscillator();
+        lfo.frequency.value = 0.23;
+        const lfoDepth = c.createGain();
+        lfoDepth.gain.value = 0.5;
+        lfo.connect(lfoDepth).connect(breath.gain);
+        const bias = c.createConstantSource();
+        bias.offset.value = 0.5;
+        bias.connect(breath.gain);
+        hissFilter.connect(breath).connect(hissGain).connect(out);
+        lfo.start();
+        bias.start();
+        return { out, rumbleGain, hissGain, rumbleFilter, sources: [loop(rumbleFilter), loop(hissFilter), lfo, bias] };
+      };
+      return {
+        update(x, y, z, level, hunting) {
+          const c = ready();
+          if (!c) return;
+          nodes ??= build(c);
+          const t = c.currentTime;
+          nodes.out.positionX.setTargetAtTime(x, t, 0.05);
+          nodes.out.positionY.setTargetAtTime(y, t, 0.05);
+          nodes.out.positionZ.setTargetAtTime(z, t, 0.05);
+          nodes.rumbleGain.gain.setTargetAtTime(level * (hunting ? 1.6 : 1.0), t, 0.4);
+          nodes.hissGain.gain.setTargetAtTime(level * (hunting ? 0.5 : 0.22), t, 0.4);
+          nodes.rumbleFilter.frequency.setTargetAtTime(hunting ? 240 : 130, t, 0.6);
+        },
+        dispose() {
+          nodes?.sources.forEach((s) => {
+            try {
+              s.stop();
+            } catch {
+              // already stopped
+            }
+          });
+          nodes?.out.disconnect();
+          nodes = null;
+        },
+      };
+    },
+    sting() {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      // A deep sine falling away under a swell of low noise: felt more than heard.
+      const tone = c.createOscillator();
+      tone.frequency.setValueAtTime(70, t);
+      tone.frequency.exponentialRampToValueAtTime(32, t + 1.3);
+      const toneGain = c.createGain();
+      toneGain.gain.setValueAtTime(0.0001, t);
+      toneGain.gain.exponentialRampToValueAtTime(0.9, t + 0.06);
+      toneGain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+      tone.connect(toneGain).connect(c.destination);
+      tone.start(t);
+      tone.stop(t + 1.6);
+      const hiss = c.createBufferSource();
+      hiss.buffer = noiseBuffer(c);
+      const band = c.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = 500;
+      band.Q.value = 0.8;
+      const hissGain = c.createGain();
+      hissGain.gain.setValueAtTime(0.0001, t);
+      hissGain.gain.exponentialRampToValueAtTime(0.35, t + 0.25);
+      hissGain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+      hiss.connect(band).connect(hissGain).connect(c.destination);
+      hiss.start(t);
+      hiss.stop(t + 1.3);
     },
     dispose() {
       void ctx?.close();

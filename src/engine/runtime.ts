@@ -3,12 +3,15 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
+import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
 import { Sanity, stillLook } from "./sanity";
 import { createSaveStore, emptyProgress, type SaveSlot } from "./save";
+import { Shadow, type PlayerSense } from "./shadow";
+import { createShadowView } from "./shadow-view";
 import { createSky } from "./sky";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
@@ -30,7 +33,7 @@ export interface RuntimeOptions {
   onLockChange?: (locked: boolean) => void;
   onStatus?: (status: PlayerStatus) => void;
   /** A short-lived message for the HUD. */
-  onNotice?: (notice: "doorLocked" | "checkpoint") => void;
+  onNotice?: (notice: "doorLocked" | "checkpoint" | "caught") => void;
 }
 
 export interface Runtime {
@@ -73,6 +76,7 @@ const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 const AO_URL = "./models/ao.png";
 const PROPS_URL = "./models/props.json"; // built by scripts/build-props.mts
+const NAV_URL = "./models/nav.json"; // built by scripts/build-nav.mts: the shadow walks on it
 
 // Plan coordinates (meters). Floor 1 starts in the entrance lobby; the others at the west hall.
 // Debug keys 1/2/3 jump to these until stairs and elevators exist.
@@ -162,7 +166,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const atrium = new AtriumTracker();
   atrium.reset(player.x, -player.z);
   const progress = emptyProgress();
-  const hunted = () => false; // true while the shadow hunts the player; the shadow card replaces this
+  let shadow: Shadow | null = null; // made once the nav data has loaded (the game works without it, just without the shadow)
+  const hunted = () => shadow?.hunting ?? false; // manual saves are refused while it hunts
   const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
   let bob = 0; // current head bob height, eased toward the target
@@ -182,6 +187,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       options.onNotice?.("doorLocked");
     },
   });
+  const shadowView = createShadowView();
+  scene.add(shadowView.object);
+  const shadowSound = audio.shadow();
+  const shadowMode = params.get("shadow"); // debug: ?shadow=off (it never comes), ?shadow=now (it comes within seconds)
   doors.auto = params.get("doors") !== "off"; // debug: ?doors=off stops the mall moving doors by itself
 
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -216,6 +225,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       }
       doors.load(gltf.scene);
       walk.load(gltf.scene, loadedProps?.colliders);
+      try {
+        const nav = NavGrid.fromData((await (await fetch(NAV_URL)).json()) as NavData);
+        const made = new Shadow(nav);
+        made.director = shadowMode !== "off";
+        if (shadowMode === "now") made.scheduleSpawn(3);
+        const at = (params.get("shadowat") ?? "").split(",").map(parseFloat); // debug: ?shadowat=x,y puts it there on the starting floor, facing the player
+        if (at.length === 2 && at.every(Number.isFinite)) made.appearAt(floor, at[0], at[1], Math.atan2(-player.z - at[1], player.x - at[0]), true);
+        shadow = made;
+      } catch (err) {
+        console.error("Could not load the navigation data; there will be no shadow", err);
+      }
     } catch (err) {
       console.error("Could not load the mall blockout", err);
     }
@@ -225,6 +245,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let locked = false;
   let charge = 1;
   let flashOn = true;
+  const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: flashOn && charge > 0, hidden: false });
   const restore = (slot: SaveSlot): boolean => {
     const saved = store.read(slot);
     if (!saved || saved.area !== "mall") return false; // the garage is its own level, not built yet
@@ -241,6 +262,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     sanity.snap();
     charge = 1;
     atrium.reset(saved.x, saved.y); // no checkpoint from the load itself
+    shadow?.reset(30); // whatever was hunting is gone; it may come back later
     return true;
   };
 
@@ -254,6 +276,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (e.code === "KeyE" && !e.repeat && locked) {
       const door = doors.usable(player.x, player.z, floor, yaw);
       if (door) doors.use(door.id);
+    }
+    if (e.code === "KeyH" && !e.repeat && shadow) {
+      // Debug: bring the shadow in now (out of sight, 12 to 18 m away; or 22 to 40 if there is no such spot)
+      const sense = playerSense();
+      if (shadow.state === "absent" && !shadow.spawn(sense, true)) shadow.spawn(sense);
     }
     // Debug: force the nearest door on this floor open (even a locked one) or slam it shut.
     const nearestDoor = e.code === "KeyO" || e.code === "KeyK" ? doors.nearest(player.x, player.z, floor) : null;
@@ -353,6 +380,22 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     charge = flashOn ? (exploration ? 1 : Math.max(0, charge - FLASH_DRAIN * dt)) : Math.min(1, charge + FLASH_RECHARGE * dt);
     if (charge === 0) flashOn = false;
+    if (shadow && dt > 0) {
+      const sense = playerSense();
+      for (const ev of shadow.update(dt, sense)) {
+        if (ev === "noticed") {
+          audio.sting();
+          sanity.drain(0.05);
+        }
+        if (ev === "caught") options.onNotice?.("caught"); // the fail-states card turns this into a restart
+      }
+      // Seeing it drains sanity, more while it hunts. The player's heading in plan coordinates is (-sin yaw, cos yaw).
+      const seen = shadow.visibleTo(sense, -Math.sin(yaw), Math.cos(yaw));
+      sanity.setDrain("shadow", seen ? (shadow.hunting ? 0.03 : 0.012) : 0);
+      const level = shadow.state === "absent" ? 0 : Math.max(0, 1 - shadow.distanceTo(sense) / 45) * shadow.fade;
+      shadowSound.update(shadow.x, floor * FLOOR_HEIGHT + 1.2, -shadow.y, level, shadow.hunting);
+    }
+    if (shadow) shadowView.update(shadow, now / 1000);
     sanity.update(dt, flashOn ? 1 : 0);
     doors.tempo = sanity.shift;
     post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
@@ -377,7 +420,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
     post.render(now / 1000);
-    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · cordura ${sanity.level.toFixed(2)}`;
+    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · cordura ${sanity.level.toFixed(2)}${shadow ? ` · sombra ${shadow.state} ${shadow.awareness.toFixed(2)}` : ""}`;
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
@@ -420,6 +463,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("pointerlockchange", onLockChange);
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+      shadowSound.dispose();
+      shadowView.dispose();
       audio.dispose();
       sky.dispose();
       post.dispose();
