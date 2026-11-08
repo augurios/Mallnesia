@@ -66,6 +66,9 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "garage_van", floor: 1, x: 31, y: 7, yaw: 270, pitch: -3, extra: "&area=garage&shadow=off&guard=off&noise=off" },
   { name: "garage_booth", floor: 1, x: 68, y: 8, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
   { name: "garage_lit", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=12&stats=1" },
+  // the girl in white, 9 m ahead of the start (?girlat=x,y)
+  { name: "girl_dark", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,37&girl=off&shadow=off&guard=off&noise=off&ambient=2" },
+  { name: "girl_lit", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,35&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

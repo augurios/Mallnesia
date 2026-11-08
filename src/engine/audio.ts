@@ -17,6 +17,8 @@ export interface Audio {
   slam(x: number, y: number, z: number): void;
   /** A locked door being tried. */
   rattle(x: number, y: number, z: number): void;
+  /** The girl in white: a faint breath of high noise and a thin falling tone, at her position. */
+  whisper(x: number, y: number, z: number): void;
   /** A payphone ringing, far off: two short bursts of a bell tone. */
   ring(x: number, y: number, z: number): void;
   /** Something hard hitting the floor (a chair, a bin): `strength` 0 to 1 is how hard. */
@@ -160,6 +162,37 @@ export function createAudio(): Audio {
         src.start(t + at);
         src.stop(t + at + 0.08);
       }
+    },
+    whisper(x, y, z) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      out.refDistance = 4;
+      const src = c.createBufferSource();
+      src.buffer = noiseBuffer(c);
+      const band = c.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = 3400;
+      band.Q.value = 2.5;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.28, t + 0.5);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+      src.connect(band).connect(g).connect(out);
+      src.start(t);
+      src.stop(t + 2.3);
+      const tone = c.createOscillator();
+      tone.type = "sine";
+      tone.frequency.setValueAtTime(1180, t);
+      tone.frequency.exponentialRampToValueAtTime(760, t + 2.0);
+      const tg = c.createGain();
+      tg.gain.setValueAtTime(0.0001, t);
+      tg.gain.linearRampToValueAtTime(0.045, t + 0.6);
+      tg.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+      tone.connect(tg).connect(out);
+      tone.start(t);
+      tone.stop(t + 2.3);
     },
     ring(x, y, z) {
       const c = ready();
