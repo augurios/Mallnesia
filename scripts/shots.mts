@@ -56,6 +56,8 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   // the guard of the opening, 7 m ahead of the start (?guard=now plays it from wherever the game starts)
   { name: "guard_opening", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&guard=now&shadow=off&ambient=2" },
   { name: "guard_opening_lit", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&guard=now&shadow=off&ambient=25" },
+  // night-noise leftovers: a chair tipped over, a bin on its side, a chair slid away (?noiserest=1)
+  { name: "noise_aftermath", floor: 2, x: 60, y: 14, yaw: 0, pitch: -8, extra: "&noiserest=1&noise=off&shadow=off&guard=off&ambient=14" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

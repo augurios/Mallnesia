@@ -17,6 +17,10 @@ export interface Audio {
   slam(x: number, y: number, z: number): void;
   /** A locked door being tried. */
   rattle(x: number, y: number, z: number): void;
+  /** Something hard hitting the floor (a chair, a bin): `strength` 0 to 1 is how hard. */
+  clatter(x: number, y: number, z: number, strength: number): void;
+  /** Something dragged across the floor for `seconds`. */
+  scrape(x: number, y: number, z: number, seconds: number): void;
   /** Starts the shadow's continuous voice (call once; the returned handle is moved every frame). */
   shadow(): ShadowSound;
   /** A low hit, in the head, for the moment the shadow notices the player. */
@@ -154,6 +158,66 @@ export function createAudio(): Audio {
         src.start(t + at);
         src.stop(t + at + 0.08);
       }
+    },
+    clatter(x, y, z, strength) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      const k = Math.max(0.15, Math.min(1, strength));
+      // A short bright crack of noise, then a hollow plastic/metal ring that dies away.
+      const crack = c.createBufferSource();
+      crack.buffer = noiseBuffer(c);
+      const band = c.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = 1500;
+      band.Q.value = 0.7;
+      const crackGain = c.createGain();
+      crackGain.gain.setValueAtTime(1.1 * k, t);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      crack.connect(band).connect(crackGain).connect(out);
+      crack.start(t);
+      crack.stop(t + 0.2);
+      for (const [f, len] of [[310, 0.5], [740, 0.3], [1260, 0.18]] as const) {
+        const ring = c.createOscillator();
+        ring.type = "triangle";
+        ring.frequency.setValueAtTime(f * (1 + 0.04 * Math.random()), t);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.3 * k, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + len * (0.6 + k * 0.6));
+        ring.connect(g).connect(out);
+        ring.start(t);
+        ring.stop(t + len * 1.3);
+      }
+    },
+    scrape(x, y, z, seconds) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      // Noise through a narrow band that slides down as it slows, shuddering like plastic feet on tile.
+      const src = c.createBufferSource();
+      src.buffer = noiseBuffer(c);
+      src.loop = true;
+      const band = c.createBiquadFilter();
+      band.type = "bandpass";
+      band.Q.value = 3;
+      band.frequency.setValueAtTime(1300, t);
+      band.frequency.exponentialRampToValueAtTime(420, t + seconds);
+      const shudder = c.createOscillator();
+      shudder.frequency.value = 34;
+      const depth = c.createGain();
+      depth.gain.value = 0.25;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.5, t + 0.06);
+      g.gain.linearRampToValueAtTime(0.0001, t + seconds);
+      shudder.connect(depth).connect(g.gain);
+      src.connect(band).connect(g).connect(out);
+      src.start(t);
+      shudder.start(t);
+      src.stop(t + seconds + 0.05);
+      shudder.stop(t + seconds + 0.05);
     },
     shadow() {
       let nodes: { out: PannerNode; rumbleGain: GainNode; hissGain: GainNode; rumbleFilter: BiquadFilterNode; sources: AudioScheduledSourceNode[] } | null = null;
