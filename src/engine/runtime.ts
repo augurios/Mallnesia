@@ -7,6 +7,8 @@ import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
 import { GARAGE, atGoal, generateGarage, resolveGarage, type GarageLayout } from "./garage-gen";
 import { createGarageView, type GarageView } from "./garage-view";
+import { Watchers } from "./watchers";
+import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, pickGirlSpot } from "./girl";
 import { createGirlView } from "./girl-view";
 import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
@@ -233,6 +235,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let noiseWorld: NoiseWorld | null = null;
   // The girl in white (girl.ts): rare, brief apparitions ahead of the player; never moves, never chases. ?girl=off stops her,
   // ?girl=now brings the first in 3 s, key U calls her now, ?girlat=x,y places her there on the starting floor (screenshots).
+  // The watchers (watchers.ts): ordinary-looking people who creep closer when the player does not look at them and freeze
+  // when they do; sanity drains while they are in view. They come as sanity falls. ?watchers=off disables them,
+  // key Y adds one 20 m away now, ?watchersat=x,y,look places one (screenshots).
+  const watchers = new Watchers();
+  watchers.enabled = params.get("watchers") !== "off";
+  const watchersView = createWatchersView();
+  scene.add(watchersView.object);
   const girlMode = params.get("girl");
   const girlDirector = new GirlDirector();
   girlDirector.enabled = girlMode !== "off";
@@ -265,6 +274,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const MALL_RETURN = { floor: 1, x: 13.5, y: 88 }; // back in the parking strip, north of the door
   /** In the garage, standing under a working tube counts as light for sanity (like a lit area did). */
   const litByTube = (lay: GarageLayout, x: number, y: number) => lay.lights.some((l) => l.state === "on" && Math.hypot(l.x - x, l.y - y) < 3.5);
+  let watchersAtPending = params.has("watchersat");
   let girlAtPending = params.has("girlat");
   let ringTimer = 0;
   let startInGarage = params.get("area") === "garage"; // debug: ?area=garage starts there, once everything has loaded
@@ -495,6 +505,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (noiseWorld) noiseWorld.object.visible = inMall;
     sky.mesh.visible = inMall;
     if (!inMall) {
+      watchers.clear();
       apparition = null;
       girlView.update(0, 0, 0, 0, 0, 0);
       shadowView.object.visible = false;
@@ -541,6 +552,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     hiding.reset();
     guardScene?.finish();
     apparition = null;
+    watchers.clear();
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -589,6 +601,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     keys.add(e.code);
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
     if (e.code === "KeyU" && !e.repeat && locked) summonGirl(); // debug: the girl in white now
+    if (e.code === "KeyY" && !e.repeat && locked && nav && area === "mall") {
+      // debug: a watcher, 20 m away out of sight if there is such a place, now
+      const spot = nav.randomSpot(floor, player.x, -player.z, 14, 26, Math.random, (x, y) => unseen(x, y, floor));
+      if (spot) watchers.add(spot[0], spot[1], floor, "shopper", 0);
+    }
     if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint");
     if (e.code === "KeyP" && !e.repeat && locked && garage) fail.trigger(area === "mall" ? "to_garage" : "to_mall"); // debug // debug: faint now (the garage's sanity-out will do this)
     if (fail.locked) return; // going down or black: nothing else works
@@ -754,6 +771,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (charge === 0) flashOn = false;
     if (fail.update(dt) === "move") relocate();
     blackout.style.opacity = String(fail.fade);
+    if (watchersAtPending && nav && warmDone) {
+      watchersAtPending = false;
+      const at = (params.get("watchersat") ?? "").split(",");
+      const x = parseFloat(at[0]);
+      const y = parseFloat(at[1]);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        const look = (["shopper", "jacket", "hoodie", "guardlike"] as const).find((l) => l === at[2]) ?? "shopper";
+        watchers.add(x, y, floor, look, Math.atan2(-player.z - y, player.x - x));
+      }
+    }
     if (girlAtPending && nav && warmDone) {
       girlAtPending = false;
       const at = (params.get("girlat") ?? "").split(",").map(parseFloat);
@@ -850,6 +877,25 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         }
       }
     }
+    // The watchers: they stand still while seen, creep closer when not, and drain sanity while in view.
+    if (area === "mall" && nav) {
+      if (dt > 0 && !fail.locked) {
+        frustum.setFromProjectionMatrix(projView);
+        watchers.update(dt, {
+          nav,
+          px: player.x,
+          py: -player.z,
+          floor,
+          sanity: sanity.level,
+          observed: (x, y) => frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
+        });
+        sanity.setDrain("watchers", watchers.drain);
+      }
+      watchersView.update(watchers.list, now / 1000);
+    } else {
+      sanity.setDrain("watchers", 0);
+      watchersView.update([], now / 1000);
+    }
     // The guard's opening scene.
     if (area === "mall" && opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
       const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
@@ -945,6 +991,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       stats?.remove();
       blackout.remove();
       guardView.dispose();
+      girlView.dispose();
+      watchersView.dispose();
       noiseWorld?.dispose();
     },
   };
