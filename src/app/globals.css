@@ -107,6 +107,7 @@ body {
   color: #d8d2c0;
   text-shadow: 0 0 6px #000;
   pointer-events: none;
+  z-index: 5; /* above the black of a fail */
 }
 
 .game-root[data-hud="off"] .game-hint,
