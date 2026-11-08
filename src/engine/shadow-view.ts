@@ -102,6 +102,8 @@ const fragmentShader = /* glsl */ `
   uniform float uFade;
   uniform float uRim;
   uniform float uChurn;   // how fast it streams (more when hunting)
+  uniform float uLinear;   // 1 when drawn into the linear buffer of the post chain (medium, high), 0 straight to screen
+  uniform float uExposure;
   uniform vec4 uClip[${CLIP_RAYS}]; // wall planes: fog only where dot(xyz, p) + w > 0 (unused ones are (0, 0, 0, 1))
   varying vec3 vPos;
 
@@ -244,8 +246,17 @@ const fragmentShader = /* glsl */ `
     // faint cold glow that is all that shows of it in the dark.
     float A = 1.0 - T;
     float thin = 4.0 * A * (1.0 - A);
-    vec3 col = A * (vec3(0.002, 0.002, 0.003) + thin * (vec3(0.02, 0.021, 0.024) + uRim * vec3(0.05, 0.07, 0.11)));
-    gl_FragColor = vec4(col, A); // premultiplied
+    vec3 c = vec3(0.002, 0.002, 0.003) + thin * (vec3(0.02, 0.021, 0.024) + uRim * vec3(0.05, 0.07, 0.11));
+    // The look is tuned for drawing straight to the screen (low quality), where it blends over the finished, display-
+    // encoded picture. Into the post chain's linear buffer the same alpha darkens far less and its colour comes out
+    // brighter once tone mapping and sRGB are applied, so it read grey and washed out. Convert both so every preset
+    // gets the same look: the see-through part and the colour each raised to a power, both matched by eye against
+    // the low-quality look in side-by-side renders.
+    if (uLinear > 0.5) {
+      A = 1.0 - pow(T, 1.3);
+      c = pow(c, vec3(1.5)) / uExposure;
+    }
+    gl_FragColor = vec4(c * A, A); // premultiplied
     // The pixel's depth is that of the first fog along the ray, not of the box, so the depth test hides it behind
     // any wall between it and the camera (and still shows it through a doorway).
     vec4 clip = uProj * uMV * vec4(ro + rd * tHit, 1.0);
@@ -280,6 +291,8 @@ export function createShadowView(castWall?: CastWall): ShadowView {
     uChurn: { value: 1 },
     uMV: { value: new THREE.Matrix4() },
     uProj: { value: new THREE.Matrix4() },
+    uLinear: { value: 0 },
+    uExposure: { value: 1 },
     uClip: { value: Array.from({ length: CLIP_RAYS }, () => new THREE.Vector4(0, 0, 0, 1)) },
   };
   const make = (side: THREE.Side) =>
@@ -305,7 +318,9 @@ export function createShadowView(castWall?: CastWall): ShadowView {
   mesh.renderOrder = 10; // after the other see-through things, so it darkens them too
   const toLocal = (camera: THREE.Camera, out: THREE.Vector3) => mesh.worldToLocal(camera.getWorldPosition(out));
   // The camera is read right before the draw, so it matches exactly even if it moved after update().
-  mesh.onBeforeRender = (_r, _s, camera) => {
+  mesh.onBeforeRender = (renderer, _s, camera) => {
+    uniforms.uLinear.value = renderer.getRenderTarget() ? 1 : 0;
+    uniforms.uExposure.value = renderer.toneMappingExposure;
     toLocal(camera, uniforms.uCam.value);
     uniforms.uMV.value.multiplyMatrices(camera.matrixWorldInverse, mesh.matrixWorld);
     uniforms.uProj.value.copy(camera.projectionMatrix);
