@@ -18,6 +18,7 @@ export default function GameCanvas() {
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
   const [note, setNote] = useState<{ title: string; body: string[] } | null>(null);
+  const [monitor, setMonitor] = useState<{ label: string; index: number; total: number; glitch: number; clock: string } | null>(null);
   // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
   const hold = typeof window !== "undefined" ? parseFloat(new URLSearchParams(window.location.search).get("loading") ?? "") : NaN;
   const [load, setLoad] = useState<{ progress: number; ready: boolean; error: boolean }>({ progress: 0, ready: false, error: false });
@@ -36,6 +37,7 @@ export default function GameCanvas() {
       onStatus: setStatus,
       onSubtitle: setSubtitle,
       onNote: setNote,
+      onMonitor: setMonitor,
       onLoad: setLoad,
       onQualityChange: (level) => {
         setQuality(level);
@@ -98,6 +100,19 @@ export default function GameCanvas() {
             className={status.flashlightOn ? "game-flashlight-fill on" : "game-flashlight-fill"}
             style={{ width: `${Math.round(status.charge * 100)}%` }}
           />
+        </div>
+      )}
+      {locked && monitor && (
+        <div className="game-monitor" style={{ ["--glitch" as string]: monitor.glitch }} aria-label={monitor.label}>
+          <div className="game-monitor-top">
+            <span>
+              <i className="game-monitor-rec" /> {monitor.label}
+            </span>
+            <span>{monitor.clock}</span>
+          </div>
+          <div className="game-monitor-bottom">
+            {monitor.index + 1} / {monitor.total} · {es.monitorHelp}
+          </div>
         </div>
       )}
       {locked && note && (

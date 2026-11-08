@@ -7,6 +7,8 @@ import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
 import { GARAGE, atGoal, generateGarage, resolveGarage, type GarageLayout } from "./garage-gen";
 import { createGarageView, type GarageView } from "./garage-view";
+import { CAMERAS, Monitoring, SECURITY, consoleInReach } from "./security";
+import { createSecurityView } from "./security-view";
 import { NOTES, noteInReach, type Note } from "./notes";
 import { createNotesView } from "./notes-view";
 import { Watchers } from "./watchers";
@@ -43,7 +45,7 @@ export interface PlayerStatus {
   charge: number;
   flashlightOn: boolean;
   /** What E would do right now, if anything: use a door, crawl into a hiding spot, or crawl out of one. */
-  prompt: "interact" | "hide" | "leave" | "read" | "close" | null;
+  prompt: "interact" | "hide" | "leave" | "read" | "close" | "monitor" | null;
 }
 
 export interface RuntimeOptions {
@@ -55,6 +57,8 @@ export interface RuntimeOptions {
   onSubtitle?: (text: string | null) => void;
   /** The note being read (title and lines of text), or null when it is closed. */
   onNote?: (note: { title: string; body: string[] } | null) => void;
+  /** The security monitors: what the screen overlay shows (the selected camera's label, a clock, how much static), or null when closed. */
+  onMonitor?: (view: { label: string; index: number; total: number; glitch: number; clock: string } | null) => void;
   /** Loading progress for the loading screen: 0 to 1, `ready` once everything is loaded and warmed up, `error` if the mall could not load. */
   /** The game lowered the graphics preset by itself because frames were slow. */
   onQualityChange?: (level: QualityLevel) => void;
@@ -144,7 +148,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     renderer.info.autoReset = false; // the post passes render several times a frame: count them all
   }
   // Faint cool sky glow from above, darker blue-grey bounce from below (art doc: never pure black).
-  scene.add(new THREE.HemisphereLight(0x4a5a78, 0x10141c, Number.isFinite(ambientLevel) ? ambientLevel : 2.4)); // debug: ?ambient=<intensity>
+  const hemi = new THREE.HemisphereLight(0x4a5a78, 0x10141c, Number.isFinite(ambientLevel) ? ambientLevel : 2.4); // debug: ?ambient=<intensity>
+  const hemiBase = hemi.intensity;
+  scene.add(hemi);
   const torch = new THREE.SpotLight(0xfff2d0, FLASH_INTENSITY, 40, Math.PI / 5, 0.4);
   torch.position.set(0, 0, 0);
   torch.target.position.set(0, 0, -1);
@@ -246,6 +252,23 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   watchers.enabled = params.get("watchers") !== "off";
   const watchersView = createWatchersView();
   scene.add(watchersView.object);
+  // The security console and its monitors (security.ts): E at the console looks through the mall's cameras (the game's own
+  // camera moves to the CCTV spot, in night vision); left and right change camera; E or Esc leaves. ?monitor=1 starts
+  // looking through the feeds (?cam=<n> picks the camera), for screenshots.
+  const monitoring = new Monitoring();
+  const securityView = createSecurityView();
+  scene.add(securityView.object);
+  let monitorKey = ""; // what the HUD last got, so it is only told when something changes
+  let radioWarned = false;
+  let monitorStart = params.get("monitor") === "1";
+  const stopMonitoring = () => {
+    if (!monitoring.active) return;
+    monitoring.exit();
+    monitorKey = "";
+    options.onMonitor?.(null);
+    if (radioWarned) options.onSubtitle?.(null);
+    radioWarned = false;
+  };
   // Notes lying about the mall (notes.ts): E reads one, E again closes it; the player stands still while reading, and the
   // world goes on. Which were read is saved in `progress.notesRead`.
   const notesView = createNotesView(NOTES);
@@ -433,7 +456,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           }
         }
       }
-      walk.load(gltf.scene, loadedProps?.colliders);
+      walk.load(gltf.scene, [...(loadedProps?.colliders ?? []), securityView.collider()]);
       try {
         nav = NavGrid.fromData((await (await fetch(NAV_URL)).json()) as NavData);
         const made = new Shadow(nav);
@@ -520,8 +543,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (noiseWorld) noiseWorld.object.visible = inMall;
     sky.mesh.visible = inMall;
     notesView.object.visible = inMall;
+    securityView.object.visible = inMall;
     if (!inMall) {
       closeNote();
+      stopMonitoring();
       watchers.clear();
       apparition = null;
       girlView.update(0, 0, 0, 0, 0, 0);
@@ -571,6 +596,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     apparition = null;
     watchers.clear();
     closeNote();
+    stopMonitoring();
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -627,19 +653,29 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint");
     if (e.code === "KeyP" && !e.repeat && locked && garage) fail.trigger(area === "mall" ? "to_garage" : "to_mall"); // debug // debug: faint now (the garage's sanity-out will do this)
     if (fail.locked) return; // going down or black: nothing else works
+    if (monitoring.active && !e.repeat) {
+      if (e.code === "ArrowRight" || e.code === "KeyD") monitoring.next();
+      if (e.code === "ArrowLeft" || e.code === "KeyA") monitoring.prev();
+    }
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
       else if (charge >= FLASH_MIN_ON) flashOn = true;
     }
     if ((e.code === "KeyZ" || e.code === "KeyX") && !e.repeat) sanity.set(sanity.level + (e.code === "KeyX" ? 0.1 : -0.1)); // debug
     if (e.code === "KeyE" && !e.repeat && locked) {
-      if (reading) closeNote();
+      if (monitoring.active) stopMonitoring();
+      else if (reading) closeNote();
       else if (hiding.state === "in") hiding.leave();
       else if (!hiding.active) {
-        const note = area === "mall" ? noteInReach(NOTES, player.x, -player.z, floor, yawToHeading(yaw)) : null;
-        const spot = note ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw));
-        const door = note || spot ? null : doors.usable(player.x, player.z, floor, yaw);
-        if (note) {
+        const atConsole = area === "mall" && consoleInReach(player.x, -player.z, floor, yawToHeading(yaw));
+        const note = area === "mall" && !atConsole ? noteInReach(NOTES, player.x, -player.z, floor, yawToHeading(yaw)) : null;
+        const spot = note || atConsole ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw));
+        const door = note || spot || atConsole ? null : doors.usable(player.x, player.z, floor, yaw);
+        if (atConsole) {
+          monitoring.enter();
+          velocity.set(0, 0);
+          flashOn = false;
+        } else if (note) {
           reading = note;
           if (!progress.notesRead.includes(note.id)) {
             progress.notesRead.push(note.id);
@@ -680,7 +716,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
   let skipMouse = true; // the first event after locking can carry the jump of the cursor being recentred
   const onMouseMove = (e: MouseEvent) => {
-    if (!locked) return;
+    if (!locked || monitoring.active) return;
     if (skipMouse) {
       skipMouse = false;
       return;
@@ -694,6 +730,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     locked = document.pointerLockElement === renderer.domElement;
     skipMouse = true;
     closeNote();
+    stopMonitoring();
     keys.clear();
     velocity.set(0, 0); // resume from standing still, never mid-stride
     options.onLockChange?.(locked);
@@ -755,7 +792,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     crouch = pose ? pose.crouch : 0;
     if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
-    const stand = fail.locked || reading !== null; // reading a note, or going down: no walking
+    const stand = fail.locked || reading !== null || monitoring.active; // reading a note, or going down: no walking
     const forward = stand ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = stand ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
@@ -801,6 +838,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (charge === 0) flashOn = false;
     if (fail.update(dt) === "move") relocate();
     blackout.style.opacity = String(fail.fade);
+    if (monitorStart && warmDone && nav) {
+      monitorStart = false;
+      monitoring.enter();
+      monitoring.index = Math.max(0, Math.min(CAMERAS.length - 1, Math.round(num("cam", 1)) - 1));
+    }
     if (watchersAtPending && nav && warmDone) {
       watchersAtPending = false;
       const at = (params.get("watchersat") ?? "").split(",");
@@ -864,8 +906,31 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (shadow && area === "mall") shadowView.update(shadow, now / 1000);
     sanity.update(dt, flashOn || (area === "garage" && garage ? litByTube(garage.layout, player.x, -player.z) : false) ? 1 : 0);
     doors.tempo = sanity.shift;
-    post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
-    torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
+    const glitch = monitoring.active ? Monitoring.glitch(sanity.level) : 0;
+    post.setLook(
+      monitoring.active
+        ? { vignette: 0.3, drain: 0.9, grain: 0.1 + glitch * 0.15, pulse: 0, wobble: 0.6 + glitch, aberration: 0.8 + glitch, tunnel: 0, ghost: 0.5, shake: glitch * 0.5 }
+        : view.motion
+          ? sanity.look
+          : stillLook(sanity.look),
+    ); // the moving tiers respect the camera motion setting
+    securityView.update(now / 1000, glitch);
+    if (monitoring.active) {
+      const clockSeconds = 21 * 3600 + 7 * 60 + Math.floor(now / 1000);
+      const clock = [Math.floor(clockSeconds / 3600) % 24, Math.floor(clockSeconds / 60) % 60, clockSeconds % 60].map((n) => String(n).padStart(2, "0")).join(":");
+      const key = `${monitoring.index}|${Math.round(glitch * 10)}|${clock}`;
+      if (key !== monitorKey) {
+        monitorKey = key;
+        options.onMonitor?.({ label: CAMERAS[monitoring.index].label, index: monitoring.index, total: CAMERAS.length, glitch, clock });
+      }
+      // The radio voice: the shadow is close to the one who is watching the screens.
+      const near = shadow !== null && shadow.state !== "absent" && shadow.floor === floor && shadow.distanceTo(playerSense()) < SECURITY.WARN_DISTANCE;
+      if (near !== radioWarned) {
+        radioWarned = near;
+        options.onSubtitle?.(near ? es.radioBehind : null);
+      }
+    }
+    torch.intensity = flashOn && !monitoring.active ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
 
     eyeY = Number.isNaN(eyeY) ? player.y : eyeY + (player.y - eyeY) * (1 - Math.exp(-CAMERA_FOLLOW * dt));
     // Camera effects: a small head bob that fades with speed, and a slight widening while running.
@@ -873,8 +938,19 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     bob += (bobTarget - bob) * (1 - Math.exp(-BOB_EASE * dt));
     camera.position.set(player.x, eyeY + EYE_HEIGHT - crouch * (EYE_HEIGHT - HIDING.HIDDEN_EYE) + Math.sin(walked * BOB_FREQ) * bob, player.z);
     camera.rotation.set(pitch, yaw, 0);
+    if (monitoring.active) {
+      // looking through a CCTV camera: the camera moves to its mount, in night vision (more ambient, no flashlight)
+      const cam = CAMERAS[monitoring.shown(sanity.level, now / 1000)];
+      camera.position.set(cam.x, cam.floor * FLOOR_HEIGHT + SECURITY.HEIGHT, -cam.y);
+      camera.rotation.set(-SECURITY.TILT, headingToYaw((cam.heading * Math.PI) / 180), 0);
+      if (camera.fov !== SECURITY.FOV) {
+        camera.fov = SECURITY.FOV;
+        camera.updateProjectionMatrix();
+      }
+    }
+    hemi.intensity = monitoring.active ? hemiBase * 3.5 : hemiBase;
     const fovTarget = view.motion && running && velocity.lengthSq() > WALK_SPEED * WALK_SPEED ? baseFov + RUN_FOV - FOV : baseFov;
-    if (Math.abs(camera.fov - fovTarget) > 0.01) {
+    if (!monitoring.active && Math.abs(camera.fov - fovTarget) > 0.01) {
       camera.fov += (fovTarget - camera.fov) * (1 - Math.exp(-FOV_EASE * dt));
       camera.updateProjectionMatrix();
     }
@@ -970,7 +1046,25 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
-      const prompt = reading ? "close" : area === "garage" ? null : noteInReach(NOTES, player.x, -player.z, floor, yawToHeading(yaw)) && !hiding.active ? "read" : hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
+      const heading = yawToHeading(yaw);
+      const prompt: PlayerStatus["prompt"] =
+        monitoring.active || reading
+          ? "close"
+          : area === "garage"
+            ? null
+            : consoleInReach(player.x, -player.z, floor, heading) && !hiding.active
+              ? "monitor"
+              : noteInReach(NOTES, player.x, -player.z, floor, heading) && !hiding.active
+                ? "read"
+                : hiding.state === "in"
+                  ? "leave"
+                  : hiding.active
+                    ? null
+                    : hiding.usable(player.x, -player.z, floor, heading)
+                      ? "hide"
+                      : doors.usable(player.x, player.z, floor, yaw)
+                        ? "interact"
+                        : null;
       options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, prompt });
     }
   };
@@ -1021,6 +1115,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       stats?.remove();
       blackout.remove();
       guardView.dispose();
+      securityView.dispose();
       notesView.dispose();
       girlView.dispose();
       watchersView.dispose();

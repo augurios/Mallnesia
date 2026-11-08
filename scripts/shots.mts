@@ -74,6 +74,11 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "watchers_guardlike", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=72,28,guardlike&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   // a note on the floor at the start (notes.ts), seen from 2 m
   { name: "note_floor", floor: 1, x: 66, y: 22, yaw: 0, pitch: -35, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=4" },
+  // the security console from the player's side, and a monitor feed (?monitor=1&cam=n; the overlay is hidden by hud=off)
+  { name: "console", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: -8, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=8" },
+  { name: "feed_lobby", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: 0, extra: "&monitor=1&cam=1&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  { name: "feed_shadow", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: 0, extra: "&monitor=1&cam=1&girl=off&watchers=off&shadow=off&guard=off&noise=off&shadowat=76,30" },
+  { name: "feed_food_court", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: 0, extra: "&monitor=1&cam=4&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
