@@ -8,6 +8,8 @@ export const es = {
   interact: "Presiona E para interactuar",
   doorLocked: "No cede",
   checkpoint: "Punto de control",
+  caught: "Algo te alcanzó (provisional)",
+  debugShadow: "H: llamar a la sombra (provisional); ?shadow=off la desactiva",
   saveGame: "Guardar partida",
   loadGame: "Cargar partida",
   loadCheckpoint: "Volver al último punto de control (provisional)",

@@ -174,7 +174,7 @@ Some legends are tied to real tragedies and real people. When writing notes, dia
 
 ## Repository conventions
 
-- **No Git LFS (decided):** binaries are committed as plain files. Everything `npm run assets` writes (`public/models/mall_blockout.glb`, `ao.png`, `props.json` and `kit/*.glb`) is generated from `docs/floorplans/` and `scripts/`, so it is gitignored and rebuilt by `predev` (if any is missing) and `prebuild`. A hand-modeled file that replaces a generated one has to be committed and taken out of `.gitignore`. Revisit LFS if the repo passes about 500 MB.
+- **No Git LFS (decided):** binaries are committed as plain files. Everything `npm run assets` writes (`public/models/mall_blockout.glb`, `ao.png`, `props.json`, `nav.json` and `kit/*.glb`) is generated from `docs/floorplans/` and `scripts/`, so it is gitignored and rebuilt by `predev` (if any is missing) and `prebuild`. A hand-modeled file that replaces a generated one has to be committed and taken out of `.gitignore`. Revisit LFS if the repo passes about 500 MB.
 - Reference photos of the real mall: `reference/photos/`.
 - Design docs, floor plans, and legend notes: `docs/`.
 - Update this file when decisions change (license status, seed choice, language, priorities).

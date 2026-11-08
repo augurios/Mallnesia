@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node -e \"const f=require('fs');process.exit(['mall_blockout.glb','ao.png','props.json'].every((n)=>f.existsSync('public/models/'+n))?0:1)\" || npm run assets --silent",
+    "predev": "node -e \"const f=require('fs');process.exit(['mall_blockout.glb','ao.png','props.json','nav.json'].every((n)=>f.existsSync('public/models/'+n))?0:1)\" || npm run assets --silent",
     "dev": "next dev",
     "prebuild": "npm run assets --silent",
     "build": "next build",
@@ -11,12 +11,14 @@
     "lint": "eslint",
     "blockout": "node scripts/build-blockout.mts",
     "test:walk": "npm run assets --silent && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-walk.mts",
+    "test:shadow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-shadow.mts",
     "test:save": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-save.mts",
     "test:sanity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-sanity.mts",
     "shots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/shots.mts",
     "pieces": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/piece-shots.mts",
     "props": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-props.mts",
-    "assets": "npm run blockout --silent && npm run props --silent"
+    "nav": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-nav.mts",
+    "assets": "npm run blockout --silent && npm run props --silent && npm run nav --silent"
   },
   "dependencies": {
     "next": "16.4.5",

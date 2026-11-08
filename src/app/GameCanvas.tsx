@@ -96,6 +96,7 @@ export default function GameCanvas() {
             {!started && <p>{es.debugFloors}</p>}
             {!started && <p>{es.debugDoors}</p>}
             {!started && <p>{es.debugSanity}</p>}
+            {!started && <p>{es.debugShadow}</p>}
             <div className="game-quality" onClick={(e) => e.stopPropagation()}>
               {started && <button onClick={saveGame}>{es.saveGame}</button>}
               <button disabled={savedTimes.manual === null} onClick={() => loadGame("manual")}>

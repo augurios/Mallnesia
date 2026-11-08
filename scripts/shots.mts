@@ -45,6 +45,10 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "sanity_35", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0.35&ambient=8" },
   { name: "sanity_15", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0.15&ambient=8" },
   { name: "sanity_0", floor: 2, x: 60, y: 33, yaw: 180, pitch: 4, extra: "&sanity=0&ambient=8" },
+  // the shadow, placed with ?shadowat= (the director off so it stays), flashlight on at the start
+  { name: "shadow_near", floor: 2, x: 60, y: 33, yaw: 180, pitch: 2, extra: "&shadow=off&shadowat=60,26&ambient=4" },
+  { name: "shadow_far", floor: 2, x: 60, y: 33, yaw: 180, pitch: 2, extra: "&shadow=off&shadowat=60,12" },
+  { name: "shadow_dark_near", floor: 2, x: 60, y: 33, yaw: 180, pitch: 2, extra: "&shadow=off&shadowat=62,27&ambient=0.6" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
