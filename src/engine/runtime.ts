@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { Doors } from "./doors";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
 import { Sanity, stillLook } from "./sanity";
+import { createSaveStore, emptyProgress, type SaveSlot } from "./save";
 import { createSky } from "./sky";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
@@ -28,7 +30,7 @@ export interface RuntimeOptions {
   onLockChange?: (locked: boolean) => void;
   onStatus?: (status: PlayerStatus) => void;
   /** A short-lived message for the HUD. */
-  onNotice?: (notice: "doorLocked") => void;
+  onNotice?: (notice: "doorLocked" | "checkpoint") => void;
 }
 
 export interface Runtime {
@@ -36,6 +38,12 @@ export interface Runtime {
   getQuality(): QualityLevel;
   /** Applies a preset right away and remembers it for next time. */
   setQuality(level: QualityLevel): void;
+  /** Manual save (pause menu). "blocked" while the shadow hunts; "unsaved" if the browser will not keep it past this visit. */
+  save(): "saved" | "unsaved" | "blocked";
+  /** Loads a slot: the pause menu's manual save, or the last checkpoint (what being caught returns to). False if there is none. */
+  load(slot: SaveSlot): boolean;
+  /** When a slot was saved (ms since 1970), or null if it is empty. */
+  savedAt(slot: SaveSlot): number | null;
   getView(): ViewSettings;
   /** Applies view settings right away and remembers them for next time. */
   setView(view: ViewSettings): void;
@@ -142,6 +150,20 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let yaw = THREE.MathUtils.degToRad(num("yaw", 0));
   let pitch = THREE.MathUtils.degToRad(num("pitch", 0));
   const velocity = new THREE.Vector2(); // horizontal, x and three.js z, meters per second
+
+  // Saving (save.ts). `progress` is what the notes, guard and exit systems will fill in as they get built.
+  let storage: Storage | null = null;
+  try {
+    storage = window.localStorage;
+  } catch {
+    // blocked: saves live in memory for this visit
+  }
+  const store = createSaveStore(storage);
+  const atrium = new AtriumTracker();
+  atrium.reset(player.x, -player.z);
+  const progress = emptyProgress();
+  const hunted = () => false; // true while the shadow hunts the player; the shadow card replaces this
+  const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
   let bob = 0; // current head bob height, eased toward the target
 
@@ -201,6 +223,26 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const keys = new Set<string>();
   let locked = false;
+  let charge = 1;
+  let flashOn = true;
+  const restore = (slot: SaveSlot): boolean => {
+    const saved = store.read(slot);
+    if (!saved || saved.area !== "mall") return false; // the garage is its own level, not built yet
+    player.set(saved.x, saved.height, -saved.y);
+    yaw = saved.yaw;
+    pitch = 0;
+    walk.fallSpeed = 0;
+    velocity.set(0, 0);
+    eyeY = NaN;
+    progress.notesRead = [...saved.notesRead];
+    progress.guard = saved.guard;
+    progress.exits = [...saved.exits];
+    sanity.set(1); // sanity and the flashlight charge are not saved: they start fresh
+    sanity.snap();
+    charge = 1;
+    atrium.reset(saved.x, saved.y); // no checkpoint from the load itself
+    return true;
+  };
 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
@@ -226,6 +268,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       walk.fallSpeed = 0;
       velocity.set(0, 0);
       eyeY = NaN;
+      atrium.reset(player.x, -player.z);
     }
   };
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
@@ -267,8 +310,6 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const projView = new THREE.Matrix4();
 
   let last = performance.now();
-  let charge = 1;
-  let flashOn = true;
   let frame = 0;
   let statusTimer = 0;
   const tick = () => {
@@ -304,6 +345,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     walk.followGround(dt, floor);
     floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
     doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
+    if (atrium.update(player.x, -player.z) === "entered") {
+      // entering the atrium is the auto-save: the checkpoint the player returns to after being caught (leaving saves nothing)
+      store.write("checkpoint", snapshot());
+      options.onNotice?.("checkpoint");
+    }
 
     charge = flashOn ? (exploration ? 1 : Math.max(0, charge - FLASH_DRAIN * dt)) : Math.min(1, charge + FLASH_RECHARGE * dt);
     if (charge === 0) flashOn = false;
@@ -351,6 +397,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       saveQuality(level);
       applyQuality();
     },
+    save() {
+      if (hunted()) return "blocked";
+      return store.write("manual", snapshot()) ? "saved" : "unsaved";
+    },
+    load: restore,
+    savedAt: (slot) => store.read(slot)?.savedAt ?? null,
     getView: () => ({ ...view }),
     setView(next) {
       view = normalizeView(next);

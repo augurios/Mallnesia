@@ -16,6 +16,8 @@ export default function GameCanvas() {
   const [view, setView] = useState<ViewSettings>({ sensitivity: 1, motion: true });
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [savedTimes, setSavedTimes] = useState<{ manual: number | null; checkpoint: number | null }>({ manual: null, checkpoint: null });
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -42,6 +44,27 @@ export default function GameCanvas() {
       runtimeRef.current = null;
     };
   }, []);
+
+  // The pause menu reads the saved times each time it opens (a checkpoint may have been written while playing).
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!locked && runtime) setSavedTimes({ manual: runtime.savedAt("manual"), checkpoint: runtime.savedAt("checkpoint") });
+  }, [locked]);
+
+  const refreshTimes = (runtime: Runtime) => setSavedTimes({ manual: runtime.savedAt("manual"), checkpoint: runtime.savedAt("checkpoint") });
+  const saveGame = () => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+    const result = runtime.save();
+    setSaveMsg(result === "saved" ? es.saved : result === "unsaved" ? es.savedSession : es.saveBlocked);
+    refreshTimes(runtime);
+  };
+  const loadGame = (slot: "manual" | "checkpoint") => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+    setSaveMsg(runtime.load(slot) ? es.loaded : es.noSave);
+  };
+  const when = (t: number | null) => (t ? new Date(t).toLocaleString("es-CR", { dateStyle: "short", timeStyle: "short" }) : null);
 
   const changeView = (next: ViewSettings) => {
     runtimeRef.current?.setView(next);
@@ -73,6 +96,28 @@ export default function GameCanvas() {
             {!started && <p>{es.debugFloors}</p>}
             {!started && <p>{es.debugDoors}</p>}
             {!started && <p>{es.debugSanity}</p>}
+            <div className="game-quality" onClick={(e) => e.stopPropagation()}>
+              {started && <button onClick={saveGame}>{es.saveGame}</button>}
+              <button disabled={savedTimes.manual === null} onClick={() => loadGame("manual")}>
+                {es.loadGame}
+              </button>
+              {savedTimes.manual !== null && (
+                <span>
+                  {es.savedAt} {when(savedTimes.manual)}
+                </span>
+              )}
+            </div>
+            {savedTimes.checkpoint !== null && (
+              <div className="game-quality" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => loadGame("checkpoint")}>{es.loadCheckpoint}</button>
+                <span>{when(savedTimes.checkpoint)}</span>
+              </div>
+            )}
+            {saveMsg && (
+              <p role="status" onClick={(e) => e.stopPropagation()}>
+                {saveMsg}
+              </p>
+            )}
             <div className="game-quality" onClick={(e) => e.stopPropagation()}>
               <span>{es.quality}</span>
               {QUALITY_LEVELS.map((level) => (

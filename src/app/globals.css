@@ -115,3 +115,8 @@ body {
 .game-root[data-hud="off"] .game-prompt {
   display: none;
 }
+
+.game-quality button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
