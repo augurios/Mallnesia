@@ -5,10 +5,12 @@ import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
+import { GARAGE, atGoal, generateGarage, resolveGarage, type GarageLayout } from "./garage-gen";
+import { createGarageView, type GarageView } from "./garage-view";
 import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
-import { Hiding, HIDING, spotsFromProps, yawToHeading } from "./hiding";
+import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
 import { LoadProgress } from "./load-progress";
 import { NoiseDirector, pickNoiseSpot } from "./night-noise";
@@ -42,7 +44,7 @@ export interface RuntimeOptions {
   onLockChange?: (locked: boolean) => void;
   onStatus?: (status: PlayerStatus) => void;
   /** A short-lived message for the HUD. */
-  onNotice?: (notice: "doorLocked" | "checkpoint" | "caught") => void;
+  onNotice?: (notice: "doorLocked" | "checkpoint" | "caught" | "garageDone") => void;
   /** A line of speech to show as a subtitle (the guard), or null to clear it. */
   onSubtitle?: (text: string | null) => void;
   /** Loading progress for the loading screen: 0 to 1, `ready` once everything is loaded and warmed up, `error` if the mall could not load. */
@@ -240,6 +242,20 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const guardSphere = new THREE.Sphere();
   const guardPoint = new THREE.Vector3();
   const fail = new Fail();
+  // Two areas: the mall, and the parking garage (a level of its own, garage-gen.ts and garage-view.ts). The garage is
+  // built once at load, hidden, and swapped in behind a fade. Entered through the secret door on floor 2 when the
+  // mall opens it (or debug key P / ?area=garage), left by reaching the payphone or by fainting.
+  let area: "mall" | "garage" = "mall";
+  let garage: { layout: GarageLayout; view: GarageView } | null = null;
+  const garageSeedParam = params.get("garageseed"); // debug: ?garageseed=random or a number; the default seed is fixed
+  const garageSeed = garageSeedParam === "random" ? Math.floor(Math.random() * 1e9) : Number.isFinite(parseInt(garageSeedParam ?? "", 10)) ? parseInt(garageSeedParam ?? "", 10) : GARAGE.SEED;
+  const GARAGE_DRAIN = 1 / 220; // sanity per second lost in the garage: full to empty in under four minutes if lost
+  const GARAGE_DOOR = { id: "f2_garage", x: 13.5, y: 84 };
+  const MALL_RETURN = { floor: 1, x: 13.5, y: 88 }; // back in the parking strip, north of the door
+  /** In the garage, standing under a working tube counts as light for sanity (like a lit area did). */
+  const litByTube = (lay: GarageLayout, x: number, y: number) => lay.lights.some((l) => l.state === "on" && Math.hypot(l.x - x, l.y - y) < 3.5);
+  let ringTimer = 0;
+  let startInGarage = params.get("area") === "garage"; // debug: ?area=garage starts there, once everything has loaded
   // The black of a fail (caught, fainted): a plain overlay, so it works on every quality preset, under the HUD text (z-index 5).
   const blackout = document.createElement("div");
   blackout.style.cssText = "position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2";
@@ -259,10 +275,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let worstNow = 0; // ms
   let worstShown = 0;
   let worstSince = performance.now();
+  let warmDone = false; // the warm-up changes what is visible while it runs, so nothing else may show or hide areas until it is over
   const warmUp = async () => {
-    if (params.get("precompile") === "off") return;
+    if (params.get("precompile") === "off") {
+      warmDone = true;
+      return;
+    }
     const t0 = performance.now();
-    const asleep = [shadowView.object, guardView.object].filter((o) => !o.visible);
+    const asleep = [shadowView.object, guardView.object, ...(garage ? [garage.view.group] : [])].filter((o) => !o.visible);
     asleep.forEach((o) => (o.visible = true));
     // A loose chair and a bin of each kind: they are plain meshes, a different shader variant from the instanced kit pieces.
     const mute = { onImpact: () => {}, onScrape: () => {}, walkable: () => true };
@@ -277,6 +297,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     asleep.forEach((o) => (o.visible = false));
     post.render(0); // bloom and film compile on their first render
     warmMs = performance.now() - t0;
+    warmDone = true;
   };
 
   // Loading progress (load-progress.ts): the weights are about each part's share of the wait (the mall is 1.2 MB, the kit
@@ -390,6 +411,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       }
       load.finish("nav");
       announce();
+      garage = (() => {
+        try {
+          const layout = generateGarage(garageSeed);
+          const view = createGarageView(layout);
+          view.group.visible = false;
+          scene.add(view.group);
+          return { layout, view };
+        } catch (err) {
+          console.error("Could not build the garage", err);
+          return null;
+        }
+      })();
       await warmUp();
       load.finish("warm");
       announce();
@@ -441,6 +474,43 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     return spot ? noiseWorld.spawn(noiseDirector.pick(), spot, floor, noiseHooks, unseen) : false;
   };
 
+  /** Shows one area and hides the other. */
+  const showArea = (next: "mall" | "garage") => {
+    area = next;
+    const inMall = next === "mall";
+    if (blockout) blockout.visible = inMall;
+    if (props) props.group.visible = inMall;
+    if (noiseWorld) noiseWorld.object.visible = inMall;
+    sky.mesh.visible = inMall;
+    if (!inMall) {
+      shadowView.object.visible = false;
+      guardView.update(0, 0, 0, 0, false, false, 0);
+    }
+    if (garage) garage.view.group.visible = !inMall;
+  };
+  const enterGarage = () => {
+    if (!garage) return;
+    guardScene?.finish();
+    opening = "skip";
+    hiding.reset();
+    shadow?.reset(60);
+    showArea("garage");
+    const sp = garage.layout.spawn;
+    floor = 0;
+    player.set(sp.x, 0, -sp.y);
+    yaw = headingToYaw(sp.heading);
+    pitch = 0;
+    velocity.set(0, 0);
+    walk.fallSpeed = 0;
+    eyeY = NaN;
+    ringTimer = -8; // the phone starts ringing a little after the player arrives
+  };
+  const leaveGarage = () => {
+    if (area !== "garage") return;
+    showArea("mall");
+    sanity.setDrain("garage", 0);
+  };
+
   /** Puts the player somewhere new (a fail's respawn): standing, still, nothing hunting. */
   const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
     hiding.reset();
@@ -457,6 +527,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   };
   /** Runs while the screen is black after a fail. */
   const relocate = () => {
+    if (fail.reason === "to_garage") {
+      enterGarage();
+      return;
+    }
+    leaveGarage(); // anything else brings the player back to the mall
+    if (fail.reason === "to_mall") {
+      placePlayer(MALL_RETURN.floor, MALL_RETURN.x, MALL_RETURN.y, 0); // facing north, away from the door
+      sanity.set(Math.max(sanity.level, 0.75));
+      sanity.snap();
+      charge = 1;
+      return;
+    }
     if (fail.reason === "caught") {
       // back to the last checkpoint, or to the start if there is none yet; a full reset like a load
       if (!restore("checkpoint")) {
@@ -480,7 +562,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
-    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the garage's sanity-out will do this)
+    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint");
+    if (e.code === "KeyP" && !e.repeat && locked && garage) fail.trigger(area === "mall" ? "to_garage" : "to_mall"); // debug // debug: faint now (the garage's sanity-out will do this)
     if (fail.locked) return; // going down or black: nothing else works
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
@@ -619,13 +702,22 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (!pose && (velocity.x || velocity.y)) {
       player.x += velocity.x * dt;
       player.z += velocity.y * dt;
-      walk.collide();
+      if (area === "garage" && garage) {
+        const [gx, gy] = resolveGarage(garage.layout.boxes, player.x, -player.z, PLAYER_RADIUS);
+        player.x = gx;
+        player.z = -gy;
+      } else walk.collide();
     }
     walked += Math.hypot(player.x - startX, player.z - startZ);
-    if (!pose) walk.followGround(dt, floor);
-    floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
-    doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
-    if (atrium.update(player.x, -player.z) === "entered") {
+    if (area === "mall") {
+      if (!pose) walk.followGround(dt, floor);
+      floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
+      doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
+    } else {
+      floor = 0;
+      player.y = 0;
+    }
+    if (area === "mall" && atrium.update(player.x, -player.z) === "entered") {
       // entering the atrium is the auto-save: the checkpoint the player returns to after being caught (leaving saves nothing)
       store.write("checkpoint", snapshot());
       options.onNotice?.("checkpoint");
@@ -635,7 +727,34 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (charge === 0) flashOn = false;
     if (fail.update(dt) === "move") relocate();
     blackout.style.opacity = String(fail.fade);
-    if (shadow && dt > 0 && !fail.locked) {
+    if (startInGarage && garage && warmDone) {
+      startInGarage = false;
+      enterGarage();
+      if (params.has("x") && params.has("y")) {
+        // debug (screenshots): ?x ?y ?yaw ?pitch place the player inside the garage, in garage plan coordinates
+        player.set(num("x", 0), 0, -num("y", 0));
+        yaw = THREE.MathUtils.degToRad(num("yaw", 0));
+        pitch = THREE.MathUtils.degToRad(num("pitch", 0));
+      }
+    }
+    if (area === "mall" && floor === 1 && !fail.locked && garage && doors.angleOf(GARAGE_DOOR.id) > 0.85 && Math.abs(player.x - GARAGE_DOOR.x) < 1.5 && -player.z > GARAGE_DOOR.y - 1.5 && -player.z < GARAGE_DOOR.y + 0.6) {
+      fail.trigger("to_garage"); // the mall opened its door and the player walked into it
+    }
+    if (area === "garage" && garage) {
+      const lay = garage.layout;
+      sanity.setDrain("garage", GARAGE_DRAIN);
+      if (dt > 0 && !fail.locked) {
+        ringTimer += dt;
+        if (ringTimer >= 3.4) {
+          ringTimer = 0;
+          audio.ring(lay.goal.x, 1.2, -lay.goal.y);
+        }
+        if (atGoal(lay, player.x, -player.z) && fail.trigger("to_mall")) options.onNotice?.("garageDone");
+        else if (sanity.level <= 0.02 && fail.trigger("faint")) options.onNotice?.("caught");
+      }
+      garage.view.update(now / 1000);
+    }
+    if (shadow && dt > 0 && !fail.locked && area === "mall") {
       const sense = playerSense();
       for (const ev of shadow.update(dt, sense)) {
         if (ev === "noticed") {
@@ -650,8 +769,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const level = shadow.state === "absent" ? 0 : Math.max(0, 1 - shadow.distanceTo(sense) / 45) * shadow.fade;
       shadowSound.update(shadow.x, floor * FLOOR_HEIGHT + 1.2, -shadow.y, level, shadow.hunting);
     }
-    if (shadow) shadowView.update(shadow, now / 1000);
-    sanity.update(dt, flashOn ? 1 : 0);
+    if (shadow && area === "mall") shadowView.update(shadow, now / 1000);
+    sanity.update(dt, flashOn || (area === "garage" && garage ? litByTube(garage.layout, player.x, -player.z) : false) ? 1 : 0);
     doors.tempo = sanity.shift;
     post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
@@ -669,14 +788,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     camera.updateMatrixWorld();
     sky.follow(camera.position);
-    doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    if (area === "mall") doors.update(dt, player, floor, projView);
     // Night noises: the timer, and the motion of whatever has fallen.
-    if (noiseWorld) {
+    if (noiseWorld && area === "mall") {
       if (dt > 0 && !fail.locked && noiseDirector.update(dt, sanity.shift)) fireNoise();
       noiseWorld.update(dt, noiseHooks);
     }
     // The guard's opening scene.
-    if (opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
+    if (area === "mall" && opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
       const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
       opening = "playing";
       if (spot) {
@@ -711,7 +831,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       }
     }
     const preset = QUALITY_PRESETS[quality];
-    props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
+    if (area === "mall") props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
     post.render(now / 1000);
@@ -719,7 +839,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
-      const prompt = hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
+      const prompt = area === "garage" ? null : hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
       options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, prompt });
     }
   };
@@ -738,7 +858,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       applyQuality();
     },
     save() {
-      if (hunted()) return "blocked";
+      if (hunted() || area === "garage") return "blocked"; // a save in the garage would come back in the mall
       return store.write("manual", snapshot()) ? "saved" : "unsaved";
     },
     load: restore,

@@ -60,6 +60,12 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "noise_aftermath", floor: 2, x: 60, y: 14, yaw: 0, pitch: -8, extra: "&noiserest=1&noise=off&shadow=off&guard=off&ambient=14" },
   // the loading screen held at 45% (?loading=0.45), and a normal start to check the screen goes away by itself
   { name: "loading_screen", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&loading=0.45&guard=off" },
+  // the parking garage (?area=garage, x/y in garage coordinates; yaw 270 looks east)
+  { name: "garage_spawn", floor: 1, x: 1.8, y: 18, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
+  { name: "garage_hall", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
+  { name: "garage_van", floor: 1, x: 31, y: 7, yaw: 270, pitch: -3, extra: "&area=garage&shadow=off&guard=off&noise=off" },
+  { name: "garage_booth", floor: 1, x: 68, y: 8, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
+  { name: "garage_lit", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=12&stats=1" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
