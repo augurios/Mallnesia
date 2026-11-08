@@ -110,6 +110,23 @@ body {
   z-index: 5; /* above the black of a fail */
 }
 
+.game-subtitle {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  max-width: min(80vw, 720px);
+  padding: 4px 12px;
+  text-align: center;
+  font-size: 17px;
+  color: #ece6d4;
+  background: rgba(0, 0, 0, 0.45);
+  text-shadow: 0 0 6px #000;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.game-root[data-hud="off"] .game-subtitle,
 .game-root[data-hud="off"] .game-hint,
 .game-root[data-hud="off"] .game-status,
 .game-root[data-hud="off"] .game-flashlight,

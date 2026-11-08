@@ -5,6 +5,8 @@ import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
+import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
+import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
 import { Hiding, HIDING, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
@@ -15,6 +17,7 @@ import { createSaveStore, emptyProgress, type SaveSlot } from "./save";
 import { Shadow, type PlayerSense } from "./shadow";
 import { createShadowView } from "./shadow-view";
 import { createSky } from "./sky";
+import { es } from "../strings/es-CR";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 import { loadView, normalizeView, saveView, type ViewSettings } from "./view";
@@ -36,6 +39,8 @@ export interface RuntimeOptions {
   onStatus?: (status: PlayerStatus) => void;
   /** A short-lived message for the HUD. */
   onNotice?: (notice: "doorLocked" | "checkpoint" | "caught") => void;
+  /** A line of speech to show as a subtitle (the guard), or null to clear it. */
+  onSubtitle?: (text: string | null) => void;
 }
 
 export interface Runtime {
@@ -192,6 +197,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     },
   });
   const hiding = new Hiding();
+  const guardView = createGuardView();
+  scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
+  // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
+  // game that has already met him; ?guard=now plays it from wherever the game starts.
+  const guardParam = params.get("guard");
+  let opening = guardParam === "off" ? "skip" : guardParam === "now" || !["x", "y", "floor"].some((k) => params.has(k)) ? "ready" : "skip";
+  let guardScene: GuardScene | null = null;
+  const guardAt = { x: 0, y: 0 };
+  let guardLine: number | null = null;
+  const frustum = new THREE.Frustum();
+  const guardSphere = new THREE.Sphere();
+  const guardPoint = new THREE.Vector3();
   const fail = new Fail();
   // The black of a fail (caught, fainted): a plain overlay, so it works on every quality preset, under the HUD text (z-index 5).
   const blackout = document.createElement("div");
@@ -276,6 +293,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const saved = store.read(slot);
     if (!saved || saved.area !== "mall") return false; // the garage is its own level, not built yet
     hiding.reset();
+    guardScene?.finish(); // a load is not the opening
+    opening = "skip";
     player.set(saved.x, saved.height, -saved.y);
     yaw = saved.yaw;
     pitch = 0;
@@ -296,6 +315,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   /** Puts the player somewhere new (a fail's respawn): standing, still, nothing hunting. */
   const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
     hiding.reset();
+    guardScene?.finish();
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -363,6 +383,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (jump !== undefined) {
       floor = jump;
       hiding.reset();
+      guardScene?.finish();
+      opening = "skip";
       player.set(SPAWNS[jump].x, jump * FLOOR_HEIGHT, -SPAWNS[jump].y);
       walk.fallSpeed = 0;
       velocity.set(0, 0);
@@ -500,6 +522,41 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     camera.updateMatrixWorld();
     sky.follow(camera.position);
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    // The guard's opening scene.
+    if (opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
+      const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
+      opening = "playing";
+      if (spot) {
+        guardAt.x = spot.x;
+        guardAt.y = spot.y;
+        guardScene = new GuardScene([...es.guardOpening]);
+      }
+    }
+    if (guardScene && !guardScene.done) {
+      const px = player.x;
+      const py = -player.z;
+      const visible = frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(guardAt.x, floor * FLOOR_HEIGHT + 0.95, -guardAt.y), 0.7)) && nav !== null && nav.sees(floor, px, py, guardAt.x, guardAt.y);
+      const facingAway = Math.atan2(guardAt.y - py, guardAt.x - px);
+      if (guardScene.walking && dt > 0) {
+        const nx = guardAt.x + Math.cos(facingAway) * GUARD_SCENE.WALK_SPEED * dt;
+        const ny = guardAt.y + Math.sin(facingAway) * GUARD_SCENE.WALK_SPEED * dt;
+        if (nav?.walkable(floor, nx, ny)) {
+          guardAt.x = nx;
+          guardAt.y = ny;
+        } else guardScene.finish(); // blocked: he is gone around the corner
+      }
+      if (dt > 0) guardScene.update(dt, visible);
+      if (guardScene.line !== guardLine) {
+        guardLine = guardScene.line;
+        options.onSubtitle?.(guardLine === null ? null : es.guardOpening[guardLine]);
+      }
+      guardView.update(guardAt.x, guardAt.y, floor, guardScene.walking ? facingAway : facingAway + Math.PI, !guardScene.done, guardScene.walking, now / 1000);
+      if (guardScene.done) {
+        guardView.update(0, 0, floor, 0, false, false, 0);
+        options.onSubtitle?.(null);
+        if (progress.guard === 0) progress.guard = 1; // the opening has been seen
+      }
+    }
     const preset = QUALITY_PRESETS[quality];
     props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
@@ -558,6 +615,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       renderer.domElement.remove();
       stats?.remove();
       blackout.remove();
+      guardView.dispose();
     },
   };
 }
