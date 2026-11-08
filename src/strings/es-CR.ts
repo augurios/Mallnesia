@@ -5,7 +5,7 @@ export const es = {
   debugFloors: "1, 2, 3: saltar de piso (provisional)",
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
   debugSanity: "Z / X: bajar / subir la cordura (provisional)",
-  interact: "Presiona E para interactuar",
+  prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir" },
   doorLocked: "No cede",
   checkpoint: "Punto de control",
   caught: "Algo te alcanzó (provisional)",

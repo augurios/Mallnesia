@@ -5,6 +5,7 @@ import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
+import { Hiding, HIDING, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
@@ -25,8 +26,8 @@ export interface PlayerStatus {
   /** Flashlight charge, 0 to 1, and whether the light is on. */
   charge: number;
   flashlightOn: boolean;
-  /** A door the player could use right now ("Presiona E"). */
-  canInteract: boolean;
+  /** What E would do right now, if anything: use a door, crawl into a hiding spot, or crawl out of one. */
+  prompt: "interact" | "hide" | "leave" | null;
 }
 
 export interface RuntimeOptions {
@@ -170,6 +171,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const hunted = () => shadow?.hunting ?? false; // manual saves are refused while it hunts
   const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
+  let flashOn = true;
+  let crouch = 0; // 0 standing, 1 fully hidden: lowers the eye
   let bob = 0; // current head bob height, eased toward the target
 
   const sanity = new Sanity();
@@ -187,6 +190,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       options.onNotice?.("doorLocked");
     },
   });
+  const hiding = new Hiding();
   const shadowView = createShadowView((origin, dir, far) => walk.castWall(origin, dir, far));
   scene.add(shadowView.object);
   const shadowSound = audio.shadow();
@@ -224,6 +228,22 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         props = loadedProps;
       }
       doors.load(gltf.scene);
+      if (loadedProps) hiding.spots = spotsFromProps(loadedProps.instances, FLOOR_HEIGHT);
+      if (params.get("hide") === "1") {
+        // debug: ?hide=1 starts already hidden in the first spot on the starting floor (for screenshots, where time stands still)
+        const first = hiding.spots.find((s) => s.floor === floor);
+        if (first) {
+          const entry = { spot: first, end: 1 as const };
+          hiding.enter(entry, first.x + first.ax * HIDING.GATE, first.y + first.ay * HIDING.GATE, yaw);
+          const pose = hiding.update(HIDING.ENTER_TIME, yaw);
+          if (pose) {
+            player.set(pose.x, floor * FLOOR_HEIGHT, -pose.y);
+            yaw = pose.yaw;
+            crouch = 1;
+            flashOn = false;
+          }
+        }
+      }
       walk.load(gltf.scene, loadedProps?.colliders);
       try {
         const nav = NavGrid.fromData((await (await fetch(NAV_URL)).json()) as NavData);
@@ -244,11 +264,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const keys = new Set<string>();
   let locked = false;
   let charge = 1;
-  let flashOn = true;
-  const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: flashOn && charge > 0, hidden: false });
+  const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: flashOn && charge > 0, hidden: hiding.hidden });
   const restore = (slot: SaveSlot): boolean => {
     const saved = store.read(slot);
     if (!saved || saved.area !== "mall") return false; // the garage is its own level, not built yet
+    hiding.reset();
     player.set(saved.x, saved.height, -saved.y);
     yaw = saved.yaw;
     pitch = 0;
@@ -268,14 +288,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
-    if (e.code === "KeyF" && !e.repeat) {
+    if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
       else if (charge >= FLASH_MIN_ON) flashOn = true;
     }
     if ((e.code === "KeyZ" || e.code === "KeyX") && !e.repeat) sanity.set(sanity.level + (e.code === "KeyX" ? 0.1 : -0.1)); // debug
     if (e.code === "KeyE" && !e.repeat && locked) {
-      const door = doors.usable(player.x, player.z, floor, yaw);
-      if (door) doors.use(door.id);
+      if (hiding.state === "in") hiding.leave();
+      else if (!hiding.active) {
+        const spot = hiding.usable(player.x, -player.z, floor, yawToHeading(yaw));
+        const door = spot ? null : doors.usable(player.x, player.z, floor, yaw);
+        if (spot) {
+          hiding.enter(spot, player.x, -player.z, yaw);
+          flashOn = false; // hiding is done in the dark
+        } else if (door) doors.use(door.id);
+      }
     }
     if (e.code === "KeyH" && !e.repeat && shadow) {
       // Debug: bring the shadow in now (out of sight, 12 to 18 m away; or 22 to 40 if there is no such spot)
@@ -291,6 +318,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const jump = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];
     if (jump !== undefined) {
       floor = jump;
+      hiding.reset();
       player.set(SPAWNS[jump].x, jump * FLOOR_HEIGHT, -SPAWNS[jump].y);
       walk.fallSpeed = 0;
       velocity.set(0, 0);
@@ -345,10 +373,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
     last = now;
 
+    // Hiding takes the player over: the pose of the crawl (or of the hidden player's turned head) replaces walking.
+    const pose = hiding.update(dt, yaw);
+    if (pose) {
+      player.x = pose.x;
+      player.z = -pose.y;
+      yaw = pose.yaw;
+      velocity.set(0, 0);
+      if (hiding.state !== "leaving") pitch = Math.max(HIDING.LOOK_PITCH_DOWN, Math.min(HIDING.LOOK_PITCH_UP, pitch));
+    }
+    crouch = pose ? pose.crouch : 0;
+    if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
     const forward = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-    const moving = forward !== 0 || strafe !== 0;
+    const moving = !pose && (forward !== 0 || strafe !== 0);
     const running = moving && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
     let targetX = 0;
     let targetZ = 0;
@@ -363,13 +402,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (!moving && velocity.lengthSq() < 1e-4) velocity.set(0, 0);
     const startX = player.x;
     const startZ = player.z;
-    if (velocity.x || velocity.y) {
+    if (!pose && (velocity.x || velocity.y)) {
       player.x += velocity.x * dt;
       player.z += velocity.y * dt;
       walk.collide();
     }
     walked += Math.hypot(player.x - startX, player.z - startZ);
-    walk.followGround(dt, floor);
+    if (!pose) walk.followGround(dt, floor);
     floor = Math.min(2, Math.max(0, Math.floor((player.y + 0.6) / FLOOR_HEIGHT)));
     doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
     if (atrium.update(player.x, -player.z) === "entered") {
@@ -405,7 +444,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     // Camera effects: a small head bob that fades with speed, and a slight widening while running.
     const bobTarget = view.motion && moving && walk.fallSpeed === 0 ? (running ? BOB_RUN : BOB_WALK) : 0;
     bob += (bobTarget - bob) * (1 - Math.exp(-BOB_EASE * dt));
-    camera.position.set(player.x, eyeY + EYE_HEIGHT + Math.sin(walked * BOB_FREQ) * bob, player.z);
+    camera.position.set(player.x, eyeY + EYE_HEIGHT - crouch * (EYE_HEIGHT - HIDING.HIDDEN_EYE) + Math.sin(walked * BOB_FREQ) * bob, player.z);
     camera.rotation.set(pitch, yaw, 0);
     const fovTarget = view.motion && running && velocity.lengthSq() > WALK_SPEED * WALK_SPEED ? baseFov + RUN_FOV - FOV : baseFov;
     if (Math.abs(camera.fov - fovTarget) > 0.01) {
@@ -424,7 +463,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
-      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, canInteract: doors.usable(player.x, player.z, floor, yaw) !== null });
+      const prompt = hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
+      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, prompt });
     }
   };
   tick();
