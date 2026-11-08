@@ -5,6 +5,7 @@ import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
+import { Fail, FAIL, pickWakeSpot } from "./fail";
 import { Hiding, HIDING, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
@@ -168,7 +169,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   atrium.reset(player.x, -player.z);
   const progress = emptyProgress();
   let shadow: Shadow | null = null; // made once the nav data has loaded (the game works without it, just without the shadow)
-  const hunted = () => shadow?.hunting ?? false; // manual saves are refused while it hunts
+  const hunted = () => (shadow?.hunting ?? false) || fail.state !== "playing"; // manual saves are refused while it hunts, and during a fail
   const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
   let flashOn = true;
@@ -191,6 +192,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     },
   });
   const hiding = new Hiding();
+  const fail = new Fail();
+  // The black of a fail (caught, fainted): a plain overlay, so it works on every quality preset, under the HUD text (z-index 5).
+  const blackout = document.createElement("div");
+  blackout.style.cssText = "position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2";
+  root.append(blackout);
+  let nav: NavGrid | null = null; // the shadow's map, also used to pick where the player wakes up after fainting
   const shadowView = createShadowView((origin, dir, far) => walk.castWall(origin, dir, far));
   scene.add(shadowView.object);
   const shadowSound = audio.shadow();
@@ -246,7 +253,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       }
       walk.load(gltf.scene, loadedProps?.colliders);
       try {
-        const nav = NavGrid.fromData((await (await fetch(NAV_URL)).json()) as NavData);
+        nav = NavGrid.fromData((await (await fetch(NAV_URL)).json()) as NavData);
         const made = new Shadow(nav);
         made.director = shadowMode !== "off";
         if (shadowMode === "now") made.scheduleSpawn(3);
@@ -286,8 +293,45 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     return true;
   };
 
+  /** Puts the player somewhere new (a fail's respawn): standing, still, nothing hunting. */
+  const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
+    hiding.reset();
+    floor = toFloor;
+    player.set(x, toFloor * FLOOR_HEIGHT, -y);
+    yaw = toYaw;
+    pitch = 0;
+    walk.fallSpeed = 0;
+    velocity.set(0, 0);
+    eyeY = NaN;
+    atrium.reset(x, y); // no checkpoint from being put here
+    shadow?.reset(40);
+  };
+  /** Runs while the screen is black after a fail. */
+  const relocate = () => {
+    if (fail.reason === "caught") {
+      // back to the last checkpoint, or to the start if there is none yet; a full reset like a load
+      if (!restore("checkpoint")) {
+        placePlayer(0, SPAWNS[0].x, SPAWNS[0].y, 0);
+        sanity.set(1);
+        sanity.snap();
+        charge = 1;
+      }
+    } else {
+      // fainted: awake somewhere else in the mall, nothing is lost, a little shaken
+      const spot = nav ? pickWakeSpot(nav, floor, player.x, -player.z, Math.random) : null;
+      if (spot) placePlayer(spot.floor, spot.x, spot.y, Math.random() * Math.PI * 2);
+      else placePlayer(floor, SPAWNS[floor].x, SPAWNS[floor].y, 0);
+      sanity.set(FAIL.FAINT_SANITY);
+      sanity.snap();
+      charge = 1;
+    }
+    flashOn = false;
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
+    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
+    if (fail.locked) return; // going down or black: nothing else works
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
       else if (charge >= FLASH_MIN_ON) flashOn = true;
@@ -385,8 +429,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     crouch = pose ? pose.crouch : 0;
     if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
-    const forward = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-    const strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+    const forward = fail.locked ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+    const strafe = fail.locked ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
     const running = moving && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
     let targetX = 0;
@@ -419,14 +463,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     charge = flashOn ? (exploration ? 1 : Math.max(0, charge - FLASH_DRAIN * dt)) : Math.min(1, charge + FLASH_RECHARGE * dt);
     if (charge === 0) flashOn = false;
-    if (shadow && dt > 0) {
+    if (fail.update(dt) === "move") relocate();
+    blackout.style.opacity = String(fail.fade);
+    if (shadow && dt > 0 && !fail.locked) {
       const sense = playerSense();
       for (const ev of shadow.update(dt, sense)) {
         if (ev === "noticed") {
           audio.sting();
           sanity.drain(0.05);
         }
-        if (ev === "caught") options.onNotice?.("caught"); // the fail-states card turns this into a restart
+        if (ev === "caught" && fail.trigger("caught")) options.onNotice?.("caught");
       }
       // Seeing it drains sanity, more while it hunts. The player's heading in plan coordinates is (-sin yaw, cos yaw).
       const seen = shadow.visibleTo(sense, -Math.sin(yaw), Math.cos(yaw));
@@ -436,6 +482,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     if (shadow) shadowView.update(shadow, now / 1000, camera);
     sanity.update(dt, flashOn ? 1 : 0);
+    if (sanity.level <= 0 && dt > 0) fail.trigger("faint"); // out of sanity anywhere: faint (ignored while a fail is already under way)
     doors.tempo = sanity.shift;
     post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
@@ -511,6 +558,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       renderer.dispose();
       renderer.domElement.remove();
       stats?.remove();
+      blackout.remove();
     },
   };
 }

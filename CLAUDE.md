@@ -117,7 +117,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **No combat and no health.** The player fails by being caught by the shadow. To avoid this, the player must stay quiet, hidden, and out of sight, with the flashlight off.
 - **The shadow is the only threat that can catch the player.** The girl in white never chases, and the watchers drain sanity but never catch the player.
 - **Being caught restarts the player at the last checkpoint** (see "Save, load, and checkpoints").
-- **Other failure:** sanity running out in the garage wakes the player elsewhere in the mall (not a restart).
+- **Other failure (decided):** sanity running out, anywhere (the mall or the garage), makes the player faint and wake at a random spot elsewhere in the mall, with some sanity back (not a restart).
 
 ## Winning
 
