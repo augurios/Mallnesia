@@ -187,7 +187,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       options.onNotice?.("doorLocked");
     },
   });
-  const shadowView = createShadowView();
+  const shadowView = createShadowView((origin, dir, far) => walk.castWall(origin, dir, far));
   scene.add(shadowView.object);
   const shadowSound = audio.shadow();
   const shadowMode = params.get("shadow"); // debug: ?shadow=off (it never comes), ?shadow=now (it comes within seconds)
