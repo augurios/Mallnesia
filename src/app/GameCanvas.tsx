@@ -17,6 +17,9 @@ export default function GameCanvas() {
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
+  // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
+  const hold = typeof window !== "undefined" ? parseFloat(new URLSearchParams(window.location.search).get("loading") ?? "") : NaN;
+  const [load, setLoad] = useState<{ progress: number; ready: boolean; error: boolean }>({ progress: 0, ready: false, error: false });
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [savedTimes, setSavedTimes] = useState<{ manual: number | null; checkpoint: number | null }>({ manual: null, checkpoint: null });
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,6 +34,7 @@ export default function GameCanvas() {
       },
       onStatus: setStatus,
       onSubtitle: setSubtitle,
+      onLoad: setLoad,
       onNotice: (key) => {
         setNotice(es[key]);
         if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -91,7 +95,27 @@ export default function GameCanvas() {
       {locked && subtitle && <div className="game-subtitle">{subtitle}</div>}
       {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}
       {locked && !status?.prompt && notice && <div className="game-prompt">{notice}</div>}
-      {!locked && (
+      {(!load.ready || Number.isFinite(hold)) && (
+        <div className="game-loading" role="status" aria-live="polite">
+          <div>
+            {load.error ? (
+              <>
+                <p>{es.loadError}</p>
+                <button onClick={() => window.location.reload()}>{es.reload}</button>
+              </>
+            ) : (
+              <>
+                <p>{es.loading}</p>
+                <div className="game-loading-bar" aria-hidden="true">
+                  <div className="game-loading-fill" style={{ width: `${Math.round((Number.isFinite(hold) ? hold : load.progress) * 100)}%` }} />
+                </div>
+                <p className="game-loading-percent">{Math.round((Number.isFinite(hold) ? hold : load.progress) * 100)}%</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {!locked && load.ready && (
         <div className="game-hint" onClick={() => runtimeRef.current?.requestLock()}>
           <div>
             <h1>{started ? es.paused : es.clickToPlay}</h1>

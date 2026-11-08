@@ -65,7 +65,7 @@ function worldCollider(src: THREE.BufferGeometry, m: THREE.Matrix4): THREE.Buffe
 }
 const COLLIDER_MATERIAL = "barrier";
 
-export async function buildProps(manifest: PropsManifest, loadPiece: (url: string) => Promise<THREE.Object3D>): Promise<Props> {
+export async function buildProps(manifest: PropsManifest, loadPiece: (url: string) => Promise<THREE.Object3D>, onProgress?: (done: number, total: number) => void): Promise<Props> {
   const group = new THREE.Group();
   group.name = "props";
   const colliders: THREE.BufferGeometry[] = [];
@@ -94,10 +94,13 @@ export async function buildProps(manifest: PropsManifest, loadPiece: (url: strin
     return out;
   };
 
+  const used = Object.keys(manifest.pieces).filter((name) => manifest.instances[name]?.length).length;
+  let loaded = 0;
   for (const [name, url] of Object.entries(manifest.pieces)) {
     const flat = manifest.instances[name];
     if (!flat?.length) continue;
     const root = await loadPiece(url);
+    onProgress?.(++loaded, used);
     const near: THREE.Mesh[] = [];
     const far: THREE.Mesh[] = [];
     const solid: THREE.Mesh[] = [];
@@ -176,8 +179,8 @@ export async function buildProps(manifest: PropsManifest, loadPiece: (url: strin
 }
 
 /** Fetches the manifest and builds the props, or returns null if there is no props file (a mall without props is fine). */
-export async function loadProps(manifestUrl: string, loadPiece: (url: string) => Promise<THREE.Object3D>): Promise<Props | null> {
+export async function loadProps(manifestUrl: string, loadPiece: (url: string) => Promise<THREE.Object3D>, onProgress?: (done: number, total: number) => void): Promise<Props | null> {
   const res = await fetch(manifestUrl);
   if (!res.ok) return null;
-  return buildProps((await res.json()) as PropsManifest, loadPiece);
+  return buildProps((await res.json()) as PropsManifest, loadPiece, onProgress);
 }
