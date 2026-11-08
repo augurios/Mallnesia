@@ -230,6 +230,34 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const shadowMode = params.get("shadow"); // debug: ?shadow=off (it never comes), ?shadow=now (it comes within seconds)
   doors.auto = params.get("doors") !== "off"; // debug: ?doors=off stops the mall moving doors by itself
 
+  // Shader warm-up (card "Compile shaders at load time"): three.js builds a material's program the first time it is
+  // drawn, which can freeze a frame mid-game (the first frame the shadow, the guard or a fallen chair shows up).
+  // After loading, everything that can ever appear is made visible once and compiled, then hidden again, and the
+  // post-processing passes render one frame. ?precompile=off skips it (to compare); ?stats=1 shows how long it took.
+  let warmMs = -1;
+  let worstNow = 0; // ms
+  let worstShown = 0;
+  let worstSince = performance.now();
+  const warmUp = async () => {
+    if (params.get("precompile") === "off") return;
+    const t0 = performance.now();
+    const asleep = [shadowView.object, guardView.object].filter((o) => !o.visible);
+    asleep.forEach((o) => (o.visible = true));
+    // A loose chair and a bin of each kind: they are plain meshes, a different shader variant from the instanced kit pieces.
+    const mute = { onImpact: () => {}, onScrape: () => {}, walkable: () => true };
+    noiseWorld?.spawn("chair_tip", { x: 0, y: 0, heading: 0 }, 0, mute, () => true);
+    noiseWorld?.spawn("bin_tip", { x: 0, y: 0, heading: 0 }, 0, mute, () => true);
+    try {
+      await renderer.compileAsync(scene, camera);
+    } catch (err) {
+      console.error("Shader warm-up failed", err);
+    }
+    noiseWorld?.clear();
+    asleep.forEach((o) => (o.visible = false));
+    post.render(0); // bloom and film compile on their first render
+    warmMs = performance.now() - t0;
+  };
+
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   void (async () => {
     try {
@@ -303,6 +331,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       } catch (err) {
         console.error("Could not load the navigation data; there will be no shadow", err);
       }
+      await warmUp();
     } catch (err) {
       console.error("Could not load the mall blockout", err);
     }
@@ -476,6 +505,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     frame = requestAnimationFrame(tick);
     const now = performance.now();
     const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
+    if (stats) {
+      // the longest frame in each 5 s window, shown with ?stats=1 (a stutter shows up here even when the average is fine)
+      worstNow = Math.max(worstNow, now - last);
+      if (now - worstSince > 5000) {
+        worstShown = worstNow;
+        worstNow = 0;
+        worstSince = now;
+      }
+    }
     last = now;
 
     // Hiding takes the player over: the pose of the crawl (or of the hidden player's turned head) replaces walking.
@@ -606,7 +644,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
     post.render(now / 1000);
-    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · cordura ${sanity.level.toFixed(2)}${shadow ? ` · sombra ${shadow.state} ${shadow.awareness.toFixed(2)}` : ""}`;
+    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · cordura ${sanity.level.toFixed(2)} · peor cuadro ${worstShown.toFixed(0)} ms · precarga ${warmMs < 0 ? "-" : warmMs.toFixed(0) + " ms"}${shadow ? ` · sombra ${shadow.state} ${shadow.awareness.toFixed(2)}` : ""}`;
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
