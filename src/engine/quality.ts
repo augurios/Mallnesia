@@ -26,21 +26,39 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   high: { maxPixelRatio: 2, fogFar: 70, torchDistance: 40, lodDistance: 12, detail: true, bloom: true, film: true },
 };
 
-const STORAGE_KEY = "elmallvivo.quality";
+const STORAGE_KEY = "elmallvivo.quality"; // the player's own choice from the pause menu: always wins
+const AUTO_KEY = "elmallvivo.quality.auto"; // where the game settled by itself (auto-quality.ts), used on the next visit
 
 export function isQualityLevel(value: unknown): value is QualityLevel {
   return typeof value === "string" && (QUALITY_LEVELS as string[]).includes(value);
 }
 
-/** Saved choice, or "high". Storage may be blocked, so every access is guarded. */
-export function loadQuality(): QualityLevel {
+function read(key: string): QualityLevel | null {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
+    const saved = window.localStorage.getItem(key);
     if (isQualityLevel(saved)) return saved;
   } catch {
-    // storage blocked: fall through to the default
+    // storage blocked: no saved choice
   }
-  return "high";
+  return null;
+}
+
+/** The player's own saved choice, or null if they never picked one. Storage may be blocked, so every access is guarded. */
+export function loadQuality(): QualityLevel | null {
+  return read(STORAGE_KEY);
+}
+
+/** Where the automatic preset settled last time, or null. */
+export function loadAutoQuality(): QualityLevel | null {
+  return read(AUTO_KEY);
+}
+
+export function saveAutoQuality(level: QualityLevel) {
+  try {
+    window.localStorage.setItem(AUTO_KEY, level);
+  } catch {
+    // storage blocked: the game just works it out again next visit
+  }
 }
 
 export function saveQuality(level: QualityLevel) {

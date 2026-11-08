@@ -30,6 +30,7 @@ export const es = {
   paused: "Pausa",
   resume: "Continuar",
   quality: "Calidad gráfica",
+  qualityLowered: "El juego iba lento: calidad gráfica bajada a",
   qualityLevels: { low: "Baja", medium: "Media", high: "Alta" },
   sensitivity: "Sensibilidad del ratón",
   cameraMotion: "Movimiento de cámara",
