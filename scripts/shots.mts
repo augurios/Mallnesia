@@ -49,6 +49,10 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "shadow_near", floor: 2, x: 60, y: 33, yaw: 180, pitch: 2, extra: "&shadow=off&shadowat=60,26&ambient=4" },
   { name: "shadow_far", floor: 2, x: 60, y: 33, yaw: 180, pitch: 2, extra: "&shadow=off&shadowat=60,12" },
   { name: "shadow_dark_near", floor: 2, x: 60, y: 33, yaw: 180, pitch: 2, extra: "&shadow=off&shadowat=62,27&ambient=0.6" },
+  // hidden under a food court table (?hide=1 starts inside the first spot on the floor), looking out
+  { name: "hidden_under_table", floor: 2, x: 60, y: 10, yaw: 0, pitch: 0, extra: "&hide=1&shadow=off&ambient=3" },
+  { name: "hidden_look_up", floor: 2, x: 60, y: 10, yaw: 0, pitch: 55, extra: "&hide=1&shadow=off&ambient=30" },
+  { name: "hide_table_outside", floor: 2, x: 63.4, y: 5.2, yaw: 0, pitch: -12, extra: "&shadow=off&ambient=30" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

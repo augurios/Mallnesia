@@ -18,6 +18,8 @@ export interface Props {
   group: THREE.Group;
   /** The colliders of every instance, in world space, positions only. */
   colliders: THREE.BufferGeometry[];
+  /** Where every piece stands: per piece, flat groups of [x, height, -y, yaw] (the manifest's own numbers). */
+  instances: Record<string, number[]>;
   /** Picks near, far or not drawn for every instance, for this camera (its matrices up to date). Meters. */
   update(camera: THREE.Camera, lodDistance: number, drawDistance: number): void;
 }
@@ -170,7 +172,7 @@ export async function buildProps(manifest: PropsManifest, loadPiece: (url: strin
       if (b.far) finish(b.far);
     }
   };
-  return { group, colliders, update };
+  return { group, colliders, instances: manifest.instances, update };
 }
 
 /** Fetches the manifest and builds the props, or returns null if there is no props file (a mall without props is fine). */

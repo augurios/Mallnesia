@@ -86,8 +86,8 @@ export default function GameCanvas() {
           />
         </div>
       )}
-      {locked && status?.canInteract && <div className="game-prompt">{notice ?? es.interact}</div>}
-      {locked && !status?.canInteract && notice && <div className="game-prompt">{notice}</div>}
+      {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}
+      {locked && !status?.prompt && notice && <div className="game-prompt">{notice}</div>}
       {!locked && (
         <div className="game-hint" onClick={() => runtimeRef.current?.requestLock()}>
           <div>
