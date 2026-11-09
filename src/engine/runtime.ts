@@ -10,6 +10,8 @@ import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
 import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
+import { NoiseDirector, pickNoiseSpot } from "./night-noise";
+import { createNoiseWorld, type NoiseWorld } from "./noise-view";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
 import { Sanity, stillLook } from "./sanity";
@@ -207,6 +209,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     },
   });
   const hiding = new Hiding();
+  // Night noises: chairs and bins that tip over or scrape when the player is not looking (night-noise.ts).
+  // ?noise=off stops them, ?noise=now brings the first one in 3 s, key N makes one now.
+  const noiseMode = params.get("noise");
+  const noiseDirector = new NoiseDirector();
+  noiseDirector.enabled = noiseMode !== "off";
+  if (noiseMode === "now") noiseDirector.soon(3);
+  let noiseWorld: NoiseWorld | null = null;
   const guardView = createGuardView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
   scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
   // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
@@ -269,6 +278,20 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         props = loadedProps;
       }
       doors.load(gltf.scene);
+      const piece = (name: string) => loader.loadAsync(`./models/kit/${name}.glb`).then((g) => g.scene).catch(() => null); // optional: no model, no event of that kind
+      const [chairPiece, binPiece] = await Promise.all([piece("chair_loose"), piece("trash_bin")]);
+      noiseWorld = createNoiseWorld({ chair: chairPiece, bin: binPiece });
+      scene.add(noiseWorld.object);
+      styleBlockout(noiseWorld.object, QUALITY_PRESETS[quality].detail);
+      if (params.get("noiserest") === "1") {
+        // debug (screenshots, where time stands still): a chair tipped back, a bin on its side and a slid chair, already at rest 2 to 4 m ahead
+        const ahead = (d: number, side: number) => ({ x: player.x + -Math.sin(yaw) * d + Math.cos(yaw) * side, y: -player.z + Math.cos(yaw) * d + Math.sin(yaw) * side });
+        const mute = { onImpact: () => {}, onScrape: () => {}, walkable: () => true };
+        noiseWorld.spawn("chair_tip", { ...ahead(2.5, -0.8), heading: yawToHeading(yaw) + 0.5 }, floor, mute, () => true);
+        noiseWorld.spawn("bin_tip", { ...ahead(3.5, 0.9), heading: yawToHeading(yaw) - 0.8 }, floor, mute, () => true);
+        noiseWorld.spawn("chair_slide", { ...ahead(4.2, -0.2), heading: yawToHeading(yaw) + 2.4 }, floor, mute, () => true);
+        for (let i = 0; i < 300; i++) noiseWorld.update(1 / 60, mute);
+      }
       if (loadedProps) hiding.spots = spotsFromProps(loadedProps.instances, FLOOR_HEIGHT);
       if (params.get("hide") === "1") {
         // debug: ?hide=1 starts already hidden in the first spot on the starting floor (for screenshots, where time stands still)
@@ -330,6 +353,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     return true;
   };
 
+  /** Whether the player cannot see the plan point right now: outside the camera's view, or behind a wall. */
+  const unseen = (x: number, y: number, f: number) =>
+    f !== floor || !nav || !nav.sees(floor, player.x, -player.z, x, y) || !frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(x, f * FLOOR_HEIGHT + 0.5, -y), 1.2));
+  const noiseHooks = {
+    onImpact: (x: number, y: number, z: number, strength: number) => audio.clatter(x, y, z, strength),
+    onScrape: (x: number, y: number, z: number, seconds: number) => audio.scrape(x, y, z, seconds),
+    walkable: (f: number, x: number, y: number) => nav?.walkable(f, x, y) ?? false,
+  };
+  /** One night noise, now, out of the player's sight. False if there was nowhere to put it. */
+  const fireNoise = (): boolean => {
+    if (!noiseWorld || !nav) return false;
+    const spot = pickNoiseSpot(nav, props?.instances.table_set ?? [], FLOOR_HEIGHT, floor, player.x, -player.z, (x, y) => unseen(x, y, floor), Math.random);
+    return spot ? noiseWorld.spawn(noiseDirector.pick(), spot, floor, noiseHooks, unseen) : false;
+  };
+
   /** Puts the player somewhere new (a fail's respawn): standing, still, nothing hunting. */
   const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
     hiding.reset();
@@ -370,6 +408,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
+    if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
     if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
     if (fail.locked) return; // going down or black: nothing else works
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
@@ -563,7 +602,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     camera.updateMatrixWorld();
     sky.follow(camera.position);
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    // Night noises: the timer, and the motion of whatever has fallen.
+    if (noiseWorld) {
+      if (dt > 0 && !fail.locked && noiseDirector.update(dt, sanity.shift)) fireNoise();
+      noiseWorld.update(dt, noiseHooks);
+    }
     // The guard's opening scene (started at the top of the frame, so the player is frozen from the first one).
+    if (opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
+      const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
+      opening = "playing";
+      if (spot) {
+        guardAt.x = spot.x;
+        guardAt.y = spot.y;
+        guardScene = new GuardScene([...es.guardOpening]);
+      }
+    }
     if (guardScene && !guardScene.done) {
       const px = player.x;
       const py = -player.z;
@@ -655,6 +708,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       stats?.remove();
       blackout.remove();
       guardView.dispose();
+      noiseWorld?.dispose();
     },
   };
 }

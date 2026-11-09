@@ -326,7 +326,18 @@ function trayStand(): Piece {
   return piece;
 }
 
+// ---- the loose chair ------------------------------------------------------------------------------------
+
+/** One of the food court's chairs on its own, for the night-noise events (src/engine/night-noise.ts): it is never
+ *  placed by docs/floorplans/props.json; the game loads it and tips it over, slides it, leaves it lying. Faces +x. */
+function chairLoose(): Piece {
+  const piece: Piece = { parts: {}, collider: { hx: 0.25, hz: 0.25, h: 0.9 }, radius: 0.5 };
+  chair(piece, 0, 0, 0);
+  return piece;
+}
+
 export const PIECES: Record<string, () => Piece> = {
+  chair_loose: chairLoose,
   table_set: tableSet,
   bench_red: bench,
   trash_bin: bin,
