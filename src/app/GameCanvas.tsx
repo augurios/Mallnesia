@@ -79,11 +79,20 @@ export default function GameCanvas() {
         </div>
       )}
       {status && (
-        <div className="game-flashlight" aria-label={es.flashlight}>
-          <div
-            className={status.flashlightOn ? "game-flashlight-fill on" : "game-flashlight-fill"}
-            style={{ width: `${Math.round(status.charge * 100)}%` }}
-          />
+        <div className="game-vitals">
+          <label className={status.sanity < 0.3 ? "critical" : undefined}>
+            {es.sanity}
+            <meter min={0} max={100} low={30} optimum={100} value={Math.round(status.sanity * 100)} />
+            <span>{Math.ceil(status.sanity * 100)}%</span>
+          </label>
+          <label className={status.exhausted ? "critical" : undefined}>
+            {es.stamina}
+            <meter min={0} max={100} low={30} optimum={100} value={Math.round(status.stamina * 100)} />
+          </label>
+          <label className={status.flashlightOn ? "lit" : undefined}>
+            {es.flashlight}
+            <meter min={0} max={100} low={15} optimum={100} value={Math.round(status.charge * 100)} />
+          </label>
         </div>
       )}
       {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}

@@ -11,6 +11,7 @@ import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
 import { Sanity, stillLook } from "./sanity";
+import { Stamina } from "./stamina";
 import { createSaveStore, emptyProgress, type SaveSlot } from "./save";
 import { Shadow, type PlayerSense } from "./shadow";
 import { createShadowView } from "./shadow-view";
@@ -27,6 +28,10 @@ export interface PlayerStatus {
   /** Flashlight charge, 0 to 1, and whether the light is on. */
   charge: number;
   flashlightOn: boolean;
+  /** Stamina, 0 to 1, and sanity, 0 to 1 (see stamina.ts and sanity.ts). */
+  stamina: number;
+  exhausted: boolean;
+  sanity: number;
   /** What E would do right now, if anything: use a door, crawl into a hiding spot, or crawl out of one. */
   prompt: "interact" | "hide" | "leave" | null;
 }
@@ -177,6 +182,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let bob = 0; // current head bob height, eased toward the target
 
   const sanity = new Sanity();
+  const stamina = new Stamina();
   const startSanity = parseFloat(params.get("sanity") ?? ""); // debug: ?sanity=<0 to 1> starts at that level
   if (Number.isFinite(startSanity)) {
     sanity.set(startSanity);
@@ -198,7 +204,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   blackout.style.cssText = "position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2";
   root.append(blackout);
   let nav: NavGrid | null = null; // the shadow's map, also used to pick where the player wakes up after fainting
-  const shadowView = createShadowView();
+  const shadowView = createShadowView((origin, dir, far) => walk.castWall(origin, dir, far));
   scene.add(shadowView.object);
   const shadowSound = audio.shadow();
   const shadowMode = params.get("shadow"); // debug: ?shadow=off (it never comes), ?shadow=now (it comes within seconds)
@@ -285,6 +291,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     progress.notesRead = [...saved.notesRead];
     progress.guard = saved.guard;
     progress.exits = [...saved.exits];
+    stamina.reset();
     sanity.set(1); // sanity and the flashlight charge are not saved: they start fresh
     sanity.snap();
     charge = 1;
@@ -314,6 +321,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         placePlayer(0, SPAWNS[0].x, SPAWNS[0].y, 0);
         sanity.set(1);
         sanity.snap();
+        stamina.reset();
         charge = 1;
       }
     } else {
@@ -321,6 +329,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const spot = nav ? pickWakeSpot(nav, floor, player.x, -player.z, Math.random) : null;
       if (spot) placePlayer(spot.floor, spot.x, spot.y, Math.random() * Math.PI * 2);
       else placePlayer(floor, SPAWNS[floor].x, SPAWNS[floor].y, 0);
+      stamina.reset();
       sanity.set(FAIL.FAINT_SANITY);
       sanity.snap();
       charge = 1;
@@ -330,7 +339,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
-    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the garage's sanity-out will do this)
+    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
     if (fail.locked) return; // going down or black: nothing else works
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
@@ -432,7 +441,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const forward = fail.locked ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = fail.locked ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
-    const running = moving && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
+    const running = stamina.update(dt, moving && (keys.has("ShiftLeft") || keys.has("ShiftRight")));
     let targetX = 0;
     let targetZ = 0;
     if (moving) {
@@ -480,8 +489,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const level = shadow.state === "absent" ? 0 : Math.max(0, 1 - shadow.distanceTo(sense) / 45) * shadow.fade;
       shadowSound.update(shadow.x, floor * FLOOR_HEIGHT + 1.2, -shadow.y, level, shadow.hunting);
     }
-    if (shadow) shadowView.update(shadow, now / 1000);
+    if (shadow) shadowView.update(shadow, now / 1000, camera);
     sanity.update(dt, flashOn ? 1 : 0);
+    if (sanity.level <= 0 && dt > 0) fail.trigger("faint"); // out of sanity anywhere: faint (ignored while a fail is already under way)
     doors.tempo = sanity.shift;
     post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
@@ -510,7 +520,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (++statusTimer >= 10) {
       statusTimer = 1;
       const prompt = hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
-      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, prompt });
+      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, stamina: stamina.level, exhausted: stamina.exhausted, sanity: sanity.level, prompt });
     }
   };
   tick();

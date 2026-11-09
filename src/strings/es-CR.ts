@@ -22,6 +22,8 @@ export const es = {
   savedAt: "Guardada",
   floor: "Piso",
   flashlight: "Linterna",
+  stamina: "Aguante",
+  sanity: "Cordura",
   paused: "Pausa",
   resume: "Continuar",
   quality: "Calidad gráfica",
