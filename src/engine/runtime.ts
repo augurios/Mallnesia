@@ -8,13 +8,14 @@ import { Doors } from "./doors";
 import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
-import { Hiding, HIDING, spotsFromProps, yawToHeading } from "./hiding";
+import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
 import { NoiseDirector, pickNoiseSpot } from "./night-noise";
 import { createNoiseWorld, type NoiseWorld } from "./noise-view";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
 import { Sanity, stillLook } from "./sanity";
+import { Stamina } from "./stamina";
 import { createSaveStore, emptyProgress, type SaveSlot } from "./save";
 import { Shadow, type PlayerSense } from "./shadow";
 import { createShadowView } from "./shadow-view";
@@ -32,6 +33,10 @@ export interface PlayerStatus {
   /** Flashlight charge, 0 to 1, and whether the light is on. */
   charge: number;
   flashlightOn: boolean;
+  /** Stamina, 0 to 1, and sanity, 0 to 1 (see stamina.ts and sanity.ts). */
+  stamina: number;
+  exhausted: boolean;
+  sanity: number;
   /** What E would do right now, if anything: use a door, crawl into a hiding spot, or crawl out of one. */
   prompt: "interact" | "hide" | "leave" | null;
 }
@@ -43,6 +48,8 @@ export interface RuntimeOptions {
   onNotice?: (notice: "doorLocked" | "checkpoint" | "caught") => void;
   /** A line of speech to show as a subtitle (the guard), or null to clear it. */
   onSubtitle?: (text: string | null) => void;
+  /** A controls tip to show (after the guard's opening), or null to clear it. */
+  onTip?: (tip: "move" | "flashlight" | null) => void;
 }
 
 export interface Runtime {
@@ -81,6 +88,8 @@ const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
 const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
 const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
+const TIP_TIME = 14000; // how long the flashlight tip stays up if the player does not use it (ms)
+const LOCK_TURN = 4; // how fast the camera turns to the guard during the opening (1/s)
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 const AO_URL = "./models/ao.png";
@@ -179,11 +188,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const hunted = () => (shadow?.hunting ?? false) || fail.state !== "playing"; // manual saves are refused while it hunts, and during a fail
   const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
-  let flashOn = true;
+  let flashOn = false; // the game starts with the flashlight off
   let crouch = 0; // 0 standing, 1 fully hidden: lowers the eye
   let bob = 0; // current head bob height, eased toward the target
 
   const sanity = new Sanity();
+  const stamina = new Stamina();
   const startSanity = parseFloat(params.get("sanity") ?? ""); // debug: ?sanity=<0 to 1> starts at that level
   if (Number.isFinite(startSanity)) {
     sanity.set(startSanity);
@@ -206,7 +216,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   noiseDirector.enabled = noiseMode !== "off";
   if (noiseMode === "now") noiseDirector.soon(3);
   let noiseWorld: NoiseWorld | null = null;
-  const guardView = createGuardView();
+  const guardView = createGuardView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
   scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
   // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
   // game that has already met him; ?guard=now plays it from wherever the game starts.
@@ -215,6 +225,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let guardScene: GuardScene | null = null;
   const guardAt = { x: 0, y: 0 };
   let guardLine: number | null = null;
+  let tip: "move" | "flashlight" | null = null; // the controls tip being shown after the opening
+  let tipAt = 0;
+  const setTip = (next: typeof tip, at: number) => {
+    tip = next;
+    tipAt = at;
+    options.onTip?.(next);
+  };
   const frustum = new THREE.Frustum();
   const guardSphere = new THREE.Sphere();
   const guardPoint = new THREE.Vector3();
@@ -224,7 +241,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   blackout.style.cssText = "position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2";
   root.append(blackout);
   let nav: NavGrid | null = null; // the shadow's map, also used to pick where the player wakes up after fainting
-  const shadowView = createShadowView();
+  const shadowView = createShadowView((origin, dir, far) => walk.castWall(origin, dir, far));
   scene.add(shadowView.object);
   const shadowSound = audio.shadow();
   const shadowMode = params.get("shadow"); // debug: ?shadow=off (it never comes), ?shadow=now (it comes within seconds)
@@ -327,6 +344,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     progress.notesRead = [...saved.notesRead];
     progress.guard = saved.guard;
     progress.exits = [...saved.exits];
+    stamina.reset();
     sanity.set(1); // sanity and the flashlight charge are not saved: they start fresh
     sanity.snap();
     charge = 1;
@@ -372,6 +390,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         placePlayer(0, SPAWNS[0].x, SPAWNS[0].y, 0);
         sanity.set(1);
         sanity.snap();
+        stamina.reset();
         charge = 1;
       }
     } else {
@@ -379,6 +398,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const spot = nav ? pickWakeSpot(nav, floor, player.x, -player.z, Math.random) : null;
       if (spot) placePlayer(spot.floor, spot.x, spot.y, Math.random() * Math.PI * 2);
       else placePlayer(floor, SPAWNS[floor].x, SPAWNS[floor].y, 0);
+      stamina.reset();
       sanity.set(FAIL.FAINT_SANITY);
       sanity.snap();
       charge = 1;
@@ -389,7 +409,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
-    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the garage's sanity-out will do this)
+    if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
     if (fail.locked) return; // going down or black: nothing else works
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
@@ -434,7 +454,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
   let skipMouse = true; // the first event after locking can carry the jump of the cursor being recentred
   const onMouseMove = (e: MouseEvent) => {
-    if (!locked) return;
+    if (!locked || guardScene?.controlLocked) return; // the opening holds the camera on the guard
     if (skipMouse) {
       skipMouse = false;
       return;
@@ -478,6 +498,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
     last = now;
 
+    // The guard's opening scene: created at the top of the frame, so the player is frozen from the very first one.
+    if (opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
+      const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
+      opening = "playing";
+      if (spot) {
+        guardAt.x = spot.x;
+        guardAt.y = spot.y;
+        guardScene = new GuardScene([...es.guardOpening]);
+      }
+    }
     // Hiding takes the player over: the pose of the crawl (or of the hidden player's turned head) replaces walking.
     const pose = hiding.update(dt, yaw);
     if (pose) {
@@ -490,10 +520,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     crouch = pose ? pose.crouch : 0;
     if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
-    const forward = fail.locked ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-    const strafe = fail.locked ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+    const frozen = fail.locked || (guardScene?.controlLocked ?? false);
+    const forward = frozen ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+    const strafe = frozen ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
-    const running = moving && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
+    const running = stamina.update(dt, moving && (keys.has("ShiftLeft") || keys.has("ShiftRight")));
     let targetX = 0;
     let targetZ = 0;
     if (moving) {
@@ -541,8 +572,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const level = shadow.state === "absent" ? 0 : Math.max(0, 1 - shadow.distanceTo(sense) / 45) * shadow.fade;
       shadowSound.update(shadow.x, floor * FLOOR_HEIGHT + 1.2, -shadow.y, level, shadow.hunting);
     }
-    if (shadow) shadowView.update(shadow, now / 1000);
+    if (shadow) shadowView.update(shadow, now / 1000, camera);
     sanity.update(dt, flashOn ? 1 : 0);
+    if (sanity.level <= 0 && dt > 0) fail.trigger("faint"); // out of sanity anywhere: faint (ignored while a fail is already under way)
     doors.tempo = sanity.shift;
     post.setLook(view.motion ? sanity.look : stillLook(sanity.look)); // the moving tiers respect the camera motion setting
     torch.intensity = flashOn ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
@@ -551,6 +583,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     // Camera effects: a small head bob that fades with speed, and a slight widening while running.
     const bobTarget = view.motion && moving && walk.fallSpeed === 0 ? (running ? BOB_RUN : BOB_WALK) : 0;
     bob += (bobTarget - bob) * (1 - Math.exp(-BOB_EASE * dt));
+    // The opening holds the camera on the guard: it turns to him smoothly and stays on his chest and face.
+    if (guardScene?.controlLocked) {
+      const toGuard = Math.atan2(guardAt.y - -player.z, guardAt.x - player.x); // plan heading to him
+      const wantYaw = headingToYaw(toGuard);
+      const wantPitch = Math.atan2(1.5 - EYE_HEIGHT, Math.max(0.5, Math.hypot(guardAt.x - player.x, guardAt.y + player.z))); // his face, a little below the eye
+      const turn = 1 - Math.exp(-LOCK_TURN * dt);
+      yaw += Math.atan2(Math.sin(wantYaw - yaw), Math.cos(wantYaw - yaw)) * turn;
+      pitch += (wantPitch - pitch) * turn;
+    }
     camera.position.set(player.x, eyeY + EYE_HEIGHT - crouch * (EYE_HEIGHT - HIDING.HIDDEN_EYE) + Math.sin(walked * BOB_FREQ) * bob, player.z);
     camera.rotation.set(pitch, yaw, 0);
     const fovTarget = view.motion && running && velocity.lengthSq() > WALK_SPEED * WALK_SPEED ? baseFov + RUN_FOV - FOV : baseFov;
@@ -566,7 +607,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (dt > 0 && !fail.locked && noiseDirector.update(dt, sanity.shift)) fireNoise();
       noiseWorld.update(dt, noiseHooks);
     }
-    // The guard's opening scene.
+    // The guard's opening scene (started at the top of the frame, so the player is frozen from the first one).
     if (opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
       const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
       opening = "playing";
@@ -579,28 +620,35 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (guardScene && !guardScene.done) {
       const px = player.x;
       const py = -player.z;
+      const toPlayer = Math.atan2(py - guardAt.y, px - guardAt.x); // plan heading from the guard to the player
+      const distance = Math.hypot(px - guardAt.x, py - guardAt.y);
       const visible = frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(guardAt.x, floor * FLOOR_HEIGHT + 0.95, -guardAt.y), 0.7)) && nav !== null && nav.sees(floor, px, py, guardAt.x, guardAt.y);
-      const facingAway = Math.atan2(guardAt.y - py, guardAt.x - px);
-      if (guardScene.walking && dt > 0) {
-        const nx = guardAt.x + Math.cos(facingAway) * GUARD_SCENE.WALK_SPEED * dt;
-        const ny = guardAt.y + Math.sin(facingAway) * GUARD_SCENE.WALK_SPEED * dt;
+      if (guardScene.approaching && dt > 0) {
+        const dir = toPlayer;
+        const nx = guardAt.x + Math.cos(dir) * GUARD_SCENE.WALK_SPEED * dt;
+        const ny = guardAt.y + Math.sin(dir) * GUARD_SCENE.WALK_SPEED * dt;
         if (nav?.walkable(floor, nx, ny)) {
           guardAt.x = nx;
           guardAt.y = ny;
-        } else guardScene.finish(); // blocked: he is gone around the corner
+        } else guardScene.stop(); // blocked on the way: he talks from where he is
       }
-      if (dt > 0) guardScene.update(dt, visible);
+      if (dt > 0) guardScene.update(dt, distance, visible);
       if (guardScene.line !== guardLine) {
         guardLine = guardScene.line;
         options.onSubtitle?.(guardLine === null ? null : es.guardOpening[guardLine]);
       }
-      guardView.update(guardAt.x, guardAt.y, floor, guardScene.walking ? facingAway : facingAway + Math.PI, !guardScene.done, guardScene.walking, now / 1000);
+      // Once he has spoken and the player is free: how to move. Once he is gone: the flashlight.
+      if (guardScene.phase === "lingering" && tip === null && progress.guard === 0) setTip("move", now);
+      // He faces the player while he comes up, talks, and stays.
+      guardView.update(guardAt.x, guardAt.y, floor, toPlayer, !guardScene.done, guardScene.approaching ? "walk" : guardScene.line !== null ? "talk" : "idle", now / 1000);
       if (guardScene.done) {
-        guardView.update(0, 0, floor, 0, false, false, 0);
+        guardView.update(0, 0, floor, 0, false, "idle", 0);
         options.onSubtitle?.(null);
+        if (tip === "move") setTip("flashlight", now);
         if (progress.guard === 0) progress.guard = 1; // the opening has been seen
       }
     }
+    if (tip === "flashlight" && (flashOn || now - tipAt > TIP_TIME)) setTip(null, now); // used, or shown long enough
     const preset = QUALITY_PRESETS[quality];
     props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
@@ -611,7 +659,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (++statusTimer >= 10) {
       statusTimer = 1;
       const prompt = hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
-      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, prompt });
+      options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, stamina: stamina.level, exhausted: stamina.exhausted, sanity: sanity.level, prompt });
     }
   };
   tick();
