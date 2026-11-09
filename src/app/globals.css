@@ -57,6 +57,28 @@ body {
   transition: width 0.2s ease-out;
 }
 
+.game-loading-wait {
+  width: 30%;
+  animation: game-loading-wait 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes game-loading-wait {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(233%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-loading-wait {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+
 .game-loading-percent {
   font-size: 13px;
   color: #8a8575;
