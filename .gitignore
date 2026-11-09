@@ -50,3 +50,4 @@ next-env.d.ts
 /public/models/nav.json
 /public/models/kit/
 /backrooms-main
+.DS_Store
