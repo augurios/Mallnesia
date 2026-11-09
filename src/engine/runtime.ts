@@ -207,7 +207,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     },
   });
   const hiding = new Hiding();
-  const guardView = createGuardView();
+  const guardView = createGuardView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
   scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
   // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
   // game that has already met him; ?guard=now plays it from wherever the game starts.
@@ -587,9 +587,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       // Once he has spoken and the player is free: how to move. Once he is gone: the flashlight.
       if (guardScene.phase === "lingering" && tip === null && progress.guard === 0) setTip("move", now);
       // He faces the player while he comes up, talks, and stays.
-      guardView.update(guardAt.x, guardAt.y, floor, toPlayer, !guardScene.done, guardScene.approaching, now / 1000);
+      guardView.update(guardAt.x, guardAt.y, floor, toPlayer, !guardScene.done, guardScene.approaching ? "walk" : guardScene.line !== null ? "talk" : "idle", now / 1000);
       if (guardScene.done) {
-        guardView.update(0, 0, floor, 0, false, false, 0);
+        guardView.update(0, 0, floor, 0, false, "idle", 0);
         options.onSubtitle?.(null);
         if (tip === "move") setTip("flashlight", now);
         if (progress.guard === 0) progress.guard = 1; // the opening has been seen
