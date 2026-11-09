@@ -10,6 +10,7 @@ import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
 import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
+import { LoadProgress } from "./load-progress";
 import { NoiseDirector, pickNoiseSpot } from "./night-noise";
 import { createNoiseWorld, type NoiseWorld } from "./noise-view";
 import { createPost } from "./post";
@@ -50,6 +51,8 @@ export interface RuntimeOptions {
   onSubtitle?: (text: string | null) => void;
   /** A controls tip to show (after the guard's opening), or null to clear it. */
   onTip?: (tip: "move" | "flashlight" | null) => void;
+  /** Loading progress for the loading screen: 0 to 1, `ready` once everything is loaded and warmed up, `error` if the mall could not load. */
+  onLoad?: (state: { progress: number; ready: boolean; error: boolean }) => void;
 }
 
 export interface Runtime {
@@ -275,20 +278,54 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     warmMs = performance.now() - t0;
   };
 
+  // Loading progress (load-progress.ts): the weights are about each part's share of the wait (the mall is 1.2 MB, the kit
+  // pieces about 1 MB, the rest small, then the shader warm-up).
+  const load = new LoadProgress([
+    { name: "mall", weight: 5 },
+    { name: "props", weight: 4 },
+    { name: "ao", weight: 0.3 },
+    { name: "nav", weight: 0.3 },
+    { name: "extra", weight: 0.6 },
+    { name: "warm", weight: 2 },
+  ]);
+  let lastAnnounced = -1;
+  const announce = (error = false) => {
+    const progress = load.value;
+    if (!error && progress === lastAnnounced) return;
+    lastAnnounced = progress;
+    options.onLoad?.({ progress, ready: load.complete && !error, error });
+  };
+  const MALL_BYTES_GUESS = 1_300_000; // when the server does not say how long the file is
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  announce();
   void (async () => {
     try {
       // The props are optional: a missing or broken props file must not stop the mall from loading.
       const [gltf, loadedProps, ao] = await Promise.all([
-        loader.loadAsync(BLOCKOUT_URL),
-        loadProps(PROPS_URL, async (url) => (await loader.loadAsync(url)).scene).catch((err) => {
-          console.error("Could not load the props", err);
-          return null;
-        }),
-        new THREE.TextureLoader().loadAsync(AO_URL).catch((err) => {
-          console.error("Could not load the baked occlusion", err);
-          return null;
-        }),
+        loader.loadAsync(BLOCKOUT_URL, (e) => {
+          load.report("mall", e.loaded, e.lengthComputable && e.total > 0 ? e.total : MALL_BYTES_GUESS);
+          announce();
+        }).then((g) => (load.finish("mall"), announce(), g)),
+        loadProps(
+          PROPS_URL,
+          async (url) => (await loader.loadAsync(url)).scene,
+          (done, total) => {
+            load.report("props", done, total);
+            announce();
+          },
+        )
+          .catch((err) => {
+            console.error("Could not load the props", err);
+            return null;
+          })
+          .then((p) => (load.finish("props"), announce(), p)),
+        new THREE.TextureLoader()
+          .loadAsync(AO_URL)
+          .catch((err) => {
+            console.error("Could not load the baked occlusion", err);
+            return null;
+          })
+          .then((t) => (load.finish("ao"), announce(), t)),
       ]);
       setBakedAO(ao); // before the first styled frame: the shader samples it
       gltf.scene.traverse((o) => {
@@ -308,6 +345,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       doors.load(gltf.scene);
       const piece = (name: string) => loader.loadAsync(`./models/kit/${name}.glb`).then((g) => g.scene).catch(() => null); // optional: no model, no event of that kind
       const [chairPiece, binPiece] = await Promise.all([piece("chair_loose"), piece("trash_bin")]);
+      load.finish("extra");
+      announce();
       noiseWorld = createNoiseWorld({ chair: chairPiece, bin: binPiece });
       scene.add(noiseWorld.object);
       styleBlockout(noiseWorld.object, QUALITY_PRESETS[quality].detail);
@@ -348,9 +387,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       } catch (err) {
         console.error("Could not load the navigation data; there will be no shadow", err);
       }
+      load.finish("nav");
+      announce();
       await warmUp();
+      load.finish("warm");
+      announce();
     } catch (err) {
       console.error("Could not load the mall blockout", err);
+      announce(true);
     }
   })();
 

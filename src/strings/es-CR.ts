@@ -1,5 +1,8 @@
 // All UI and in-world text lives here (Costa Rican Spanish).
 export const es = {
+  loading: "Cargando el centro comercial…",
+  loadError: "No se pudo cargar el centro comercial. Revise su conexión y recargue la página.",
+  reload: "Recargar",
   clickToPlay: "Clic para jugar",
   controls: "WASD para moverse, Shift para correr, F para la linterna, E para interactuar, ratón para mirar, Esc para pausar",
   debugFloors: "1, 2, 3: saltar de piso (provisional)",

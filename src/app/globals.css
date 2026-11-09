@@ -31,6 +31,46 @@ body {
   cursor: pointer;
 }
 
+.game-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  background: #04060a;
+  color: #d8d2c0;
+}
+
+.game-loading-bar {
+  width: min(70vw, 360px);
+  height: 4px;
+  margin: 18px auto 8px;
+  background: #1a1f28;
+}
+
+.game-loading-fill {
+  height: 100%;
+  background: #8c8472;
+  transition: width 0.2s ease-out;
+}
+
+.game-loading-percent {
+  font-size: 13px;
+  color: #8a8575;
+}
+
+.game-loading button {
+  margin-top: 12px;
+  background: transparent;
+  color: #d8d2c0;
+  border: 1px solid #555;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
 .game-quality {
   display: flex;
   gap: 8px;
