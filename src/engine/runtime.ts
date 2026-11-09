@@ -23,7 +23,8 @@ import { createShadowView } from "./shadow-view";
 import { createSky } from "./sky";
 import { es } from "../strings/es-CR";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
-import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
+import { FrameGovernor, pickInitialQuality } from "./auto-quality";
+import { QUALITY_LEVELS, QUALITY_PRESETS, isQualityLevel, loadAutoQuality, loadQuality, saveAutoQuality, saveQuality, type QualityLevel } from "./quality";
 import { loadView, normalizeView, saveView, type ViewSettings } from "./view";
 
 export interface PlayerStatus {
@@ -52,6 +53,8 @@ export interface RuntimeOptions {
   /** A controls tip to show (after the guard's opening), or null to clear it. */
   onTip?: (tip: "move" | "flashlight" | null) => void;
   /** Loading progress for the loading screen: 0 to 1, `ready` once everything is loaded and warmed up, `error` if the mall could not load. */
+  /** The game lowered the graphics preset by itself because frames were slow. */
+  onQualityChange?: (level: QualityLevel) => void;
   onLoad?: (state: { progress: number; ready: boolean; error: boolean }) => void;
 }
 
@@ -150,7 +153,22 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const post = createPost(renderer, scene, camera);
   let blockout: THREE.Object3D | null = null;
   let props: Props | null = null;
-  let quality: QualityLevel = isQualityLevel(urlQuality) ? urlQuality : loadQuality();
+  // The preset: ?quality= (debug), else the player's own saved choice, else where the game settled last time, else a guess
+  // from the device. Only the last two are automatic: the governor then lowers the preset one level whenever frames
+  // run slow (never raises it), and a pause-menu choice turns that off. ?autoquality=off disables the governor.
+  const gl = renderer.getContext();
+  const gpuInfo = gl.getExtension("WEBGL_debug_renderer_info");
+  const nav2 = navigator as Navigator & { deviceMemory?: number };
+  const device = {
+    mobile: /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 820),
+    cores: navigator.hardwareConcurrency || 0,
+    memoryGB: nav2.deviceMemory ?? 0,
+    gpu: gpuInfo ? String(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL)) : "",
+  };
+  const chosen = loadQuality();
+  let autoQuality = !isQualityLevel(urlQuality) && chosen === null && params.get("autoquality") !== "off";
+  let quality: QualityLevel = isQualityLevel(urlQuality) ? urlQuality : (chosen ?? loadAutoQuality() ?? pickInitialQuality(device));
+  const governor = new FrameGovernor();
   const applyQuality = () => {
     const preset = QUALITY_PRESETS[quality];
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.maxPixelRatio));
@@ -569,6 +587,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     frame = requestAnimationFrame(tick);
     const now = performance.now();
     const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
+    if (autoQuality && locked && governor.update((now - last) / 1000, true) === "drop") {
+      const lower = QUALITY_LEVELS[QUALITY_LEVELS.indexOf(quality) - 1];
+      if (lower) {
+        quality = lower;
+        saveAutoQuality(quality);
+        applyQuality();
+        options.onQualityChange?.(quality);
+      } else autoQuality = false; // already on the lowest: nothing more to give
+    }
     if (stats) {
       // the longest frame in each 5 s window, shown with ?stats=1 (a stutter shows up here even when the average is fine)
       worstNow = Math.max(worstNow, now - last);
@@ -753,6 +780,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     },
     getQuality: () => quality,
     setQuality(level) {
+      autoQuality = false; // the player decided: the game stops adjusting it
       quality = level;
       saveQuality(level);
       applyQuality();

@@ -88,7 +88,7 @@ mkdirSync(SHOTS, { recursive: true });
 const only = process.env.ONLY?.split(","); // e.g. ONLY=ao_hall,chair_closeup: just those views
 for (const v of VIEWS) {
   if (only && !only.includes(v.name)) continue;
-  const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}${v.extra ?? ""}`;
+  const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}${v.extra?.includes("quality=") ? "" : "&quality=high"}${v.extra ?? ""}`; // pinned: headless Chrome has a software renderer, which the automatic preset would put on low
   const file = `${SHOTS}/${v.name}.png`;
   // Async, not spawnSync: the server above lives in this process and has to answer Chrome while it waits.
   const code = await new Promise<number | null>((done) => {

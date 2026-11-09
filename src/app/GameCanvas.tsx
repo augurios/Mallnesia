@@ -37,6 +37,12 @@ export default function GameCanvas() {
       onSubtitle: setSubtitle,
       onTip: setTip,
       onLoad: setLoad,
+      onQualityChange: (level) => {
+        setQuality(level);
+        setNotice(`${es.qualityLowered} ${es.qualityLevels[level]}`);
+        if (noticeTimer.current) clearTimeout(noticeTimer.current);
+        noticeTimer.current = setTimeout(() => setNotice(null), 3500);
+      },
       onNotice: (key) => {
         setNotice(es[key]);
         if (noticeTimer.current) clearTimeout(noticeTimer.current);
