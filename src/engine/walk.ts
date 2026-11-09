@@ -14,6 +14,14 @@ const SNAP_DOWN = 0.4; // and follows the ground down this far without falling
 const GRAVITY = 18;
 // Meshes of the blockout the player collides with. Keep in sync with COLLIDERS in scripts/blockout/config.ts.
 export const COLLIDERS = ["walls", "glass", "rails", "stairs", "elev", "column", "steel", "planter", "barrier"];
+/** The full-height ones among them, which things drawn near a wall (the shadow's fog) must not show through. */
+const FULL_WALLS = ["walls", "glass", "elev"];
+
+export interface WallHit {
+  point: THREE.Vector3;
+  /** The wall's face normal, turned back toward where the ray came from. */
+  normal: THREE.Vector3;
+}
 
 /** The material's name, not the node's: the loader makes node names unique (walls, walls_1, ...) for chunks. */
 const kindOf = (mesh: THREE.Mesh) => (mesh.material as THREE.Material).name;
@@ -24,6 +32,9 @@ export class Walk {
   private bvh: MeshBVH | null = null;
   /** Floor slabs and stair treads, raycast downward to find what the player stands on. */
   private groundBvh: MeshBVH | null = null;
+  /** FULL_WALLS only, for castWall(). */
+  private wallBvh: MeshBVH | null = null;
+  private wallRay = new THREE.Ray();
   private sphere = new THREE.Sphere();
   private closest = new THREE.Vector3();
   private push = new THREE.Vector3();
@@ -39,6 +50,7 @@ export class Walk {
   load(root: THREE.Object3D, extra: THREE.BufferGeometry[] = []) {
     const parts: THREE.BufferGeometry[] = [...extra];
     const ground: THREE.BufferGeometry[] = [];
+    const walls: THREE.BufferGeometry[] = [];
     const plain = (mesh: THREE.Mesh) => {
       const g = (mesh.geometry as THREE.BufferGeometry).clone();
       g.deleteAttribute("normal");
@@ -49,9 +61,22 @@ export class Walk {
       const kind = kindOf(o);
       if (kind.startsWith("floor") || kind === "stairs") ground.push(plain(o));
       if (COLLIDERS.includes(kind)) parts.push(plain(o));
+      if (FULL_WALLS.includes(kind)) walls.push(plain(o));
     });
     this.bvh = parts.length ? new MeshBVH(mergeGeometries(parts, false)) : null;
     this.groundBvh = ground.length ? new MeshBVH(mergeGeometries(ground, false)) : null;
+    this.wallBvh = walls.length ? new MeshBVH(mergeGeometries(walls, false)) : null;
+  }
+
+  /** The nearest full-height wall (walls, glass, elevator shafts) along a ray, within `far`, or null. */
+  castWall(origin: THREE.Vector3, dir: THREE.Vector3, far: number): WallHit | null {
+    if (!this.wallBvh) return null;
+    this.wallRay.set(origin, dir);
+    const hit = this.wallBvh.raycastFirst(this.wallRay, THREE.DoubleSide, 0, far);
+    if (!hit?.face) return null;
+    const normal = hit.face.normal.clone();
+    if (normal.dot(dir) > 0) normal.negate();
+    return { point: hit.point.clone(), normal };
   }
 
   get ready() {
