@@ -46,6 +46,8 @@ export interface RuntimeOptions {
   onNotice?: (notice: "doorLocked" | "checkpoint" | "caught") => void;
   /** A line of speech to show as a subtitle (the guard), or null to clear it. */
   onSubtitle?: (text: string | null) => void;
+  /** A controls tip to show (after the guard's opening), or null to clear it. */
+  onTip?: (tip: "move" | "flashlight" | null) => void;
 }
 
 export interface Runtime {
@@ -84,6 +86,7 @@ const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
 const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
 const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
+const TIP_TIME = 14000; // how long the flashlight tip stays up if the player does not use it (ms)
 const LOCK_TURN = 4; // how fast the camera turns to the guard during the opening (1/s)
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
@@ -213,6 +216,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let guardScene: GuardScene | null = null;
   const guardAt = { x: 0, y: 0 };
   let guardLine: number | null = null;
+  let tip: "move" | "flashlight" | null = null; // the controls tip being shown after the opening
+  let tipAt = 0;
+  const setTip = (next: typeof tip, at: number) => {
+    tip = next;
+    tipAt = at;
+    options.onTip?.(next);
+  };
   const frustum = new THREE.Frustum();
   const guardSphere = new THREE.Sphere();
   const guardPoint = new THREE.Vector3();
@@ -574,14 +584,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         guardLine = guardScene.line;
         options.onSubtitle?.(guardLine === null ? null : es.guardOpening[guardLine]);
       }
+      // Once he has spoken and the player is free: how to move. Once he is gone: the flashlight.
+      if (guardScene.phase === "lingering" && tip === null && progress.guard === 0) setTip("move", now);
       // He faces the player while he comes up, talks, and stays.
       guardView.update(guardAt.x, guardAt.y, floor, toPlayer, !guardScene.done, guardScene.approaching, now / 1000);
       if (guardScene.done) {
         guardView.update(0, 0, floor, 0, false, false, 0);
         options.onSubtitle?.(null);
+        if (tip === "move") setTip("flashlight", now);
         if (progress.guard === 0) progress.guard = 1; // the opening has been seen
       }
     }
+    if (tip === "flashlight" && (flashOn || now - tipAt > TIP_TIME)) setTip(null, now); // used, or shown long enough
     const preset = QUALITY_PRESETS[quality];
     props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);

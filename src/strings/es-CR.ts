@@ -6,6 +6,8 @@ export const es = {
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
   debugSanity: "Z / X: bajar / subir la cordura (provisional)",
   prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir" },
+  // Controls hints after the guard's opening: the movement ones once he has spoken, the flashlight one once he is gone.
+  tips: { move: "WASD para moverse · Ratón para mirar · Shift para correr", flashlight: "F para linterna" },
   doorLocked: "No cede",
   checkpoint: "Punto de control",
   // The guard's opening (he is a real, ordinary worker). Genre neutral: usted and "le", never lo/la or señor/señora. Words for Augusto to review.

@@ -17,6 +17,7 @@ export default function GameCanvas() {
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
+  const [tip, setTip] = useState<"move" | "flashlight" | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [savedTimes, setSavedTimes] = useState<{ manual: number | null; checkpoint: number | null }>({ manual: null, checkpoint: null });
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,6 +32,7 @@ export default function GameCanvas() {
       },
       onStatus: setStatus,
       onSubtitle: setSubtitle,
+      onTip: setTip,
       onNotice: (key) => {
         setNotice(es[key]);
         if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -97,6 +99,7 @@ export default function GameCanvas() {
           </label>
         </div>
       )}
+      {locked && tip && <div className="game-tip">{es.tips[tip]}</div>}
       {locked && subtitle && <div className="game-subtitle">{subtitle}</div>}
       {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}
       {locked && !status?.prompt && notice && <div className="game-prompt">{notice}</div>}
