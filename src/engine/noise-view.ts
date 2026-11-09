@@ -34,6 +34,8 @@ export interface NoiseWorld {
   /** Starts an event at a spot. False if the kind's model did not load or the world is full of things the player can see. */
   spawn(kind: NoiseKind, spot: NoiseSpot, floor: number, hooks: NoiseHooks, hidden: (x: number, y: number, floor: number) => boolean): boolean;
   update(dt: number, hooks: NoiseHooks): void;
+  /** Removes every loose object (the shader warm-up uses a temporary one of each kind). */
+  clear(): void;
   dispose(): void;
 }
 
@@ -122,6 +124,9 @@ export function createNoiseWorld(pieces: { chair: THREE.Object3D | null; bin: TH
           }
         }
       }
+    },
+    clear() {
+      for (const l of [...loose]) remove(l);
     },
     dispose() {
       loose.length = 0;
