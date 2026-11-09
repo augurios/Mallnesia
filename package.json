@@ -16,6 +16,7 @@
     "test:fail": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-fail.mts",
     "test:hiding": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-hiding.mts",
     "test:save": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-save.mts",
+    "test:stamina": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-stamina.mts",
     "test:sanity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-sanity.mts",
     "shots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/shots.mts",
     "pieces": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/piece-shots.mts",

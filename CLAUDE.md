@@ -41,7 +41,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 ## Tech stack and base project
 
 - **Base (decided):** a **Next.js (App Router) + TypeScript** project, exported statically (`output: 'export'`). The 3D engine is **plain Three.js** in framework-free TypeScript (`src/engine/`); React/Next handles only menu, HUD, pause and settings. [dirien/backrooms](https://github.com/dirien/backrooms) (Three.js + Vite) is a **reference for architecture only**. It has no license, so we do not copy its code; we rebuild the ideas in our own code.
-- **Planned additions:** the mall as a blockout GLB generated from the floor-plan JSON by a Node script (no Blender installed), later hand-modeled; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
+- **Planned additions:** the mall as a blockout GLB generated from the floor-plan JSON by a Node script, later hand-modeled; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
 
 ### Module plan (relative to the backrooms reference)
 
@@ -117,7 +117,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **No combat and no health.** The player fails by being caught by the shadow. To avoid this, the player must stay quiet, hidden, and out of sight, with the flashlight off.
 - **The shadow is the only threat that can catch the player.** The girl in white never chases, and the watchers drain sanity but never catch the player.
 - **Being caught restarts the player at the last checkpoint** (see "Save, load, and checkpoints").
-- **Other failure:** sanity running out in the garage wakes the player elsewhere in the mall (not a restart).
+- **Other failure (decided):** sanity running out, anywhere (the mall or the garage), makes the player faint and wake at a random spot elsewhere in the mall, with some sanity back (not a restart).
 
 ## Winning
 
@@ -175,6 +175,7 @@ Some legends are tied to real tragedies and real people. When writing notes, dia
 ## Repository conventions
 
 - **No Git LFS (decided):** binaries are committed as plain files. Everything `npm run assets` writes (`public/models/mall_blockout.glb`, `ao.png`, `props.json`, `nav.json` and `kit/*.glb`) is generated from `docs/floorplans/` and `scripts/`, so it is gitignored and rebuilt by `predev` (if any is missing) and `prebuild`. A hand-modeled file that replaces a generated one has to be committed and taken out of `.gitignore`. Revisit LFS if the repo passes about 500 MB.
+- **Characters (decided):** realistic, built with Blender + MPFB (MakeHuman, CC0) and animated with CC0 clips (Quaternius' Universal Animation Library), all scripted (`scripts/guard/`); no Adobe/Mixamo. The built `public/models/guard.glb` is committed, since it needs Blender to rebuild.
 - Reference photos of the real mall: `reference/photos/`.
 - Design docs, floor plans, and legend notes: `docs/`.
 - Update this file when decisions change (license status, seed choice, language, priorities).
