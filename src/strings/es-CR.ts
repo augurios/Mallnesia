@@ -8,6 +8,8 @@ export const es = {
   prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir" },
   doorLocked: "No cede",
   checkpoint: "Punto de control",
+  // The guard's opening (he is a real, ordinary worker). Genre neutral: usted and "le", never lo/la or señor/señora. Words for Augusto to review.
+  guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Voy a hacer mi ronda, Mejor que ya no le encuentre aquí."],
   caught: "Algo te alcanzó",
   debugFaint: "G: desmayarse ahora (provisional)",
   debugShadow: "H: llamar a la sombra (provisional); ?shadow=off la desactiva",

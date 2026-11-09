@@ -53,6 +53,9 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "hidden_under_table", floor: 2, x: 60, y: 10, yaw: 0, pitch: 0, extra: "&hide=1&shadow=off&ambient=3" },
   { name: "hidden_look_up", floor: 2, x: 60, y: 10, yaw: 0, pitch: 55, extra: "&hide=1&shadow=off&ambient=30" },
   { name: "hide_table_outside", floor: 2, x: 63.4, y: 5.2, yaw: 0, pitch: -12, extra: "&shadow=off&ambient=30" },
+  // the guard of the opening, 7 m ahead of the start (?guard=now plays it from wherever the game starts)
+  { name: "guard_opening", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&guard=now&shadow=off&ambient=2" },
+  { name: "guard_opening_lit", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&guard=now&shadow=off&ambient=25" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

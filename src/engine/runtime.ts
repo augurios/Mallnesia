@@ -5,8 +5,10 @@ import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
+import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
+import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
-import { Hiding, HIDING, spotsFromProps, yawToHeading } from "./hiding";
+import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
 import { setBakedAO, styleBlockout } from "./materials";
 import { createPost } from "./post";
 import { loadProps, type Props } from "./props";
@@ -16,6 +18,7 @@ import { createSaveStore, emptyProgress, type SaveSlot } from "./save";
 import { Shadow, type PlayerSense } from "./shadow";
 import { createShadowView } from "./shadow-view";
 import { createSky } from "./sky";
+import { es } from "../strings/es-CR";
 import { Walk, FLOOR_HEIGHT, PLAYER_RADIUS } from "./walk";
 import { QUALITY_PRESETS, isQualityLevel, loadQuality, saveQuality, type QualityLevel } from "./quality";
 import { loadView, normalizeView, saveView, type ViewSettings } from "./view";
@@ -41,6 +44,8 @@ export interface RuntimeOptions {
   onStatus?: (status: PlayerStatus) => void;
   /** A short-lived message for the HUD. */
   onNotice?: (notice: "doorLocked" | "checkpoint" | "caught") => void;
+  /** A line of speech to show as a subtitle (the guard), or null to clear it. */
+  onSubtitle?: (text: string | null) => void;
 }
 
 export interface Runtime {
@@ -79,6 +84,7 @@ const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
 const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
 const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
+const LOCK_TURN = 4; // how fast the camera turns to the guard during the opening (1/s)
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
 const BLOCKOUT_URL = "./models/mall_blockout.glb";
 const AO_URL = "./models/ao.png";
@@ -177,7 +183,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const hunted = () => (shadow?.hunting ?? false) || fail.state !== "playing"; // manual saves are refused while it hunts, and during a fail
   const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
-  let flashOn = true;
+  let flashOn = false; // the game starts with the flashlight off
   let crouch = 0; // 0 standing, 1 fully hidden: lowers the eye
   let bob = 0; // current head bob height, eased toward the target
 
@@ -198,6 +204,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     },
   });
   const hiding = new Hiding();
+  const guardView = createGuardView();
+  scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
+  // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
+  // game that has already met him; ?guard=now plays it from wherever the game starts.
+  const guardParam = params.get("guard");
+  let opening = guardParam === "off" ? "skip" : guardParam === "now" || !["x", "y", "floor"].some((k) => params.has(k)) ? "ready" : "skip";
+  let guardScene: GuardScene | null = null;
+  const guardAt = { x: 0, y: 0 };
+  let guardLine: number | null = null;
+  const frustum = new THREE.Frustum();
+  const guardSphere = new THREE.Sphere();
+  const guardPoint = new THREE.Vector3();
   const fail = new Fail();
   // The black of a fail (caught, fainted): a plain overlay, so it works on every quality preset, under the HUD text (z-index 5).
   const blackout = document.createElement("div");
@@ -282,6 +300,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const saved = store.read(slot);
     if (!saved || saved.area !== "mall") return false; // the garage is its own level, not built yet
     hiding.reset();
+    guardScene?.finish(); // a load is not the opening
+    opening = "skip";
     player.set(saved.x, saved.height, -saved.y);
     yaw = saved.yaw;
     pitch = 0;
@@ -303,6 +323,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   /** Puts the player somewhere new (a fail's respawn): standing, still, nothing hunting. */
   const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
     hiding.reset();
+    guardScene?.finish();
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -372,6 +393,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (jump !== undefined) {
       floor = jump;
       hiding.reset();
+      guardScene?.finish();
+      opening = "skip";
       player.set(SPAWNS[jump].x, jump * FLOOR_HEIGHT, -SPAWNS[jump].y);
       walk.fallSpeed = 0;
       velocity.set(0, 0);
@@ -382,7 +405,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
   let skipMouse = true; // the first event after locking can carry the jump of the cursor being recentred
   const onMouseMove = (e: MouseEvent) => {
-    if (!locked) return;
+    if (!locked || guardScene?.controlLocked) return; // the opening holds the camera on the guard
     if (skipMouse) {
       skipMouse = false;
       return;
@@ -426,6 +449,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
     last = now;
 
+    // The guard's opening scene: created at the top of the frame, so the player is frozen from the very first one.
+    if (opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
+      const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
+      opening = "playing";
+      if (spot) {
+        guardAt.x = spot.x;
+        guardAt.y = spot.y;
+        guardScene = new GuardScene([...es.guardOpening]);
+      }
+    }
     // Hiding takes the player over: the pose of the crawl (or of the hidden player's turned head) replaces walking.
     const pose = hiding.update(dt, yaw);
     if (pose) {
@@ -438,8 +471,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     crouch = pose ? pose.crouch : 0;
     if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
-    const forward = fail.locked ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-    const strafe = fail.locked ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+    const frozen = fail.locked || (guardScene?.controlLocked ?? false);
+    const forward = frozen ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+    const strafe = frozen ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
     const running = stamina.update(dt, moving && (keys.has("ShiftLeft") || keys.has("ShiftRight")));
     let targetX = 0;
@@ -500,6 +534,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     // Camera effects: a small head bob that fades with speed, and a slight widening while running.
     const bobTarget = view.motion && moving && walk.fallSpeed === 0 ? (running ? BOB_RUN : BOB_WALK) : 0;
     bob += (bobTarget - bob) * (1 - Math.exp(-BOB_EASE * dt));
+    // The opening holds the camera on the guard: it turns to him smoothly and stays on his chest and face.
+    if (guardScene?.controlLocked) {
+      const toGuard = Math.atan2(guardAt.y - -player.z, guardAt.x - player.x); // plan heading to him
+      const wantYaw = headingToYaw(toGuard);
+      const wantPitch = Math.atan2(1.5 - EYE_HEIGHT, Math.max(0.5, Math.hypot(guardAt.x - player.x, guardAt.y + player.z))); // his face, a little below the eye
+      const turn = 1 - Math.exp(-LOCK_TURN * dt);
+      yaw += Math.atan2(Math.sin(wantYaw - yaw), Math.cos(wantYaw - yaw)) * turn;
+      pitch += (wantPitch - pitch) * turn;
+    }
     camera.position.set(player.x, eyeY + EYE_HEIGHT - crouch * (EYE_HEIGHT - HIDING.HIDDEN_EYE) + Math.sin(walked * BOB_FREQ) * bob, player.z);
     camera.rotation.set(pitch, yaw, 0);
     const fovTarget = view.motion && running && velocity.lengthSq() > WALK_SPEED * WALK_SPEED ? baseFov + RUN_FOV - FOV : baseFov;
@@ -510,6 +553,35 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     camera.updateMatrixWorld();
     sky.follow(camera.position);
     doors.update(dt, player, floor, projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    // The guard's opening scene (started at the top of the frame, so the player is frozen from the first one).
+    if (guardScene && !guardScene.done) {
+      const px = player.x;
+      const py = -player.z;
+      const toPlayer = Math.atan2(py - guardAt.y, px - guardAt.x); // plan heading from the guard to the player
+      const distance = Math.hypot(px - guardAt.x, py - guardAt.y);
+      const visible = frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(guardAt.x, floor * FLOOR_HEIGHT + 0.95, -guardAt.y), 0.7)) && nav !== null && nav.sees(floor, px, py, guardAt.x, guardAt.y);
+      if (guardScene.approaching && dt > 0) {
+        const dir = toPlayer;
+        const nx = guardAt.x + Math.cos(dir) * GUARD_SCENE.WALK_SPEED * dt;
+        const ny = guardAt.y + Math.sin(dir) * GUARD_SCENE.WALK_SPEED * dt;
+        if (nav?.walkable(floor, nx, ny)) {
+          guardAt.x = nx;
+          guardAt.y = ny;
+        } else guardScene.stop(); // blocked on the way: he talks from where he is
+      }
+      if (dt > 0) guardScene.update(dt, distance, visible);
+      if (guardScene.line !== guardLine) {
+        guardLine = guardScene.line;
+        options.onSubtitle?.(guardLine === null ? null : es.guardOpening[guardLine]);
+      }
+      // He faces the player while he comes up, talks, and stays.
+      guardView.update(guardAt.x, guardAt.y, floor, toPlayer, !guardScene.done, guardScene.approaching, now / 1000);
+      if (guardScene.done) {
+        guardView.update(0, 0, floor, 0, false, false, 0);
+        options.onSubtitle?.(null);
+        if (progress.guard === 0) progress.guard = 1; // the opening has been seen
+      }
+    }
     const preset = QUALITY_PRESETS[quality];
     props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
@@ -568,6 +640,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       renderer.domElement.remove();
       stats?.remove();
       blackout.remove();
+      guardView.dispose();
     },
   };
 }
