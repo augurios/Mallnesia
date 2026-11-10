@@ -9,10 +9,12 @@ export const es = {
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
   debugSanity: "Z / X: bajar / subir la cordura (provisional)",
   prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir" },
+  // Controls hints after the guard's opening: the movement ones once he has spoken, the flashlight one once he is gone.
+  tips: { move: "WASD para moverse · Ratón para mirar · Shift para correr", flashlight: "F para linterna" },
   doorLocked: "No cede",
   checkpoint: "Punto de control",
-  // The guard's opening (he is a real, ordinary worker). Words for Augusto to review.
-  guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Termino mi ronda y vuelvo. Mejor que ya no lo encuentre aquí."],
+  // The guard's opening (he is a real, ordinary worker). Genre neutral: usted and "le", never lo/la or señor/señora. Words for Augusto to review.
+  guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Voy a hacer mi ronda, Mejor que ya no le encuentre aquí."],
   caught: "Algo te alcanzó",
   debugFaint: "G: desmayarse ahora (provisional)",
   debugShadow: "H: llamar a la sombra (provisional); ?shadow=off la desactiva",
@@ -27,6 +29,8 @@ export const es = {
   savedAt: "Guardada",
   floor: "Piso",
   flashlight: "Linterna",
+  stamina: "Aguante",
+  sanity: "Cordura",
   paused: "Pausa",
   resume: "Continuar",
   quality: "Calidad gráfica",
