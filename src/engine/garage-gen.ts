@@ -11,6 +11,189 @@
 //
 // Plan coordinates (meters, x east, y north), the origin at the south-west corner of the first cell.
 
+/**
+ * The openings from the mall onto the parking strip (west edge, x 3 to 15; the same two on all three floors, see
+ * docs/floorplans/*_plan.json). The strip is dressed as the garage's first column (`stripPart`), so walking into it
+ * and then being swapped into the real garage shows no change. Plan coordinates: x east, y north (m); `y` is the
+ * centre of the opening and `half` half its width.
+ *
+ * Each opening has a block of the strip behind it: the garage's column 0 turned half a turn about the vertical axis
+ * (the garage's west wall, with its stairwell door, is the strip's east wall, the opening in it; the garage's east
+ * is the strip's west). The entry cell sits at the opening, so the block runs from y - 30 to y + 18.
+ */
+export interface GarageEntrance {
+  id: "strip_north" | "strip_south";
+  x: number;
+  y: number;
+  half: number;
+}
+export const GARAGE_ENTRANCES: readonly GarageEntrance[] = [
+  { id: "strip_north", x: 15, y: 162, half: 3 },
+  { id: "strip_south", x: 15, y: 114, half: 3 },
+];
+/** The garage's cell width is also the strip's width (x 3 to 15). */
+export const STRIP_WEST = 3;
+/** How far past the opening (into the strip) the player must be before the garage takes over. */
+export const GARAGE_ENTRANCE_DEPTH = 2.5;
+/** Where the player is put back in the mall when they come out: this far inside the opening. */
+export const GARAGE_EXIT_INSIDE = 2;
+/** The secret door at the south end of the floor-2 strip (y 84, x 12 to 15, floor index 1) opens into the south block. */
+export const STRIP_DOOR = { floor: 1, x0: 12, x1: 15, y: 84 };
+
+/**
+ * The seed of the garage behind one of the six strip openings (2 openings x 3 floors, `f` the floor index): each door
+ * leads to its own garage, the same one every time. The south opening on floor 2 (the one the debug key and the fade use)
+ * keeps the base seed.
+ */
+export const entranceSeed = (base: number, e: GarageEntrance, f: number) => base + (GARAGE_ENTRANCES.findIndex((x) => x.id === e.id) * 3 + f - 4) * 7919;
+
+const entryY = () => (GARAGE.ENTRY_ROW + 0.5) * GARAGE.CELL;
+/** The y range of an entrance's block of the strip. */
+export const blockRange = (e: GarageEntrance) => ({ y0: e.y + entryY() - GARAGE.ROWS * GARAGE.CELL, y1: e.y + entryY() });
+
+/** Mall plan point to garage plan point, and back (a half turn: headings differ by PI). */
+export const stripToGarage = (e: GarageEntrance, x: number, y: number) => ({ x: e.x - x, y: e.y + entryY() - y });
+export const garageToStrip = (e: GarageEntrance, gx: number, gy: number) => ({ x: e.x - gx, y: e.y + entryY() - gy });
+
+/** The block of the strip a mall point (x, y) is inside, once it is `depth` m past the opening's wall; else null. */
+export function stripBlockAt(x: number, y: number, depth = 0) {
+  for (const e of GARAGE_ENTRANCES) {
+    const r = blockRange(e);
+    if (x < e.x - depth && x > STRIP_WEST && y > r.y0 && y < r.y1) return e;
+  }
+  return null;
+}
+
+/** The doorways in column 0's east wall (garage x = cell), as y ranges: in the mall the strip has a wall there (it is closed). */
+export function columnGaps(layout: GarageLayout): { y0: number; y1: number }[] {
+  const C = layout.cell;
+  const gaps: { y0: number; y1: number }[] = [];
+  for (let j = 0; j < layout.rows; j++) {
+    if (!layout.openE[j][0]) continue;
+    const pieces = layout.boxes
+      .filter((b) => b.kind === "wall" && Math.abs((b.x0 + b.x1) / 2 - C) < 0.01 && b.y0 >= j * C - 0.01 && b.y1 <= (j + 1) * C + 0.01)
+      .sort((a, b) => a.y0 - b.y0);
+    if (pieces.length === 2) gaps.push({ y0: pieces[0].y1, y1: pieces[1].y0 });
+  }
+  return gaps;
+}
+
+/** The walls that fill `columnGaps`, in the same order. */
+export const gapWalls = (layout: GarageLayout): Box[] =>
+  columnGaps(layout).map((g) => ({ kind: "wall", x0: layout.cell - GARAGE.WALL / 2, x1: layout.cell + GARAGE.WALL / 2, y0: g.y0, y1: g.y1, top: layout.height }));
+
+/**
+ * The part of the garage that is dressed into the mall: column 0 only (cars, stalls, columns, tubes, walls, signs), the
+ * stairwell door left out and the opening cut out of its west wall (which stands just inside the mall's own wall), as a
+ * layout the view can draw. `doorHole` cuts the 3 m gap of the floor-2 secret door out of the far end wall. `closed` walls up the doorways
+ * to column 1 (decided by Augusto: the strip is closed, nothing of the outside shows); left open, it is the shape both
+ * worlds share, which is what `seamSeen` looks through.
+ */
+export function stripPart(layout: GarageLayout, doorHole = false, closed = true): GarageLayout {
+  const C = layout.cell;
+  const inside = (x: number) => x >= 0 && x <= C;
+  let boxes = layout.boxes.filter((b) => b.kind !== "door" && b.kind !== "booth" && b.kind !== "phone" && b.x0 >= -0.4 && b.x1 <= C + 0.4);
+  // the west wall (the stairwell's) stays, in front of the mall's own wall, with the opening cut out of it
+  const half = GARAGE_ENTRANCES[0].half;
+  const oy0 = layout.stairDoor.y - half;
+  const oy1 = layout.stairDoor.y + half;
+  boxes = boxes.flatMap((b) => {
+    if (b.kind !== "wall" || b.x0 > 0 || b.y1 <= oy0 || b.y0 >= oy1) return [b];
+    return [...(b.y0 < oy0 ? [{ ...b, y1: oy0 }] : []), ...(b.y1 > oy1 ? [{ ...b, y0: oy1 }] : [])];
+  });
+  if (doorHole) {
+    // the far wall (y = depth) of column 0 loses its first 3 m (garage x 0 to 3 is mall x 12 to 15), and the corner column there
+    const cut = STRIP_DOOR.x1 - STRIP_DOOR.x0;
+    boxes = boxes.flatMap((b) => ((b.kind === "wall" || b.kind === "column") && b.y0 > layout.depth - 0.5 && b.x0 < cut ? (b.kind === "wall" && b.x1 > cut ? [{ ...b, x0: cut }] : []) : [b]));
+  }
+  if (closed) boxes = [...boxes, ...gapWalls(layout)];
+  return {
+    ...layout,
+    boxes,
+    cars: layout.cars.filter((c) => inside(c.x)),
+    lights: layout.lights.filter((l) => inside(l.x)),
+    signs: layout.signs.filter((s) => inside(s.x) && s.kind !== "stairs"), // (the "Escalera" sign is for the stairwell door; the opening has none)
+    lines: layout.lines.filter((l) => inside(l.x0) && inside(l.x1)),
+    ramps: layout.ramps.filter((r) => boxes.includes(r.box)),
+    width: C,
+  };
+}
+
+/** The boxes of `stripPart` as mall plan boxes, for the block behind `e` (collision while the player is still in the mall). */
+export function stripBoxes(part: GarageLayout, e: GarageEntrance): Box[] {
+  return part.boxes.map((b) => {
+    const a = garageToStrip(e, b.x0, b.y0);
+    const c = garageToStrip(e, b.x1, b.y1);
+    return { ...b, x0: Math.min(a.x, c.x), x1: Math.max(a.x, c.x), y0: Math.min(a.y, c.y), y1: Math.max(a.y, c.y) };
+  });
+}
+
+type Point = { x: number; y: number };
+
+/**
+ * Points (garage plan, every 0.5 m) along the places the strip and the garage's column 0 can differ: `opening`, the
+ * stairwell wall (the opening in the strip) and the floor-2 secret door's gap; `gaps`, each doorway to column 1 (always
+ * walled in the strip; in the garage walled or open, see `gapWalls`).
+ */
+export function stripSeams(layout: GarageLayout, doorHole: boolean): { opening: Point[]; gaps: Point[][] } {
+  const along = (x0: number, y0: number, x1: number, y1: number, pts: Point[] = []) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.5));
+    for (let k = 0; k <= n; k++) pts.push({ x: x0 + ((x1 - x0) * k) / n, y: y0 + ((y1 - y0) * k) / n });
+    return pts;
+  };
+  const C = layout.cell;
+  const half = GARAGE_ENTRANCES[0].half;
+  const opening = along(0, layout.stairDoor.y - half, 0, layout.stairDoor.y + half);
+  if (doorHole) along(0.02, layout.depth, STRIP_DOOR.x1 - STRIP_DOOR.x0 - 0.02, layout.depth, opening);
+  return { opening, gaps: columnGaps(layout).map((g) => along(C, g.y0 + 0.02, C, g.y1 - 0.02)) };
+}
+
+/** Whether the segment (ax, ay)-(bx, by) passes through the box (slab test; touching an edge does not count). */
+function segmentHits(b: Box, ax: number, ay: number, bx: number, by: number): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = bx - ax;
+  const dy = by - ay;
+  for (const [p, d, lo, hi] of [[ax, dx, b.x0 + 0.01, b.x1 - 0.01], [ay, dy, b.y0 + 0.01, b.y1 - 0.01]] as const) {
+    if (Math.abs(d) < 1e-9) {
+      if (p <= lo || p >= hi) return false;
+      continue;
+    }
+    let a = (lo - p) / d;
+    let c = (hi - p) / d;
+    if (a > c) [a, c] = [c, a];
+    t0 = Math.max(t0, a);
+    t1 = Math.min(t1, c);
+    if (t0 >= t1) return false;
+  }
+  return true;
+}
+
+/**
+ * Whether any seam point can be on screen: inside the view cone (`fwd` a unit plan vector, `cosHalf` the cosine of the
+ * cone's half angle) and not behind a wall or column both worlds share (`occluders`, from `stripPart(layout, door, false)`).
+ * A seam within arm's reach always counts. Garage plan coordinates.
+ */
+export function seamSeen(occluders: Box[], seams: Point[], eye: Point, fwd: Point, cosHalf: number): boolean {
+  for (const p of seams) {
+    const dx = p.x - eye.x;
+    const dy = p.y - eye.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.6) return true;
+    if ((dx * fwd.x + dy * fwd.y) / d <= cosHalf) continue;
+    if (!occluders.some((b) => segmentHits(b, eye.x, eye.y, p.x, p.y))) return true;
+  }
+  return false;
+}
+
+/** The rows of column 0 that the closed strip joins to the entry cell (its north and south doorways): where the swap back may happen. */
+export function stripRows(layout: GarageLayout): Set<number> {
+  const rows = new Set([GARAGE.ENTRY_ROW]);
+  for (let j = GARAGE.ENTRY_ROW; j < layout.rows - 1 && layout.openN[j][0]; j++) rows.add(j + 1);
+  for (let j = GARAGE.ENTRY_ROW - 1; j >= 0 && layout.openN[j][0]; j--) rows.add(j);
+  return rows;
+}
+
 export const GARAGE = {
   COLS: 7,
   ROWS: 4,
@@ -18,6 +201,8 @@ export const GARAGE = {
   HEIGHT: 2.7,
   /** The default seed: the same garage every time unless the debug flag asks for another. */
   SEED: 1995,
+  /** The row of the entry cell, always: the strip's blocks (see GARAGE_ENTRANCES) line up with the garage's first column. */
+  ENTRY_ROW: 1,
   WALL: 0.35,
   COLUMN: 0.6,
   /** Doorway half-width in a cell wall (m), and the wider "open bay" one. */
@@ -145,7 +330,8 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
   const openN: boolean[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
   const wideE: boolean[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
   const wideN: boolean[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
-  const entryRow = Math.floor(rand() * ROWS);
+  rand(); // (the entry row used to be drawn here; it is fixed now, and the stream stays as it was)
+  const entryRow = GARAGE.ENTRY_ROW;
   const seen = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
   const stack: [number, number][] = [[0, entryRow]];
   seen[entryRow][0] = true;
@@ -155,9 +341,14 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
     else if (dj === 1) openN[j][i] = true;
     else openN[j - 1][i] = true;
   };
+  // The entry cell's far wall (east of it) is always solid, and its side walls (north and south) always open: the player
+  // comes in facing a wall and turns left or right, which is when the strip becomes the garage (see `seamSeen`).
+  const entryBack = (i: number, j: number, di: number, dj: number) => j === entryRow && dj === 0 && ((i === 0 && di === 1) || (i === 1 && di === -1));
   while (stack.length) {
     const [i, j] = stack[stack.length - 1];
-    const next = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).filter(([di, dj]) => i + di >= 0 && i + di < COLS && j + dj >= 0 && j + dj < ROWS && !seen[j + dj][i + di]);
+    const next = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).filter(
+      ([di, dj]) => i + di >= 0 && i + di < COLS && j + dj >= 0 && j + dj < ROWS && !seen[j + dj][i + di] && !entryBack(i, j, di, dj),
+    );
     if (!next.length) {
       stack.pop();
       continue;
@@ -169,11 +360,13 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
   }
   for (let j = 0; j < ROWS; j++)
     for (let i = 0; i < COLS; i++) {
-      if (i < COLS - 1 && !openE[j][i] && rand() < GARAGE.LOOP) openE[j][i] = true;
+      if (i < COLS - 1 && !openE[j][i] && rand() < GARAGE.LOOP && !entryBack(i, j, 1, 0)) openE[j][i] = true;
       if (j < ROWS - 1 && !openN[j][i] && rand() < GARAGE.LOOP) openN[j][i] = true;
       wideE[j][i] = rand() < GARAGE.WIDE;
       wideN[j][i] = rand() < GARAGE.WIDE;
     }
+  if (entryRow > 0) openN[entryRow - 1][0] = true;
+  if (entryRow < ROWS - 1) openN[entryRow][0] = true;
 
   const neighbours = (i: number, j: number): [number, number][] => {
     const out: [number, number][] = [];
@@ -279,6 +472,7 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
         const rect = { x0: x - GARAGE.SLOT_W / 2, x1: x + GARAGE.SLOT_W / 2, y0: y - GARAGE.SLOT_L / 2, y1: y + GARAGE.SLOT_L / 2 };
         if (clear.some((c) => overlap(rect, c))) continue;
         if (isGoal && rect.x1 > cx(i) + 0.5) continue; // the booth is at the east end
+        if (i === 0 && j === GARAGE.ENTRY_ROW && lx === -4.5) continue; // nothing parked in front of the stairwell door (in the strip: the opening)
         slots.push({ x, y, north });
       }
     return slots;

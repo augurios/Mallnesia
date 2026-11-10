@@ -196,10 +196,16 @@ export interface GarageView {
   group: THREE.Group;
   /** Flicker of the tubes; `seconds` is any steadily increasing clock. */
   update(seconds: number): void;
+  /** Walls up (or opens) the k-th of `opts.gapWalls`: the doorways the mall closes and opens while nobody looks. */
+  setGapWall(k: number, closed: boolean): void;
   dispose(): void;
 }
 
-export function createGarageView(layout: GarageLayout): GarageView {
+/**
+ * `partial`: a piece of the garage dressed into the mall (the strip): no booth, no phone. `gapWalls`: walls that fill
+ * doorways, each shown or hidden on its own (`setGapWall`); hidden at first.
+ */
+export function createGarageView(layout: GarageLayout, opts: { partial?: boolean; gapWalls?: Box[] } = {}): GarageView {
   const group = new THREE.Group();
   group.name = "garage";
   const disposables: { dispose(): void }[] = [];
@@ -226,7 +232,14 @@ export function createGarageView(layout: GarageLayout): GarageView {
 
   // walls, columns (with a yellow band), the stairwell door, the booth, the phone
   const wallTex = own(concrete(1, 1, 120));
-  addMerged(layout.boxes.filter((b) => b.kind === "wall").map(boxGeo), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, color: 0xa9abae }));
+  const wallMat = own(new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, color: 0xa9abae }));
+  addMerged(layout.boxes.filter((b) => b.kind === "wall").map(boxGeo), wallMat);
+  const gapWalls = (opts.gapWalls ?? []).map((b) => {
+    const m = new THREE.Mesh(own(boxGeo(b)), wallMat);
+    m.visible = false;
+    group.add(m);
+    return m;
+  });
   const cols = layout.boxes.filter((b) => b.kind === "column");
   addMerged(cols.map(boxGeo), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, color: 0x9a9ca0 }));
   addMerged(
@@ -244,6 +257,7 @@ export function createGarageView(layout: GarageLayout): GarageView {
   // the booth's lit window (west face) and the payphone's lit panel
   const lit = own(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 1.45, 0.9) }));
   const booth = layout.booth;
+  if (!opts.partial) {
   const win = new THREE.Mesh(own(new THREE.PlaneGeometry(2.2, 1.0)), lit);
   win.rotation.y = -Math.PI / 2;
   win.position.set(booth.x0 - 0.01, 1.45, -(booth.y0 + booth.y1) / 2);
@@ -251,6 +265,7 @@ export function createGarageView(layout: GarageLayout): GarageView {
   panel.rotation.y = -Math.PI / 2;
   panel.position.set(booth.x0 - 0.41, 1.35, -layout.goal.y);
   group.add(win, panel);
+  }
 
   // painted lines
   const flat = (x0: number, y0: number, x1: number, y1: number, width: number) => {
@@ -301,9 +316,10 @@ export function createGarageView(layout: GarageLayout): GarageView {
   const tubeMat = own(new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.5, 2.8) }));
   const deadMat = own(new THREE.MeshBasicMaterial({ color: 0x25282c }));
   const poolMat = (opacity: number) => own(new THREE.MeshBasicMaterial({ map: poolTex, color: 0xdfe8ff, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  const steadyPool = poolMat(0.34);
   instanced(steady, tubeGeo, tubeMat, layout.height - 0.05);
   instanced(dead, tubeGeo, deadMat, layout.height - 0.05);
-  instanced(steady, poolGeo, poolMat(0.34), 0.012, 1);
+  instanced(steady, poolGeo, steadyPool, 0.012, 1);
   const flickerGroups = [0, 1, 2].map((k) => {
     const list = flick.filter((_, i) => i % 3 === k);
     const tube = own(new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.5, 2.8) }));
@@ -347,6 +363,9 @@ export function createGarageView(layout: GarageLayout): GarageView {
         f.tube.color.setRGB(2.4 * k, 2.5 * k, 2.8 * k);
         f.pool.opacity = 0.34 * k;
       }
+    },
+    setGapWall(k, closed) {
+      if (gapWalls[k]) gapWalls[k].visible = closed;
     },
     dispose() {
       disposables.forEach((d) => d.dispose());

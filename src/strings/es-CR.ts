@@ -15,7 +15,7 @@ export const es = {
   checkpoint: "Punto de control",
   // The guard's opening (he is a real, ordinary worker). Genre neutral: usted and "le", never lo/la or señor/señora. Words for Augusto to review.
   guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Voy a hacer mi ronda, Mejor que ya no le encuentre aquí."],
-  garageDone: "La línea se corta. Estás otra vez en el piso de los parqueos.",
+  garageDone: "La línea se corta. Atrás, por donde entraste, algo se abrió.",
   debugGarage: "P: entrar o salir del parqueo (provisional); ?garageseed=random cambia el parqueo",
   caught: "Algo te alcanzó",
   debugFaint: "G: desmayarse ahora (provisional)",

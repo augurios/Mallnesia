@@ -5,7 +5,31 @@ import { AtriumTracker } from "./atrium";
 import { createAudio } from "./audio";
 import { NavGrid, type NavData } from "./nav";
 import { Doors } from "./doors";
-import { GARAGE, atGoal, generateGarage, resolveGarage, type GarageLayout } from "./garage-gen";
+import {
+  GARAGE,
+  GARAGE_ENTRANCES,
+  GARAGE_ENTRANCE_DEPTH,
+  GARAGE_EXIT_INSIDE,
+  STRIP_DOOR,
+  STRIP_WEST,
+  atGoal,
+  entranceSeed,
+  blockRange,
+  garageToStrip,
+  generateGarage,
+  resolveGarage,
+  gapWalls,
+  seamSeen,
+  stripBlockAt,
+  stripBoxes,
+  stripPart,
+  stripRows,
+  stripSeams,
+  stripToGarage,
+  type Box,
+  type GarageEntrance,
+  type GarageLayout,
+} from "./garage-gen";
 import { createGarageView, type GarageView } from "./garage-view";
 import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
@@ -135,7 +159,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   renderer.toneMappingExposure = parseFloat(params.get("exposure") ?? "") || 1.6; // debug: ?exposure=<number>
   const ambientLevel = parseFloat(params.get("ambient") ?? "");
-  const exploration = params.get("epx") === "1"; // debug: ?epx=1 is exploration mode: the flashlight never runs out
+  const exploration = params.get("epx") === "1"; // debug: ?epx=1 is exploration mode: the flashlight and stamina never run out
   const lodOverride = parseFloat(params.get("lod") ?? ""); // debug: ?lod=<meters> (0 draws every kit piece far, 999 near)
   // debug: ?stats=1 shows triangles and draw calls per frame (all passes) in the corner
   const stats = params.get("stats") ? document.createElement("div") : null;
@@ -259,16 +283,35 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const guardSphere = new THREE.Sphere();
   const guardPoint = new THREE.Vector3();
   const fail = new Fail();
-  // Two areas: the mall, and the parking garage (a level of its own, garage-gen.ts and garage-view.ts). The garage is
-  // built once at load, hidden, and swapped in behind a fade. Entered through the secret door on floor 2 when the
-  // mall opens it (or debug key P / ?area=garage), left by reaching the payphone or by fainting.
+  // Two areas: the mall, and the parking garage (a level of its own, garage-gen.ts and garage-view.ts). The mall's parking
+  // strip is dressed as the garage's first column (a copy of it, turned half a turn, in each of the 6 places: 2 openings
+  // x 3 floors), so entering is seamless: once the player is inside the strip and none of its holes (the opening, the
+  // floor-2 secret door) is in view, the world swaps to the real garage with the same view and the maze appears beyond
+  // the doorways. The way back mirrors it: after the payphone, walking into the first column swaps back to the mall.
+  // Debug key P and ?area=garage still enter with a fade, standing at the south opening.
   let area: "mall" | "garage" = "mall";
-  let garage: { layout: GarageLayout; view: GarageView } | null = null;
+  // `gapWalls`: the doorways from the first column to the second, which the mall walls up and opens while nobody looks
+  // (`gapClosed`); `solid` is what the player collides with (the layout's boxes and the closed doorways).
+  // Each of the six strip openings (2 x 3 floors) has its own garage (`entranceSeed`), built when first needed; `garage` is
+  // the one the player is in (or last was in).
+  type Garage = { layout: GarageLayout; view: GarageView; gapWalls: Box[]; gapClosed: boolean[]; solid: Box[] };
+  let garage: Garage | null = null;
+  const garages = new Map<string, Garage>();
+  const layouts = new Map<string, GarageLayout>();
+  const placeKey = (e: GarageEntrance, f: number) => `${e.id}:${f}`;
+  type Seams = { opening: { x: number; y: number }[]; gaps: { x: number; y: number }[][]; occluders: Box[] };
+  /** What the mall holds for one opening and floor: the dressing (the garage's first column, in the mall's frame), its collision, seams and rows. */
+  type StripPlace = { view: GarageView; boxes: Box[]; seams: Seams; rows: Set<number> };
+  let strip: { group: THREE.Group; places: Map<string, StripPlace> } | null = null;
   const garageSeedParam = params.get("garageseed"); // debug: ?garageseed=random or a number; the default seed is fixed
   const garageSeed = garageSeedParam === "random" ? Math.floor(Math.random() * 1e9) : Number.isFinite(parseInt(garageSeedParam ?? "", 10)) ? parseInt(garageSeedParam ?? "", 10) : GARAGE.SEED;
   const GARAGE_DRAIN = 1 / 220; // sanity per second lost in the garage: full to empty in under four minutes if lost
-  const GARAGE_DOOR = { id: "f2_garage", x: 13.5, y: 84 };
-  const MALL_RETURN = { floor: 1, x: 13.5, y: 88 }; // back in the parking strip, north of the door
+  /** Which opening and floor the player came in by, so the way out brings them back there. */
+  let stripEntry: { e: GarageEntrance; floor: number } = { e: GARAGE_ENTRANCES[1], floor: STRIP_DOOR.floor };
+  /** Set once the payphone has been reached: the first column then swaps back to the mall. */
+  let garageReleased = false;
+  /** After the swap back the player stands inside the strip: no swap into the garage again until they have walked out of it. */
+  let stripHeld = false;
   /** In the garage, standing under a working tube counts as light for sanity (like a lit area did). */
   const litByTube = (lay: GarageLayout, x: number, y: number) => lay.lights.some((l) => l.state === "on" && Math.hypot(l.x - x, l.y - y) < 3.5);
   let ringTimer = 0;
@@ -430,11 +473,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       announce();
       garage = (() => {
         try {
-          const layout = generateGarage(garageSeed);
-          const view = createGarageView(layout);
-          view.group.visible = false;
-          scene.add(view.group);
-          return { layout, view };
+          buildStrip();
+          return garageFor(GARAGE_ENTRANCES[1], STRIP_DOOR.floor); // the debug key's garage; the others are built when the player is in their strip
         } catch (err) {
           console.error("Could not build the garage", err);
           return null;
@@ -448,6 +488,56 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       announce(true);
     }
   })();
+
+  /** The layout behind an opening on a floor: its own seed, generated once. */
+  function layoutOf(e: GarageEntrance, f: number): GarageLayout {
+    let layout = layouts.get(placeKey(e, f));
+    if (!layout) {
+      layout = generateGarage(entranceSeed(garageSeed, e, f));
+      layouts.set(placeKey(e, f), layout);
+    }
+    return layout;
+  }
+  /** The whole garage behind an opening on a floor, built (hidden) the first time it is asked for. */
+  function garageFor(e: GarageEntrance, f: number): Garage {
+    let g = garages.get(placeKey(e, f));
+    if (!g) {
+      const layout = layoutOf(e, f);
+      const walls = gapWalls(layout);
+      const view = createGarageView(layout, { gapWalls: walls });
+      view.group.visible = false;
+      scene.add(view.group);
+      g = { layout, view, gapWalls: walls, gapClosed: walls.map(() => false), solid: layout.boxes };
+      garages.set(placeKey(e, f), g);
+    }
+    return g;
+  }
+
+  /** Dresses the mall's parking strip as each garage's first column, in each of the 6 places (2 openings x 3 floors). */
+  function buildStrip() {
+    const group = new THREE.Group();
+    const places = new Map<string, StripPlace>();
+    for (const e of GARAGE_ENTRANCES) {
+      const range = blockRange(e);
+      for (let f = 0; f < 3; f++) {
+        const layout = layoutOf(e, f);
+        const door = e.id === "strip_south" && f === STRIP_DOOR.floor; // the floor-2 secret door's gap in the far wall
+        const part = stripPart(layout, door);
+        const view = createGarageView(part, { partial: true });
+        view.group.rotation.y = Math.PI;
+        view.group.position.set(e.x, f * FLOOR_HEIGHT + 0.015, -range.y1); // just above the mall's floor, no z-fighting
+        group.add(view.group);
+        // what differs between the strip and the garage's column 0, and the walls both share that can hide it
+        const seams: Seams = { ...stripSeams(layout, door), occluders: stripPart(layout, door, false).boxes.filter((b) => b.kind === "wall" || b.kind === "column") };
+        places.set(placeKey(e, f), { view, boxes: stripBoxes(part, e), seams, rows: stripRows(layout) });
+      }
+    }
+    group.visible = area === "mall";
+    scene.add(group);
+    strip = { group, places };
+    // nobody else walks in the strip (the shadow, a noise): the dressing has no map of its own
+    nav?.blockRect(STRIP_WEST, blockRange(GARAGE_ENTRANCES[1]).y0, 15, blockRange(GARAGE_ENTRANCES[0]).y1);
+  }
 
   const keys = new Set<string>();
   let locked = false;
@@ -502,9 +592,74 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     sky.mesh.visible = inMall;
     if (!inMall) {
       shadowView.object.visible = false;
-      guardView.update(0, 0, 0, 0, false, false, 0);
+      guardView.update(0, 0, 0, 0, false, "idle", 0);
     }
     if (garage) garage.view.group.visible = !inMall;
+    if (strip) strip.group.visible = inMall;
+  };
+  /**
+   * Whether a seam between the strip's block and the garage's column 0 could be on screen: `pick` chooses which (the
+   * opening and the floor-2 secret door's gap, or one doorway to column 1). `inGarage` says which frame the player is in.
+   * The cone is the screen's width (at the running FOV) plus a margin; looking steeply up or down counts as seeing it.
+   */
+  const seamInView = (e: GarageEntrance, f: number, inGarage: boolean, pick: (s: Seams) => { x: number; y: number }[]) => {
+    if (!strip) return true;
+    if (Math.abs(pitch) > THREE.MathUtils.degToRad(50)) return true;
+    const s = strip.places.get(placeKey(e, f))?.seams;
+    if (!s) return true;
+    const eye = inGarage ? { x: player.x, y: -player.z } : stripToGarage(e, player.x, -player.z);
+    const flip = inGarage ? 1 : -1; // the half turn reverses directions
+    const fwd = { x: -Math.sin(yaw) * flip, y: Math.cos(yaw) * flip };
+    const vFov = THREE.MathUtils.degToRad(Math.max(camera.fov, baseFov + RUN_FOV - FOV));
+    const half = Math.atan(Math.tan(vFov / 2) * camera.aspect) + THREE.MathUtils.degToRad(6);
+    return seamSeen(s.occluders, pick(s), eye, fwd, Math.cos(Math.min(half, Math.PI * 0.95)));
+  };
+  /** The world turns half a turn about the vertical axis at the swap: same view, other level. */
+  const turnAround = () => {
+    yaw += Math.PI;
+    velocity.set(-velocity.x, -velocity.y);
+    walk.fallSpeed = 0;
+    eyeY = NaN;
+  };
+  /** Walls up or opens the garage's doorways from the first column to the second (view and collision). */
+  const setGaps = (closed: (k: number) => boolean) => {
+    if (!garage) return;
+    const g = garage;
+    g.gapClosed = g.gapWalls.map((_, k) => closed(k));
+    g.gapClosed.forEach((c, k) => g.view.setGapWall(k, c));
+    g.solid = [...g.layout.boxes, ...g.gapWalls.filter((_, k) => g.gapClosed[k])];
+  };
+  /** Mall to garage with nothing changing on screen: the strip's dressing is the garage's first column, closed like it. */
+  const swapToGarage = (e: GarageEntrance, f: number) => {
+    if (!garage) return;
+    garage.view.group.visible = false;
+    garage = garageFor(e, f); // each opening has its own garage
+    const g = stripToGarage(e, player.x, -player.z);
+    guardScene?.finish();
+    opening = "skip";
+    hiding.reset();
+    shadow?.reset(60);
+    stripEntry = { e, floor: f };
+    garageReleased = false;
+    setGaps(() => true); // the doorways to the second column open one by one, each while the player is not looking at it
+    showArea("garage");
+    floor = 0;
+    player.set(g.x, 0, -g.y);
+    turnAround();
+    ringTimer = -8;
+  };
+  /** Garage to mall, the same way: the strip's block around the player, the wall of the stairwell now an opening. */
+  const swapToMall = () => {
+    const { e, floor: f } = stripEntry;
+    const m = garageToStrip(e, player.x, -player.z);
+    showArea("mall");
+    sanity.setDrain("garage", 0);
+    stripHeld = true;
+    floor = f;
+    player.set(m.x, f * FLOOR_HEIGHT, -m.y);
+    turnAround();
+    atrium.reset(m.x, m.y);
+    shadow?.reset(40);
   };
   const enterGarage = () => {
     if (!garage) return;
@@ -512,6 +667,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     opening = "skip";
     hiding.reset();
     shadow?.reset(60);
+    garage.view.group.visible = false;
+    garage = garageFor(GARAGE_ENTRANCES[1], STRIP_DOOR.floor); // the debug key's garage: the south opening on floor 2
+    setGaps(() => false); // (by the fade: no strip to match)
     showArea("garage");
     const sp = garage.layout.spawn;
     floor = 0;
@@ -521,6 +679,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     velocity.set(0, 0);
     walk.fallSpeed = 0;
     eyeY = NaN;
+    stripEntry = { e: GARAGE_ENTRANCES[1], floor: STRIP_DOOR.floor }; // the spawn is the south opening's block
+    garageReleased = false;
     ringTimer = -8; // the phone starts ringing a little after the player arrives
   };
   const leaveGarage = () => {
@@ -551,7 +711,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     leaveGarage(); // anything else brings the player back to the mall
     if (fail.reason === "to_mall") {
-      placePlayer(MALL_RETURN.floor, MALL_RETURN.x, MALL_RETURN.y, 0); // facing north, away from the door
+      // (debug key P) back through the opening the player came in by, just inside the mall, facing east
+      placePlayer(stripEntry.floor, stripEntry.e.x + GARAGE_EXIT_INSIDE, stripEntry.e.y, headingToYaw(0));
       sanity.set(Math.max(sanity.level, 0.75));
       sanity.snap();
       charge = 1;
@@ -583,7 +744,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     keys.add(e.code);
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
     if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
-    if (e.code === "KeyP" && !e.repeat && locked && garage) fail.trigger(area === "mall" ? "to_garage" : "to_mall"); // debug // debug: faint now (the garage's sanity-out will do this)
+    if (e.code === "KeyP" && !e.repeat && locked && garage) {
+      // debug: to the garage and back, with a fade
+      fail.trigger(area === "mall" ? "to_garage" : "to_mall");
+    }
     if (fail.locked) return; // going down or black: nothing else works
     if (e.code === "KeyF" && !e.repeat && !hiding.active) {
       if (flashOn) flashOn = false;
@@ -665,11 +829,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
   let last = performance.now();
   let frame = 0;
+  const forceRun = params.get("forcerun") === "1";
   let statusTimer = 0;
   const tick = () => {
     frame = requestAnimationFrame(tick);
     const now = performance.now();
-    const dt = locked ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free
+    const dt = locked || forceRun ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free (?forcerun=1, debug: runs without it, for scripted walks)
     if (autoQuality && locked && governor.update((now - last) / 1000, true) === "drop") {
       const lower = QUALITY_LEVELS[QUALITY_LEVELS.indexOf(quality) - 1];
       if (lower) {
@@ -716,7 +881,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const forward = frozen ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = frozen ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
-    const running = stamina.update(dt, moving && (keys.has("ShiftLeft") || keys.has("ShiftRight")));
+    const running = stamina.update(exploration ? 0 : dt, moving && (keys.has("ShiftLeft") || keys.has("ShiftRight")));
     let targetX = 0;
     let targetZ = 0;
     if (moving) {
@@ -734,10 +899,20 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       player.x += velocity.x * dt;
       player.z += velocity.y * dt;
       if (area === "garage" && garage) {
-        const [gx, gy] = resolveGarage(garage.layout.boxes, player.x, -player.z, PLAYER_RADIUS);
+        const [gx, gy] = resolveGarage(garage.solid, player.x, -player.z, PLAYER_RADIUS);
         player.x = gx;
         player.z = -gy;
-      } else walk.collide();
+      } else {
+        walk.collide();
+        // inside the strip the dressing (walls, columns, cars) is solid too: the garage's own boxes, turned into the mall's frame
+        const blk = strip && stripBlockAt(player.x, -player.z);
+        const boxes = blk ? strip?.places.get(placeKey(blk, floor))?.boxes : undefined;
+        if (boxes) {
+          const [bx, by] = resolveGarage(boxes, player.x, -player.z, PLAYER_RADIUS);
+          player.x = bx;
+          player.z = -by;
+        }
+      }
     }
     walked += Math.hypot(player.x - startX, player.z - startZ);
     if (area === "mall") {
@@ -761,6 +936,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (startInGarage && garage && warmDone) {
       startInGarage = false;
       enterGarage();
+      garageReleased = params.get("released") === "1"; // debug: as if the payphone had been answered
       if (params.has("x") && params.has("y")) {
         // debug (screenshots): ?x ?y ?yaw ?pitch place the player inside the garage, in garage plan coordinates
         player.set(num("x", 0), 0, -num("y", 0));
@@ -768,20 +944,53 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         pitch = THREE.MathUtils.degToRad(num("pitch", 0));
       }
     }
-    if (area === "mall" && floor === 1 && !fail.locked && garage && doors.angleOf(GARAGE_DOOR.id) > 0.85 && Math.abs(player.x - GARAGE_DOOR.x) < 1.5 && -player.z > GARAGE_DOOR.y - 1.5 && -player.z < GARAGE_DOOR.y + 0.6) {
-      fail.trigger("to_garage"); // the mall opened its door and the player walked into it
+    // In the strip, deep enough and with nothing that differs from the garage on screen, the mall becomes the garage
+    // (decided by Augusto: any opening, any floor, any time; the strip is closed, and the swap comes as the player turns
+    // left or right from the entry cell's solid far wall). While a seam could be seen, the swap waits.
+    if (area === "mall" && garage && strip) {
+      const inBlock = stripBlockAt(player.x, -player.z);
+      if (inBlock) garageFor(inBlock, floor); // built (hidden) while the player is still in the strip, so the swap itself costs nothing
     }
+    if (area === "mall" && !fail.locked && garage && strip && dt > 0 && !pose && params.get("stripswap") !== "off") { // (?stripswap=off: debug, stay in the strip's dressing)
+      if (stripHeld && !stripBlockAt(player.x, -player.z)) stripHeld = false;
+      const blk = stripHeld ? null : stripBlockAt(player.x, -player.z, GARAGE_ENTRANCE_DEPTH);
+      if (blk && !seamInView(blk, floor, false, (s) => s.opening)) swapToGarage(blk, floor);
+    }
+    if (strip && area === "mall") for (const p of strip.places.values()) p.view.update(now / 1000);
     if (area === "garage" && garage) {
       const lay = garage.layout;
-      sanity.setDrain("garage", GARAGE_DRAIN);
+      sanity.setDrain("garage", garageReleased ? 0 : GARAGE_DRAIN);
       if (dt > 0 && !fail.locked) {
-        ringTimer += dt;
-        if (ringTimer >= 3.4) {
-          ringTimer = 0;
-          audio.ring(lay.goal.x, 1.2, -lay.goal.y);
+        if (!garageReleased) {
+          ringTimer += dt;
+          if (ringTimer >= 3.4) {
+            ringTimer = 0;
+            audio.ring(lay.goal.x, 1.2, -lay.goal.y);
+          }
         }
-        if (atGoal(lay, player.x, -player.z) && fail.trigger("to_mall")) options.onNotice?.("garageDone");
-        else if (sanity.level <= 0.02 && fail.trigger("faint")) options.onNotice?.("caught");
+        if (!garageReleased && atGoal(lay, player.x, -player.z)) {
+          // the call is answered: the line cuts, the drain stops, and the way in is the way out (the strip's first column)
+          garageReleased = true;
+          sanity.set(Math.max(sanity.level, 0.75));
+          sanity.snap();
+          options.onNotice?.("garageDone");
+        } else if (sanity.level <= 0.02 && fail.trigger("faint")) options.onNotice?.("caught");
+        else if (strip && !pose) {
+          const { e, floor: f } = stripEntry;
+          const inStrip = player.x > 0.5 && player.x < lay.cell - 0.7 && strip.places.get(placeKey(e, f))?.rows.has(Math.floor(-player.z / lay.cell));
+          // The mall shifts the doorways to the second column while nobody looks: before the call they open (the maze
+          // unfolds around the strip the player came in by); after it, with the player back in the strip's part of the
+          // first column, they wall up again, and once all are walled and the opening is out of view, it is the mall again.
+          const want = !(garageReleased && inStrip);
+          let changed = false;
+          const next = garage.gapClosed.map((c, k) => {
+            if (c !== want || seamInView(e, f, true, (s) => s.gaps[k])) return c;
+            changed = true;
+            return !c;
+          });
+          if (changed) setGaps((k) => next[k]);
+          if (garageReleased && inStrip && garage.gapClosed.every(Boolean) && !seamInView(e, f, true, (s) => s.opening)) swapToMall();
+        }
       }
       garage.view.update(now / 1000);
     }
@@ -883,7 +1092,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
     post.render(now / 1000);
-    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · cordura ${sanity.level.toFixed(2)} · peor cuadro ${worstShown.toFixed(0)} ms · precarga ${warmMs < 0 ? "-" : warmMs.toFixed(0) + " ms"}${shadow ? ` · sombra ${shadow.state} ${shadow.awareness.toFixed(2)}` : ""}`;
+    if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · zona ${area} (${player.x.toFixed(1)}, ${(-player.z).toFixed(1)}) · cordura ${sanity.level.toFixed(2)} · peor cuadro ${worstShown.toFixed(0)} ms · precarga ${warmMs < 0 ? "-" : warmMs.toFixed(0) + " ms"}${shadow ? ` · sombra ${shadow.state} ${shadow.awareness.toFixed(2)}` : ""}`;
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
