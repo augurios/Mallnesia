@@ -79,7 +79,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 ### Other areas
 
 - **Hand-built areas** carry the place's identity: food court (first area), abandoned gym, gray service corridors (shortcuts and stealth network), upper-floor offices with an empty pool, TV station offices, bathrooms and elevators, fifth floor, atriums.
-- **The parking garage** is procedural and treated as its own level, entered via the wrong-floor elevator or a stairwell door, with a fade transition. A seamless ramp connection is a later goal.
+- **The parking garage** is procedural and treated as its own level, entered via the wrong-floor elevator or a stairwell door, with a fade transition. (First pass built: it is entered through the floor 2 garage door when the mall opens it; the elevator comes with the elevator kit piece. See `docs/engine-architecture.md`.) A seamless ramp connection is a later goal.
   - Built from a small chunk set: column bays, ramps, dead ends, stairwell doors, painted lines, fluorescent lights, parked cars.
   - Starts looking normal; then level signs skip (P2, P3, P7, P-12) and "Salida" arrows point into walls.
   - A recurring generic minivan landmark signals the player is going in circles.

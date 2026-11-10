@@ -119,6 +119,11 @@ export class Doors {
     return best ? { id: best.id, locked: best.locked } : null;
   }
 
+  /** How open a door is, 0 closed to 1 open (0 for an id that does not exist). */
+  angleOf(id: string): number {
+    return this.doors.find((d) => d.id === id)?.angle ?? 0;
+  }
+
   /** The player pressed E at a door: it toggles, unless it is locked. */
   use(id: string) {
     const d = this.doors.find((x) => x.id === id);

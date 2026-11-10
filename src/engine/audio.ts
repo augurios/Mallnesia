@@ -17,6 +17,8 @@ export interface Audio {
   slam(x: number, y: number, z: number): void;
   /** A locked door being tried. */
   rattle(x: number, y: number, z: number): void;
+  /** A payphone ringing, far off: two short bursts of a bell tone. */
+  ring(x: number, y: number, z: number): void;
   /** Something hard hitting the floor (a chair, a bin): `strength` 0 to 1 is how hard. */
   clatter(x: number, y: number, z: number, strength: number): void;
   /** Something dragged across the floor for `seconds`. */
@@ -157,6 +159,36 @@ export function createAudio(): Audio {
         src.connect(band).connect(g).connect(out);
         src.start(t + at);
         src.stop(t + at + 0.08);
+      }
+    },
+    ring(x, y, z) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      out.refDistance = 6;
+      out.rolloffFactor = 1.0; // it carries down the whole garage: it is the way to go
+      for (const at of [0, 0.5]) {
+        for (const f of [1330, 1670]) {
+          const osc = c.createOscillator();
+          osc.type = "square";
+          osc.frequency.value = f;
+          const g = c.createGain();
+          const lfo = c.createOscillator(); // the bell's warble
+          lfo.frequency.value = 22;
+          const depth = c.createGain();
+          depth.gain.value = 0.05;
+          lfo.connect(depth).connect(g.gain);
+          g.gain.setValueAtTime(0.0001, t + at);
+          g.gain.linearRampToValueAtTime(0.07, t + at + 0.02);
+          g.gain.setValueAtTime(0.07, t + at + 0.38);
+          g.gain.linearRampToValueAtTime(0.0001, t + at + 0.42);
+          osc.connect(g).connect(out);
+          osc.start(t + at);
+          lfo.start(t + at);
+          osc.stop(t + at + 0.45);
+          lfo.stop(t + at + 0.45);
+        }
       }
     },
     clatter(x, y, z, strength) {

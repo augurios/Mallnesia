@@ -4,7 +4,8 @@
 // No DOM and no Three.js, so scripts/test-fail.mts runs the exact code the game runs.
 import type { NavGrid } from "./nav";
 
-export type FailReason = "caught" | "faint";
+/** Why the screen goes black: caught (back to the checkpoint), faint (wakes elsewhere), and the two moves between the mall and the garage. */
+export type FailReason = "caught" | "faint" | "to_garage" | "to_mall";
 export type FailState = "playing" | "falling" | "dark" | "waking";
 
 export const FAIL = {
