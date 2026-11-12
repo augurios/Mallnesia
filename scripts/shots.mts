@@ -65,6 +65,22 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "garage_hall", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
   { name: "garage_van", floor: 1, x: 31, y: 7, yaw: 270, pitch: -3, extra: "&area=garage&shadow=off&guard=off&noise=off" },
   { name: "garage_booth", floor: 1, x: 68, y: 8, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
+  // the parking strip dressed as the garage's first column (?stripswap=off keeps the mall there), and the same place in the garage
+  { name: "strip_from_hall", floor: 1, x: 22, y: 114, yaw: 90, pitch: 0, extra: "&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_inside", floor: 1, x: 11, y: 114, yaw: 90, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_inside_match", floor: 1, x: 4, y: 18, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_inside_back", floor: 1, x: 7, y: 120, yaw: 270, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
+  // the moment of the swap, turned left from the entry cell: the same view in the strip (mall) and in the garage
+  { name: "strip_turn_mall", floor: 1, x: 11, y: 112.4, yaw: 180, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_turn_garage", floor: 1, x: 4, y: 19.6, yaw: 0, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14" },
+  // ramps: from the doorway, halfway up, and the arrival garage's open doorway
+  { name: "ramp_foot", floor: 1, x: 51, y: 42, yaw: 90, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "ramp_up", floor: 1, x: 42, y: 42, yaw: 90, pitch: 6, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14&forcerun=1" },
+  // the same pose just over the swap height, without and with the swap (the two must look the same)
+  { name: "ramp_above_prep", floor: 1, x: 40.1, y: 42, yaw: 90, pitch: 12, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14&forcerun=1&rampseed=5&rampswap=off" },
+  { name: "ramp_above_swapped", floor: 1, x: 40.1, y: 42, yaw: 90, pitch: 12, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14&forcerun=1&rampseed=5" },
+  { name: "ramp_exit_door", floor: 1, x: 6, y: 18, yaw: 90, pitch: 0, extra: "&area=ramp&rampseed=5&ramptarget=north:3&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_floor3", floor: 3, x: 11, y: 162, yaw: 90, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "garage_lit", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=12&stats=1" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look

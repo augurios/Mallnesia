@@ -41,7 +41,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 ## Tech stack and base project
 
 - **Base (decided):** a **Next.js (App Router) + TypeScript** project, exported statically (`output: 'export'`). The 3D engine is **plain Three.js** in framework-free TypeScript (`src/engine/`); React/Next handles only menu, HUD, pause and settings. [dirien/backrooms](https://github.com/dirien/backrooms) (Three.js + Vite) is a **reference for architecture only**. It has no license, so we do not copy its code; we rebuild the ideas in our own code.
-- **Planned additions:** the mall as a blockout GLB generated from the floor-plan JSON by a Node script (no Blender installed), later hand-modeled; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
+- **Planned additions:** the mall as a blockout GLB generated from the floor-plan JSON by a Node script, later hand-modeled; mesh collision with `three-mesh-bvh`; KTX2/Basis texture compression.
 
 ### Module plan (relative to the backrooms reference)
 
@@ -58,7 +58,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **Light:** a flashlight with limited charge (equivalent of Amnesia's lantern oil). Charge drains while it is on (2 minutes for a full charge) and **recharges by itself while it is off** (90 seconds to refill; decided by Augusto, replacing lit areas and charging points). There are no battery pickups.
 - **Locked zones:** no keys or access cards. The mall opens and locks sections on its own, tied to story beats.
 - **Doors:** the mall opens and closes doors on its own: doors that were open are now closed, and vice versa. Door state is a tool of the mall's shifting (see "Central premise"), driven by scripted events and by sanity. Drawers are not interactive. **The only doors the player can use are the secret-hallway doors** (below), with **E**; no other door is operable.
-  - **Where doors exist (decided):** only at the ends of the secret hallway on each floor (double service doors, 6 in total, placed in `docs/floorplans/secret_doors.json`). The floor 2 door at the south end of the parking strip is the entrance to the procedural garage level. Everywhere else is open or walled. The mall moves them only when the player isn't watching (`src/engine/doors.ts`).
+  - **Where doors exist (decided):** only at the ends of the secret hallway on each floor (double service doors, 6 in total, placed in `docs/floorplans/secret_doors.json`). The floor 2 door at the south end of the parking strip is an entrance to the procedural garage level, and so are the two openings onto the parking strip on every floor (decided: any of them, any time). **Each of the six openings (2 per floor, 3 floors) leads to its own garage (decided): the seed depends on the door, and the same door always gives the same garage** (`entranceSeed`; the debug seed is the base). The entry is **seamless**: the strip is dressed as the garage's first column (two walled 48 m blocks) and is **closed** (decided: no doorways to the outside; the opening's cell has a solid far wall and doorways left and right). Once the player is inside and the opening is out of view (turning left or right does it), the world swaps to the real garage with the same view, with no blink; the garage's doorways out of the first column start walled and open one by one while the player isn't looking (the mall shifting). The way out is seamless too: after the payphone, back in the first column, the doorways wall up again while unseen and the world swaps to the mall at the same opening. Everywhere else is open or walled. The mall moves them only when the player isn't watching (`src/engine/doors.ts`).
   - **Secret doors (decided):** closed, they use the wall material and blend into the wall. The player finds them by walking up to one (a "Presiona E para interactuar" prompt appears when close and facing it) or by seeing the mall open one; **E** opens or closes it. The garage door is **locked to the player**: only the mall opens it (pressing E gives a rattle and "No cede"), so the garage can be entered only when the mall allows it.
 - **Interaction (E):** limited to the secret doors, hiding spots (food court tables first; abandoned cars in the garage later), readable notes, and security-room monitors. **No inventory and no item pickup.**
 - **Security room:** monitors the player can use to scout other areas; the shadow can appear on the feeds. The player can also spot the guard here (see "The guard").
@@ -84,6 +84,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
   - Starts looking normal; then level signs skip (P2, P3, P7, P-12) and "Salida" arrows point into walls.
   - A recurring generic minivan landmark signals the player is going in circles.
   - Goal: reach a payphone, intercom, or attendant booth before sanity runs out. Failure → wake up elsewhere in the mall.
+  - **Ramps (decided):** every door's garage has at least 2 ramps, in dead-end cells, 6 m wide and 11 m long, that the player really **walks up** (the floor rises 3 m, through a hole in the ceiling; no cars or stalls on them). **Going up is seamless, one continuous place (decided):** the next garage is drawn right above the ramp, turned and placed so its own ramp *from below* (a pit in its floor, in a dead-end cell, top flush with the floor and facing the cell's only doorway) is the very ramp the player is climbing; through the ceiling's hole they see where they are going, and when their eye is above the ceiling (in the dark) the world just becomes that garage, with no change on screen. It is **another garage with a random seed, different every time**: no booth, no payphone, no ramps of its own (one level deep). Its way out is an **open doorway, always open** (in the first column's west wall, with an "Escalera" sign beside it; the ring comes from it) **with the real mall visible beyond it** (drawn in the garage's frame, so the way out is the same place the whole way); the world swaps to the mall once the player is about 2 m past the doorway and the garage is behind them (off camera), at a **random one of the six strip openings**. The strips are never changed: the door's own garage is as it was. The sanity drain keeps running until the player is out. The pit closes behind the player (nobody walks back down).
   - Contained, guided sequence, not endless wandering. Seed: **fixed by default**, with a config flag to randomize.
 
 ## Threats
@@ -117,7 +118,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 - **No combat and no health.** The player fails by being caught by the shadow. To avoid this, the player must stay quiet, hidden, and out of sight, with the flashlight off.
 - **The shadow is the only threat that can catch the player.** The girl in white never chases, and the watchers drain sanity but never catch the player.
 - **Being caught restarts the player at the last checkpoint** (see "Save, load, and checkpoints").
-- **Other failure:** sanity running out in the garage wakes the player elsewhere in the mall (not a restart).
+- **Other failure (decided):** sanity running out, anywhere (the mall or the garage), makes the player faint and wake at a random spot elsewhere in the mall, with some sanity back (not a restart).
 
 ## Winning
 
@@ -175,6 +176,7 @@ Some legends are tied to real tragedies and real people. When writing notes, dia
 ## Repository conventions
 
 - **No Git LFS (decided):** binaries are committed as plain files. Everything `npm run assets` writes (`public/models/mall_blockout.glb`, `ao.png`, `props.json`, `nav.json` and `kit/*.glb`) is generated from `docs/floorplans/` and `scripts/`, so it is gitignored and rebuilt by `predev` (if any is missing) and `prebuild`. A hand-modeled file that replaces a generated one has to be committed and taken out of `.gitignore`. Revisit LFS if the repo passes about 500 MB.
+- **Characters (decided):** realistic, built with Blender + MPFB (MakeHuman, CC0) and animated with CC0 clips (Quaternius' Universal Animation Library), all scripted (`scripts/guard/`); no Adobe/Mixamo. The built `public/models/guard.glb` is committed, since it needs Blender to rebuild.
 - Reference photos of the real mall: `reference/photos/`.
 - Design docs, floor plans, and legend notes: `docs/`.
 - Update this file when decisions change (license status, seed choice, language, priorities).

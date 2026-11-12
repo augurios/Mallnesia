@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import type { Box, GarageLayout, Sign } from "./garage-gen";
+import { rampHole, type Box, type GarageLayout, type Sign } from "./garage-gen";
 
 // Draws a garage layout (garage-gen.ts): concrete floor, ceiling, walls and columns, painted lines, parked cars and the
 // minivan, fluorescent tubes that flicker or are dead, hanging signs, the attendant's booth and its payphone. Everything
@@ -196,10 +196,18 @@ export interface GarageView {
   group: THREE.Group;
   /** Flicker of the tubes; `seconds` is any steadily increasing clock. */
   update(seconds: number): void;
+  /** Walls up (or opens) the k-th of `opts.gapWalls`: the doorways the mall closes and opens while nobody looks. */
+  setGapWall(k: number, closed: boolean): void;
+  /** Shows (or hides) the pit of an arrival garage's landing: the ramp from below and its shaft. Hidden while the ramp it continues is on screen. */
+  setPit(visible: boolean): void;
   dispose(): void;
 }
 
-export function createGarageView(layout: GarageLayout): GarageView {
+/**
+ * `partial`: a piece of the garage dressed into the mall (the strip): no booth, no phone. `gapWalls`: walls that fill
+ * doorways, each shown or hidden on its own (`setGapWall`); hidden at first.
+ */
+export function createGarageView(layout: GarageLayout, opts: { partial?: boolean; gapWalls?: Box[] } = {}): GarageView {
   const group = new THREE.Group();
   group.name = "garage";
   const disposables: { dispose(): void }[] = [];
@@ -216,17 +224,47 @@ export function createGarageView(layout: GarageLayout): GarageView {
   };
 
   // floor and ceiling
-  const floor = new THREE.Mesh(own(new THREE.PlaneGeometry(layout.width, layout.depth)), own(new THREE.MeshStandardMaterial({ map: own(concrete(layout.width / 4, layout.depth / 4, 96)), roughness: 0.82, color: 0xb0b2b6 })));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(layout.width / 2, 0, -layout.depth / 2);
-  const ceiling = new THREE.Mesh(own(new THREE.PlaneGeometry(layout.width, layout.depth)), own(new THREE.MeshStandardMaterial({ map: own(concrete(layout.width / 5, layout.depth / 5, 70)), roughness: 0.95, color: 0x8a8c90 })));
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(layout.width / 2, layout.height, -layout.depth / 2);
+  const floorMat = own(new THREE.MeshStandardMaterial({ map: own(concrete(layout.width / 4, layout.depth / 4, 96)), roughness: 0.82, color: 0xb0b2b6 }));
+  let floor: THREE.Mesh;
+  if (layout.landing) {
+    // an arrival garage: a hole where the ramp comes up from below
+    const l = layout.landing.box;
+    const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(layout.width, 0), new THREE.Vector2(layout.width, layout.depth), new THREE.Vector2(0, layout.depth)]);
+    shape.holes.push(new THREE.Path([new THREE.Vector2(l.x0, l.y0), new THREE.Vector2(l.x1, l.y0), new THREE.Vector2(l.x1, l.y1), new THREE.Vector2(l.x0, l.y1)]));
+    const geo = new THREE.ShapeGeometry(shape);
+    const uv = geo.getAttribute("uv");
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) / layout.width, uv.getY(k) / layout.depth);
+    geo.rotateX(-Math.PI / 2); // flat, facing up (plan y becomes -z)
+    floor = new THREE.Mesh(own(geo), floorMat);
+  } else {
+    floor = new THREE.Mesh(own(new THREE.PlaneGeometry(layout.width, layout.depth)), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(layout.width / 2, 0, -layout.depth / 2);
+  }
+  // the ceiling, with a hole where each ramp goes up through it
+  const ceilingShape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(layout.width, 0), new THREE.Vector2(layout.width, -layout.depth), new THREE.Vector2(0, -layout.depth)]);
+  for (const r of layout.ramps) {
+    const h = rampHole(r);
+    ceilingShape.holes.push(new THREE.Path([new THREE.Vector2(h.x0, -h.y0), new THREE.Vector2(h.x1, -h.y0), new THREE.Vector2(h.x1, -h.y1), new THREE.Vector2(h.x0, -h.y1)]));
+  }
+  const ceilingGeo = new THREE.ShapeGeometry(ceilingShape);
+  const uv = ceilingGeo.getAttribute("uv");
+  for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) / layout.width, 1 + uv.getY(k) / layout.depth); // the texture's repeat is per whole ceiling
+  ceilingGeo.rotateX(Math.PI / 2); // flat, facing down
+  const ceiling = new THREE.Mesh(own(ceilingGeo), own(new THREE.MeshStandardMaterial({ map: own(concrete(layout.width / 5, layout.depth / 5, 70)), roughness: 0.95, color: 0x8a8c90 })));
+  ceiling.position.set(0, layout.height, 0);
   group.add(floor, ceiling);
 
   // walls, columns (with a yellow band), the stairwell door, the booth, the phone
   const wallTex = own(concrete(1, 1, 120));
-  addMerged(layout.boxes.filter((b) => b.kind === "wall").map(boxGeo), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, color: 0xa9abae }));
+  const wallMat = own(new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, color: 0xa9abae }));
+  addMerged(layout.boxes.filter((b) => b.kind === "wall").map(boxGeo), wallMat);
+  const gapWalls = (opts.gapWalls ?? []).map((b) => {
+    const m = new THREE.Mesh(own(boxGeo(b)), wallMat);
+    m.visible = false;
+    group.add(m);
+    return m;
+  });
   const cols = layout.boxes.filter((b) => b.kind === "column");
   addMerged(cols.map(boxGeo), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, color: 0x9a9ca0 }));
   addMerged(
@@ -239,11 +277,40 @@ export function createGarageView(layout: GarageLayout): GarageView {
   addMerged(layout.boxes.filter((b) => b.kind === "door").map(boxGeo), new THREE.MeshStandardMaterial({ color: 0x5c6670, roughness: 0.5, metalness: 0.5 }));
   addMerged(layout.boxes.filter((b) => b.kind === "booth").map(boxGeo), new THREE.MeshStandardMaterial({ color: 0x6f7a72, roughness: 0.8 }));
   addMerged(layout.boxes.filter((b) => b.kind === "phone").map(boxGeo), new THREE.MeshStandardMaterial({ color: 0x1f3d5a, roughness: 0.4, metalness: 0.4 }));
-  addMerged(layout.ramps.map((r) => wedge(r.box, r.rise)), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.95, color: 0x76787c, side: THREE.DoubleSide }));
+  addMerged(layout.ramps.map((r) => wedge(r.box, r.rise)), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.95, color: 0x9c9ea2, side: THREE.DoubleSide }));
+
+  // the pit of an arrival garage: the ramp from below (the wedge sunk by its rise) and the shaft walls along its sides and foot
+  const pit = new THREE.Group();
+  pit.visible = false;
+  if (layout.landing) {
+    const { box: l, rise } = layout.landing;
+    const w = wedge(l, rise);
+    w.translate(0, -l.top, 0);
+    pit.add(new THREE.Mesh(own(w), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.95, color: 0x9c9ea2, side: THREE.DoubleSide })));
+    const shaft: THREE.BufferGeometry[] = [];
+    const wall = (x0: number, x1: number, y0: number, y1: number) => shaft.push(at(new THREE.BoxGeometry(x1 - x0, l.top, y1 - y0), (x0 + x1) / 2, -l.top / 2, -(y0 + y1) / 2));
+    const T = 0.1;
+    if (Math.abs(Math.cos(rise)) > 0.5) {
+      wall(l.x0, l.x1, l.y0 - T, l.y0);
+      wall(l.x0, l.x1, l.y1, l.y1 + T);
+      if (Math.cos(rise) > 0) wall(l.x0 - T, l.x0, l.y0 - T, l.y1 + T);
+      else wall(l.x1, l.x1 + T, l.y0 - T, l.y1 + T);
+    } else {
+      wall(l.x0 - T, l.x0, l.y0, l.y1);
+      wall(l.x1, l.x1 + T, l.y0, l.y1);
+      if (Math.sin(rise) > 0) wall(l.x0 - T, l.x1 + T, l.y0 - T, l.y0);
+      else wall(l.x0 - T, l.x1 + T, l.y1, l.y1 + T);
+    }
+    const merged = mergeGeometries(shaft, false);
+    shaft.forEach((g) => g.dispose());
+    if (merged) pit.add(new THREE.Mesh(own(merged), wallMat));
+  }
+  group.add(pit);
 
   // the booth's lit window (west face) and the payphone's lit panel
   const lit = own(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 1.45, 0.9) }));
   const booth = layout.booth;
+  if (!opts.partial && !layout.arrival) {
   const win = new THREE.Mesh(own(new THREE.PlaneGeometry(2.2, 1.0)), lit);
   win.rotation.y = -Math.PI / 2;
   win.position.set(booth.x0 - 0.01, 1.45, -(booth.y0 + booth.y1) / 2);
@@ -251,6 +318,7 @@ export function createGarageView(layout: GarageLayout): GarageView {
   panel.rotation.y = -Math.PI / 2;
   panel.position.set(booth.x0 - 0.41, 1.35, -layout.goal.y);
   group.add(win, panel);
+  }
 
   // painted lines
   const flat = (x0: number, y0: number, x1: number, y1: number, width: number) => {
@@ -301,9 +369,10 @@ export function createGarageView(layout: GarageLayout): GarageView {
   const tubeMat = own(new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.5, 2.8) }));
   const deadMat = own(new THREE.MeshBasicMaterial({ color: 0x25282c }));
   const poolMat = (opacity: number) => own(new THREE.MeshBasicMaterial({ map: poolTex, color: 0xdfe8ff, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  const steadyPool = poolMat(0.34);
   instanced(steady, tubeGeo, tubeMat, layout.height - 0.05);
   instanced(dead, tubeGeo, deadMat, layout.height - 0.05);
-  instanced(steady, poolGeo, poolMat(0.34), 0.012, 1);
+  instanced(steady, poolGeo, steadyPool, 0.012, 1);
   const flickerGroups = [0, 1, 2].map((k) => {
     const list = flick.filter((_, i) => i % 3 === k);
     const tube = own(new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.5, 2.8) }));
@@ -347,6 +416,12 @@ export function createGarageView(layout: GarageLayout): GarageView {
         f.tube.color.setRGB(2.4 * k, 2.5 * k, 2.8 * k);
         f.pool.opacity = 0.34 * k;
       }
+    },
+    setGapWall(k, closed) {
+      if (gapWalls[k]) gapWalls[k].visible = closed;
+    },
+    setPit(visible) {
+      pit.visible = visible;
     },
     dispose() {
       disposables.forEach((d) => d.dispose());

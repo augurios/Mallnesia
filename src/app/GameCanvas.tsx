@@ -17,6 +17,7 @@ export default function GameCanvas() {
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
+  const [tip, setTip] = useState<"move" | "flashlight" | null>(null);
   // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
   const hold = typeof window !== "undefined" ? parseFloat(new URLSearchParams(window.location.search).get("loading") ?? "") : NaN;
   const [load, setLoad] = useState<{ progress: number; ready: boolean; error: boolean }>({ progress: 0, ready: false, error: false });
@@ -34,6 +35,7 @@ export default function GameCanvas() {
       },
       onStatus: setStatus,
       onSubtitle: setSubtitle,
+      onTip: setTip,
       onLoad: setLoad,
       onQualityChange: (level) => {
         setQuality(level);
@@ -91,13 +93,23 @@ export default function GameCanvas() {
         </div>
       )}
       {status && (
-        <div className="game-flashlight" aria-label={es.flashlight}>
-          <div
-            className={status.flashlightOn ? "game-flashlight-fill on" : "game-flashlight-fill"}
-            style={{ width: `${Math.round(status.charge * 100)}%` }}
-          />
+        <div className="game-vitals">
+          <label className={status.sanity < 0.3 ? "critical" : undefined}>
+            {es.sanity}
+            <meter min={0} max={100} low={30} optimum={100} value={Math.round(status.sanity * 100)} />
+            <span>{Math.ceil(status.sanity * 100)}%</span>
+          </label>
+          <label className={status.exhausted ? "critical" : undefined}>
+            {es.stamina}
+            <meter min={0} max={100} low={30} optimum={100} value={Math.round(status.stamina * 100)} />
+          </label>
+          <label className={status.flashlightOn ? "lit" : undefined}>
+            {es.flashlight}
+            <meter min={0} max={100} low={15} optimum={100} value={Math.round(status.charge * 100)} />
+          </label>
         </div>
       )}
+      {locked && tip && <div className="game-tip">{es.tips[tip]}</div>}
       {locked && subtitle && <div className="game-subtitle">{subtitle}</div>}
       {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}
       {locked && !status?.prompt && notice && <div className="game-prompt">{notice}</div>}
