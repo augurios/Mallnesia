@@ -1289,6 +1289,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(a.spot.x, gy + 0.7, -a.spot.y), 0.6));
         if (dt > 0 && a.update(dt, distance, inView)) sanity.drain(GIRL.FIRST_SIGHT);
         sanity.setDrain("girl", inView ? girlDrain(distance) : 0);
+        if (dt > 0 && inView && distance < GIRL.TOUCH_DIST) sanity.set(0); // right next to her: everything goes at once (then the faint below)
         if (dt > 0 && a.takeCall()) {
           girlVoice.call();
           options.onSubtitle?.(es.girlCalls[Math.floor(Math.random() * es.girlCalls.length)]);

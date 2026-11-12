@@ -45,6 +45,7 @@ const seeded = (seed: number) => () => {
   c.update(GIRL.CALL_GAP[1], 8, false);
   check("and come again", c.takeCall());
   check("the closer, the more she drains", girlDrain(2) > girlDrain(8) && girlDrain(8) > girlDrain(15) && girlDrain(15) >= GIRL.DRAIN_FAR);
+  check("touch distance is closer than the point where the drain peaks", GIRL.TOUCH_DIST < GIRL.NEAR_DIST);
   check("drain bounds", Math.abs(girlDrain(0) - GIRL.DRAIN_NEAR) < 1e-9 && Math.abs(girlDrain(GIRL.LEAVE_DIST) - GIRL.DRAIN_FAR) < 1e-9);
 }
 {

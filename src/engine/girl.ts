@@ -34,6 +34,8 @@ export const GIRL = {
   DRAIN_FAR: 0.012,
   DRAIN_NEAR: 0.07,
   NEAR_DIST: 2,
+  /** Seeing her from this close (m) takes all the sanity at once. */
+  TOUCH_DIST: 1.5,
   /** Seconds between her calls (first one after CALL_FIRST). */
   CALL_FIRST: 2.5,
   CALL_GAP: [7, 11] as [number, number],
