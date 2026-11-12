@@ -5,8 +5,9 @@
 #   blender -b --python scripts/girl/build_girl.py -- <out.glb> [<out.blend>]
 #
 # The look (decided by Augusto): a girl of about eight in a first communion dress, white lace, a short veil on a wreath
-# of small flowers, white socks and shoes, her dark hair in a neat braid. The wrongness is in her face: grey-pale skin,
-# dark hollows round red-rimmed eyes, nearly black irises, bloodless lips. Hidden behind her hands while she cries.
+# of small flowers, white socks and shoes, her long dark hair loose and messy (MPFB's long01 here, as the mass under
+# it; the messy locks are grown over her in her crying pose by hair.py, a later step). The wrongness is in her face:
+# grey-pale skin, dark hollows round red-rimmed eyes, nearly black irises, bloodless lips. Hidden behind her hands.
 import os
 import sys
 
@@ -47,7 +48,7 @@ HUMAN = {
     "eyelashes": "eyelashes02.mhclo",
     "teeth": "",
     "tongue": "",
-    "hair": "braid01.mhclo",
+    "hair": "long01.mhclo",
     "proxy": "",
     "clothes": ["shoes01.mhclo"],
     "skin_mhmat": "young_caucasian_female.mhmat",
@@ -84,7 +85,7 @@ print("lifted by", round(-lowest, 3))
 objs = {o.name.split(".", 1)[1] if "." in o.name else o.name: o for o in bpy.data.objects}
 body = objs["body"]
 shoes = objs["shoes01"]
-hair = objs["braid01"]
+hair = objs["long01"]
 eyes = objs["low-poly"]
 
 
@@ -251,7 +252,7 @@ shoes.data.materials.append(simple("girl_shoes", sh, 0.3))
 hp = pixels(sized(diffuse_of(hair), 512)).copy()
 hp[..., :3] = hp[..., :3] * 0.42 * np.array([1.0, 0.9, 0.82])
 hair.data.materials.clear()
-hair.data.materials.append(simple("girl_braid01", hp, 0.7, alpha=True))
+hair.data.materials.append(simple("girl_hair", hp, 0.7, alpha=True))
 for key in ("eyebrow010", "eyelashes02"):
     o = objs[key]
     px = pixels(sized(diffuse_of(o), 256)).copy()

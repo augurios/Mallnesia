@@ -287,7 +287,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   if (girlMode === "now") girlDirector.soon(3);
   const girlView = createGirlView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
   const girlVoice = audio.girl();
-  scene.add(girlView.object);
+  scene.add(girlView.object, girlView.light); // her light stays in the scene (dimmed to nothing), so shaders never recompile
   let apparition: Apparition | null = null;
   let girlSubtitleUntil = 0;
   const guardView = createGuardView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives

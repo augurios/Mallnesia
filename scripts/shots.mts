@@ -82,10 +82,11 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "ramp_exit_door", floor: 1, x: 6, y: 18, yaw: 90, pitch: 0, extra: "&area=ramp&rampseed=5&ramptarget=north:3&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "strip_floor3", floor: 3, x: 11, y: 162, yaw: 90, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "garage_lit", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=12&stats=1" },
-  // the girl in white ahead of the start (?girlat=x,y): 5 m in the dark, 7 m lit, 3 m close
+  // the girl in white ahead of the start (?girlat=x,y): 5 m in the dark, 7 m lit, 3 m close, 1.9 m (her hair and face)
   { name: "girl_dark", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,33&girl=off&shadow=off&guard=off&noise=off&ambient=2" },
   { name: "girl_lit", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,35&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "girl_close", floor: 1, x: 72, y: 28, yaw: 0, pitch: -10, extra: "&girlat=72,31&girl=off&shadow=off&guard=off&noise=off&ambient=10" },
+  { name: "girl_near", floor: 1, x: 72, y: 28, yaw: 0, pitch: -16, extra: "&girlat=72,29.9&girl=off&shadow=off&guard=off&noise=off&ambient=6" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

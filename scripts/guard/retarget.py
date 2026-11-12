@@ -8,13 +8,15 @@
 #   --clips Lib_Clip:name,... (default: the guard's clips below)
 #   --limb-swing yes          swing only the limbs' rest directions onto the library's (the spine, neck and head keep
 #                             their own rest: on a child the library's spine directions bend the chest forward)
-#   --post <script.py>        run after the clips are baked and before export, with `rig`, `made` (the baked actions)
-#                             and `scene` in its namespace; it may append more actions to `made`.
+#   --post <a.py>,<b.py>      run in order after the clips are baked and before export, each with `rig`, `made` (the
+#                             baked actions), `scene` and `__file__` in its namespace; they may append more actions to
+#                             `made` and add meshes (everything in the scene is exported).
 #
 # How: both rigs face -y. For every frame, each target bone gets the world rotation the source bone has turned through
 # since its own rest pose, applied on top of the target's rest, after first swinging the target's rest direction onto
 # the source's (the library rests in a T-pose, MPFB in an A-pose). Bone lengths stay the guard's; only the hips move,
 # scaled by leg length.
+import os
 import re
 import sys
 import bpy
@@ -177,8 +179,10 @@ for clip, name in CLIPS.items():
     made.append(out)
     print("baked", name, f1 - f0 + 1, "frames")
 
-if "--post" in opts:
-    exec(compile(open(opts["--post"]).read(), opts["--post"], "exec"), {"rig": guard, "made": made, "scene": scene, "__name__": "post"})
+for post in opts.get("--post", "").split(","):
+    if post:
+        ns = {"rig": guard, "made": made, "scene": scene, "__name__": "post", "__file__": os.path.abspath(post)}
+        exec(compile(open(post).read(), post, "exec"), ns)
 
 # drop the library: its rig, its mesh and its actions, so only the guard and our clips are exported
 for o in imported:
