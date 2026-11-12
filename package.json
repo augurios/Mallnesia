@@ -12,6 +12,7 @@
     "blockout": "node scripts/build-blockout.mts",
     "test:walk": "npm run assets --silent && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-walk.mts",
     "test:shadow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-shadow.mts",
+    "test:girl": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-girl.mts",
     "test:garage": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-garage.mts",
     "test:quality": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-quality.mts",
     "test:load": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-load.mts",

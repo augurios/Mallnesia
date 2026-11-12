@@ -34,6 +34,8 @@ import {
   type GarageLayout,
 } from "./garage-gen";
 import { createGarageView, type GarageView } from "./garage-view";
+import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
+import { createGirlView } from "./girl-view";
 import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
@@ -277,6 +279,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   noiseDirector.enabled = noiseMode !== "off";
   if (noiseMode === "now") noiseDirector.soon(3);
   let noiseWorld: NoiseWorld | null = null;
+  // The girl in white (girl.ts): rare, brief apparitions ahead of the player; never moves, never chases. ?girl=off stops her,
+  // ?girl=now brings the first in 3 s, key U calls her now, ?girlat=x,y places her there on the starting floor (screenshots).
+  const girlMode = params.get("girl");
+  const girlDirector = new GirlDirector();
+  girlDirector.enabled = girlMode !== "off";
+  if (girlMode === "now") girlDirector.soon(3);
+  const girlView = createGirlView();
+  const girlVoice = audio.girl();
+  scene.add(girlView.object);
+  let apparition: Apparition | null = null;
+  let girlSubtitleUntil = 0;
   const guardView = createGuardView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
   scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
   // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
@@ -332,6 +345,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let stripHeld = false;
   /** In the garage, standing under a working tube counts as light for sanity (like a lit area did). */
   const litByTube = (lay: GarageLayout, x: number, y: number) => lay.lights.some((l) => l.state === "on" && Math.hypot(l.x - x, l.y - y) < 3.5);
+  let girlAtPending = params.has("girlat");
   let ringTimer = 0;
   let startInGarage = params.get("area") === "garage" || params.get("area") === "ramp"; // debug: ?area=garage (or ramp: up a ramp, see enterRampMap) starts there, once everything has loaded
   // The black of a fail (caught, fainted): a plain overlay, so it works on every quality preset, under the HUD text (z-index 5).
@@ -634,6 +648,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (noiseWorld) noiseWorld.object.visible = shown;
     sky.mesh.visible = inMall;
     if (!inMall) {
+      apparition = null;
+      sanity.setDrain("girl", 0);
+      girlView.update(0, 0, 0, 0, 0, 0);
       shadowView.object.visible = false;
       guardView.update(0, 0, 0, 0, false, "idle", 0);
     }
@@ -850,10 +867,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     sanity.setDrain("garage", 0);
   };
 
+  /** She appears now, out of the player's view (behind or beside them, or ahead but hidden behind something). False if there is nowhere to put her. */
+  const summonGirl = (): boolean => {
+    if (!nav || apparition || area !== "mall") return false;
+    const spot = chooseGirlSpot(nav, floor, player.x, -player.z, yawToHeading(yaw), Math.random);
+    if (!spot) return false;
+    apparition = new Apparition("corridor", spot);
+    return true;
+  };
+
   /** Puts the player somewhere new (a fail's respawn): standing, still, nothing hunting. */
   const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
     hiding.reset();
     guardScene?.finish();
+    apparition = null;
+    sanity.setDrain("girl", 0);
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -904,6 +932,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
+    if (e.code === "KeyU" && !e.repeat && locked) summonGirl(); // debug: the girl in white now
     if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
     if (e.code === "KeyP" && !e.repeat && locked && garage) {
       // debug: to the garage and back, with a fade
@@ -1094,6 +1123,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (charge === 0) flashOn = false;
     if (fail.update(dt) === "move") relocate();
     blackout.style.opacity = String(fail.fade);
+    if (girlAtPending && nav && warmDone) {
+      girlAtPending = false;
+      const at = (params.get("girlat") ?? "").split(",").map(parseFloat);
+      if (at.length === 2 && at.every(Number.isFinite)) {
+        apparition = new Apparition("corridor", { x: at[0], y: at[1], facing: Math.atan2(-player.z - at[1], player.x - at[0]) });
+        apparition.update(1, 0, false); // fully faded in (screenshots, where time stands still)
+      }
+    }
     if (startInGarage && garage && warmDone) {
       startInGarage = false;
       if (params.get("area") === "ramp") enterRampMap();
@@ -1236,6 +1273,41 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (dt > 0 && !fail.locked && noiseDirector.update(dt, sanity.shift)) fireNoise();
       noiseWorld.update(dt, noiseHooks);
     }
+    // The girl in white: out of view, crying; seeing her costs sanity, more the closer the player is.
+    if (area === "mall") {
+      if (dt > 0 && !fail.locked) {
+        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready";
+        if (girlDirector.update(dt, sanity.shift, busy) && !summonGirl()) girlDirector.soon(8); // nowhere to put her: try again soon
+      }
+      if (apparition) {
+        const a = apparition;
+        const distance = Math.hypot(a.spot.x - player.x, a.spot.y + player.z);
+        const gy = floor * FLOOR_HEIGHT;
+        const inView =
+          a.opacity > 0.5 &&
+          !!nav?.sees(floor, player.x, -player.z, a.spot.x, a.spot.y) &&
+          frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(a.spot.x, gy + 0.7, -a.spot.y), 0.6));
+        if (dt > 0 && a.update(dt, distance, inView)) sanity.drain(GIRL.FIRST_SIGHT);
+        sanity.setDrain("girl", inView ? girlDrain(distance) : 0);
+        if (dt > 0 && a.takeCall()) {
+          girlVoice.call();
+          options.onSubtitle?.(es.girlCalls[Math.floor(Math.random() * es.girlCalls.length)]);
+          girlSubtitleUntil = now + 3000;
+        }
+        girlVoice.update(a.spot.x, gy + 1.0, -a.spot.y, a.opacity);
+        girlView.update(a.spot.x, a.spot.y, floor, a.spot.facing, a.opacity, now / 1000);
+        if (a.done) {
+          apparition = null;
+          girlView.update(0, 0, 0, 0, 0, 0);
+          sanity.setDrain("girl", 0);
+          girlVoice.update(0, 0, 0, 0);
+        }
+      } else girlVoice.update(0, 0, 0, 0);
+      if (girlSubtitleUntil > 0 && now > girlSubtitleUntil) {
+        girlSubtitleUntil = 0;
+        if (!guardScene || guardScene.done) options.onSubtitle?.(null);
+      }
+    } else girlVoice.update(0, 0, 0, 0);
     // The guard's opening scene (started at the top of the frame, so the player is frozen from the first one).
     if (area === "mall" && opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {
       const spot = placeAhead(nav, floor, player.x, -player.z, yawToHeading(yaw));
@@ -1330,6 +1402,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
       shadowSound.dispose();
       shadowView.dispose();
+      girlVoice.dispose();
       audio.dispose();
       sky.dispose();
       post.dispose();

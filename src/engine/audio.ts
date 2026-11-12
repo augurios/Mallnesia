@@ -8,6 +8,15 @@ export interface ShadowSound {
   dispose(): void;
 }
 
+/** The girl in white's voice: a soft sob that follows her, and a wailing call. */
+export interface GirlSound {
+  /** World position in meters, and how present she is (0 to 1). */
+  update(x: number, y: number, z: number, level: number): void;
+  /** A wailing "ma-má": two falling notes with a quaver. */
+  call(): void;
+  dispose(): void;
+}
+
 export interface Audio {
   /** Call from a user gesture (the click that locks the pointer); browsers keep audio suspended until then. */
   resume(): void;
@@ -17,6 +26,8 @@ export interface Audio {
   slam(x: number, y: number, z: number): void;
   /** A locked door being tried. */
   rattle(x: number, y: number, z: number): void;
+  /** Starts the girl in white's voice: a child sobbing, with calls for her mother. Silent until `update` gives it a level above 0. */
+  girl(): GirlSound;
   /** A payphone ringing, far off: two short bursts of a bell tone. */
   ring(x: number, y: number, z: number): void;
   /** Something hard hitting the floor (a chair, a bin): `strength` 0 to 1 is how hard. */
@@ -160,6 +171,105 @@ export function createAudio(): Audio {
         src.start(t + at);
         src.stop(t + at + 0.08);
       }
+    },
+    girl() {
+      let nodes: { out: PannerNode; level: GainNode; sources: AudioScheduledSourceNode[] } | null = null;
+      const build = (c: AudioContext) => {
+        const out = panner(c, 0, 0, 0);
+        out.refDistance = 4;
+        const level = c.createGain();
+        level.gain.value = 0;
+        level.connect(out);
+        // The sob: breathy noise in a vowel band, gated by a slow, uneven pulse (a breath in, a shudder out).
+        const src = c.createBufferSource();
+        src.buffer = noiseBuffer(c);
+        src.loop = true;
+        const band = c.createBiquadFilter();
+        band.type = "bandpass";
+        band.frequency.value = 1500;
+        band.Q.value = 3;
+        const sob = c.createGain();
+        sob.gain.value = 0;
+        const pulse = c.createOscillator();
+        pulse.frequency.value = 0.7;
+        const pulseDepth = c.createGain();
+        pulseDepth.gain.value = 0.16;
+        pulse.connect(pulseDepth).connect(sob.gain);
+        const bias = c.createConstantSource();
+        bias.offset.value = 0.17;
+        bias.connect(sob.gain);
+        src.connect(band).connect(sob).connect(level);
+        // A thin voiced whimper under it, wobbling in pitch.
+        const tone = c.createOscillator();
+        tone.type = "triangle";
+        tone.frequency.value = 520;
+        const wobble = c.createOscillator();
+        wobble.frequency.value = 5.5;
+        const wobbleDepth = c.createGain();
+        wobbleDepth.gain.value = 22;
+        wobble.connect(wobbleDepth).connect(tone.frequency);
+        const toneGain = c.createGain();
+        toneGain.gain.value = 0;
+        const toneDepth = c.createGain();
+        toneDepth.gain.value = 0.035;
+        pulse.connect(toneDepth).connect(toneGain.gain);
+        tone.connect(toneGain).connect(level);
+        for (const n of [src, pulse, bias, tone, wobble]) n.start();
+        return { out, level, sources: [src, pulse, bias, tone, wobble] };
+      };
+      return {
+        update(x, y, z, lvl) {
+          const c = ready();
+          if (!c) return;
+          nodes ??= build(c);
+          const t = c.currentTime;
+          nodes.out.positionX.setTargetAtTime(x, t, 0.05);
+          nodes.out.positionY.setTargetAtTime(y, t, 0.05);
+          nodes.out.positionZ.setTargetAtTime(z, t, 0.05);
+          nodes.level.gain.setTargetAtTime(lvl, t, 0.3);
+        },
+        call() {
+          const c = ready();
+          if (!c || !nodes) return;
+          const t = c.currentTime;
+          // Two falling notes ("ma-má"), each a sawtooth through a vowel band, with a quaver.
+          for (const [at, from, to, len] of [[0, 640, 560, 0.5], [0.62, 700, 470, 0.9]] as const) {
+            const o = c.createOscillator();
+            o.type = "sawtooth";
+            o.frequency.setValueAtTime(from, t + at);
+            o.frequency.linearRampToValueAtTime(to, t + at + len);
+            const q = c.createOscillator();
+            q.frequency.value = 6.5;
+            const qd = c.createGain();
+            qd.gain.value = 14;
+            q.connect(qd).connect(o.frequency);
+            const vowel = c.createBiquadFilter();
+            vowel.type = "bandpass";
+            vowel.frequency.value = 1050;
+            vowel.Q.value = 4;
+            const g = c.createGain();
+            g.gain.setValueAtTime(0.0001, t + at);
+            g.gain.linearRampToValueAtTime(0.14, t + at + 0.08);
+            g.gain.exponentialRampToValueAtTime(0.001, t + at + len);
+            o.connect(vowel).connect(g).connect(nodes.level);
+            o.start(t + at);
+            q.start(t + at);
+            o.stop(t + at + len + 0.05);
+            q.stop(t + at + len + 0.05);
+          }
+        },
+        dispose() {
+          nodes?.sources.forEach((src) => {
+            try {
+              src.stop();
+            } catch {
+              // already stopped
+            }
+          });
+          nodes?.out.disconnect();
+          nodes = null;
+        },
+      };
     },
     ring(x, y, z) {
       const c = ready();
