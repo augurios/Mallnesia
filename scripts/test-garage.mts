@@ -1,7 +1,7 @@
 // Garage test: the generator (src/engine/garage-gen.ts): the same garage from the same seed, a way from the stairwell
 // door to the payphone that a body can really walk, the recurring van, signs that go wrong.
 // Run: npm run test:garage
-import { GARAGE, GARAGE_ENTRANCES, GARAGE_ENTRANCE_DEPTH, GARAGE_EXIT_INSIDE, STRIP_WEST, atGoal, blockRange, entranceSeed, garageToStrip, generateGarage, resolveGarage, stripBlockAt, stripBoxes, stripPart, stripToGarage, columnGaps, gapWalls, seamSeen, stripRows, stripSeams } from "../src/engine/garage-gen.ts";
+import { GARAGE, GARAGE_ENTRANCES, GARAGE_ENTRANCE_DEPTH, GARAGE_EXIT_INSIDE, STRIP_WEST, atGoal, blockRange, entranceSeed, garageToStrip, generateGarage, pitBoxes, rampHeight, resolveGarage, stripBlockAt, stripBoxes, stripPart, stripToGarage, columnGaps, gapWalls, seamSeen, stripRows, stripSeams } from "../src/engine/garage-gen.ts";
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail = "") => {
@@ -136,7 +136,7 @@ for (const e of GARAGE_ENTRANCES) {
 }
 const part = stripPart(g);
 const partDoor = stripPart(g, true);
-check("the dressing is column 0 only", part.boxes.every((b) => b.x0 >= -0.4 && b.x1 <= GARAGE.CELL + 0.4) && part.cars.every((c) => c.x <= GARAGE.CELL) && part.lights.length === 4 * GARAGE.ROWS);
+check("the dressing is column 0 only", part.boxes.every((b) => b.x0 >= -0.4 && b.x1 <= GARAGE.CELL + 0.4) && part.cars.every((c) => c.x <= GARAGE.CELL) && part.lights.length <= 4 * GARAGE.ROWS && part.lights.length >= 2 * GARAGE.ROWS);
 check("the dressing leaves out the stairwell door and the booth", part.boxes.every((b) => b.kind !== "door" && b.kind !== "booth" && b.kind !== "phone"));
 check("the west wall stays, with the opening cut out of it", part.boxes.some((b) => b.kind === "wall" && b.x0 < 0) && !part.boxes.some((b) => b.kind === "wall" && b.x0 < 0 && b.y1 > g.stairDoor.y - 3 && b.y0 < g.stairDoor.y + 3));
 check("the floor-2 door cuts 3 m out of the far wall (and its corner column)", partDoor.boxes.length === part.boxes.length - 1 && partDoor.boxes.some((b) => b.kind === "wall" && b.y0 > g.depth - 0.5 && b.x0 === 3) && !part.boxes.some((b) => b.kind === "wall" && b.y0 > g.depth - 0.5 && b.x0 === 3));
@@ -214,6 +214,90 @@ for (const e of GARAGE_ENTRANCES) {
     }
   check("six different garages", seeds.size === 6);
   check("the south opening on floor 2 keeps the base seed", entranceSeed(GARAGE.SEED, GARAGE_ENTRANCES[1], 1) === GARAGE.SEED);
+}
+
+// ---- ramps: every garage has at least two, walkable from the doorway up through the ceiling; nothing parked on them.
+// The garages they lead to have none, no payphone, and an open doorway out.
+{
+  let bad = "";
+  for (let seed = 1; seed <= 60; seed++) {
+    const lay = generateGarage(seed * 7919);
+    const solid = lay.boxes.filter((b) => b.kind !== "ramp");
+    if (lay.ramps.length < GARAGE.RAMPS_MIN) bad += ` ${seed}:few`;
+    lay.ramps.forEach((r, k) => {
+      const horizontal = Math.abs(Math.cos(r.rise)) > 0.5;
+      const dir = horizontal ? Math.sign(Math.cos(r.rise)) : Math.sign(Math.sin(r.rise));
+      const len = horizontal ? r.box.x1 - r.box.x0 : r.box.y1 - r.box.y0;
+      const mx = (r.box.x0 + r.box.x1) / 2;
+      const my = (r.box.y0 + r.box.y1) / 2;
+      // walk up along the middle, from just before the foot: not pushed by anything, the floor rises smoothly to the swap height and beyond
+      let last = 0;
+      for (let t = -1; t <= len * 0.8; t += 0.2) {
+        const px = horizontal ? (dir > 0 ? r.box.x0 : r.box.x1) + dir * t : mx;
+        const py = horizontal ? my : (dir > 0 ? r.box.y0 : r.box.y1) + dir * t;
+        const [rx, ry] = resolveGarage(solid, px, py, 0.35);
+        if (Math.hypot(rx - px, ry - py) > 1e-6) { bad += ` ${seed}:ramp${k}blockedAt${t.toFixed(1)}`; break; }
+        const h = rampHeight(lay, px, py);
+        if (h < last - 1e-9 || h - last > 0.2) bad += ` ${seed}:ramp${k}jump`;
+        last = h;
+      }
+      if (last < GARAGE.RAMP_SWAP) bad += ` ${seed}:ramp${k}tooLow`;
+      // nothing parked on it
+      if (lay.boxes.some((b) => (b.kind === "car" || b.kind === "van") && b.x0 < r.box.x1 && b.x1 > r.box.x0 && b.y0 < r.box.y1 && b.y1 > r.box.y0)) bad += ` ${seed}:ramp${k}carOnIt`;
+    });
+    if (rampHeight(lay, lay.spawn.x, lay.spawn.y) !== 0) bad += ` ${seed}:rampAtSpawn`;
+    // the arrival garage
+    const arr = generateGarage(seed * 104729, { arrival: true });
+    if (arr.ramps.length || arr.boxes.some((b) => b.kind === "booth" || b.kind === "phone" || b.kind === "door")) bad += ` ${seed}:arrivalHasRampBoothOrDoor`;
+    const L = arr.landing;
+    if (!L) bad += ` ${seed}:noLanding`;
+    else {
+      const arrSolid = [...arr.boxes.filter((b) => b.kind !== "ramp"), ...pitBoxes(arr, false)];
+      const horizontal = Math.abs(Math.cos(L.rise)) > 0.5;
+      const dir = horizontal ? Math.sign(Math.cos(L.rise)) : Math.sign(Math.sin(L.rise));
+      const len = horizontal ? L.box.x1 - L.box.x0 : L.box.y1 - L.box.y0;
+      const mx = (L.box.x0 + L.box.x1) / 2;
+      const my = (L.box.y0 + L.box.y1) / 2;
+      // the ramp from below: the floor is `top` down at the foot and level at the top, and the body walks up it, out of the pit, and on through the doorway
+      let last = -GARAGE.RAMP_RISE;
+      for (let t = 0.4; t <= len + 3; t += 0.2) {
+        const px = horizontal ? (dir > 0 ? L.box.x0 : L.box.x1) + dir * t : mx;
+        const py = horizontal ? my : (dir > 0 ? L.box.y0 : L.box.y1) + dir * t;
+        const [rx, ry] = resolveGarage(arrSolid, px, py, 0.35);
+        if (Math.hypot(rx - px, ry - py) > 1e-6) { bad += ` ${seed}:landingBlockedAt${t.toFixed(1)}`; break; }
+        const h = rampHeight(arr, px, py);
+        if (h < last - 1e-9 || h - last > 0.2 || h > 1e-9) bad += ` ${seed}:landingHeight`;
+        last = h;
+      }
+      if (rampHeight(arr, mx - dir * (horizontal ? len / 2 - 0.1 : 0), my - dir * (horizontal ? 0 : len / 2 - 0.1)) > -GARAGE.RAMP_RISE * 0.9) bad += ` ${seed}:landingFootNotDeep`;
+      // the pit can be shut behind the player, and the walls keep them in it
+      const [sx, sy] = resolveGarage(pitBoxes(arr, true), mx, my, 0.35);
+      if (Math.hypot(sx - mx, sy - my) < 1) bad += ` ${seed}:pitNotShut`;
+      const last2 = arr.path[arr.path.length - 1];
+      if (Math.floor(mx / arr.cell) !== last2[0] || Math.floor(my / arr.cell) !== last2[1]) bad += ` ${seed}:landingNotPathEnd`;
+      // it lines up over any ramp of any garage, turned by the difference of headings
+      for (const r of lay.ramps) {
+        const delta = r.rise - L.rise;
+        const c0x = (r.box.x0 + r.box.x1) / 2;
+        const c0y = (r.box.y0 + r.box.y1) / 2;
+        const tx = c0x - (Math.cos(delta) * mx - Math.sin(delta) * my);
+        const ty = c0y - (Math.sin(delta) * mx + Math.cos(delta) * my);
+        const map = (x: number, y: number) => [Math.cos(delta) * x - Math.sin(delta) * y + tx, Math.sin(delta) * x + Math.cos(delta) * y + ty];
+        const [a0, b0] = map(L.box.x0, L.box.y0);
+        const [a1, b1] = map(L.box.x1, L.box.y1);
+        if (Math.abs(Math.min(a0, a1) - r.box.x0) > 1e-6 || Math.abs(Math.max(a0, a1) - r.box.x1) > 1e-6 || Math.abs(Math.min(b0, b1) - r.box.y0) > 1e-6 || Math.abs(Math.max(b0, b1) - r.box.y1) > 1e-6) bad += ` ${seed}:landingMisaligned`;
+      }
+    }
+    const [ax, ay] = resolveGarage(arr.boxes.filter((b) => b.kind !== "ramp"), arr.arrive.x, arr.arrive.y, 0.35);
+    if (arr.landing && Math.hypot(ax - arr.arrive.x, ay - arr.arrive.y) > 1e-6) bad += ` ${seed}:arriveBlocked`;
+    if (arr.path.length < 8) bad += ` ${seed}:shortArrivalPath`;
+    // the open doorway: a body walks straight out through it, from the first column
+    for (let x = 3; x >= -0.5; x -= 0.1) {
+      const [rx, ry] = resolveGarage(arr.boxes, x, arr.stairDoor.y, 0.35);
+      if (Math.abs(rx - x) > 1e-6 || Math.abs(ry - arr.stairDoor.y) > 1e-6) { bad += ` ${seed}:exitBlockedAt${x.toFixed(1)}`; break; }
+    }
+  }
+  check("60 seeds: >= 2 walkable ramps, none with cars on them; arrival garages have no ramps, booth or door, a clear arrival and an open doorway", bad === "", bad);
 }
 
 console.log(failed ? `\n${failed} FAILED` : "\nall good");

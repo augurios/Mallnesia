@@ -19,6 +19,9 @@ import {
   generateGarage,
   resolveGarage,
   gapWalls,
+  rampHeight,
+  pitBoxes,
+  exitPen,
   seamSeen,
   stripBlockAt,
   stripBoxes,
@@ -35,7 +38,7 @@ import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
 import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
-import { setBakedAO, styleBlockout } from "./materials";
+import { setBakedAO, setMallFrame, styleBlockout } from "./materials";
 import { LoadProgress } from "./load-progress";
 import { NoiseDirector, pickNoiseSpot } from "./night-noise";
 import { createNoiseWorld, type NoiseWorld } from "./noise-view";
@@ -73,7 +76,7 @@ export interface RuntimeOptions {
   onLockChange?: (locked: boolean) => void;
   onStatus?: (status: PlayerStatus) => void;
   /** A short-lived message for the HUD. */
-  onNotice?: (notice: "doorLocked" | "checkpoint" | "caught" | "garageDone") => void;
+  onNotice?: (notice: "doorLocked" | "checkpoint" | "caught" | "garageDone" | "rampArrive") => void;
   /** A line of speech to show as a subtitle (the guard), or null to clear it. */
   onSubtitle?: (text: string | null) => void;
   /** A controls tip to show (after the guard's opening), or null to clear it. */
@@ -139,6 +142,7 @@ const SPAWNS: { x: number; y: number }[] = [
 /** First-person walk through the mall blockout: pointer-lock look, WASD, BVH wall collision. No React in here. */
 export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): Runtime {
   const renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer.localClippingEnabled = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   root.prepend(renderer.domElement);
 
@@ -147,6 +151,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   scene.fog = new THREE.Fog(0x04060a, 6, 70);
   const sky = createSky(); // the night outside the glass; the fog does not touch it
   scene.add(sky.mesh);
+  // The mall's own objects (blockout, props, noise events) live in one group, so a ramp garage's exit doorway can show the
+  // mall beyond it: the group is turned and moved into the garage's frame, and clipped to what lies outside the doorway.
+  const mallRoot = new THREE.Group();
+  scene.add(mallRoot);
+  const mallClip = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 1e6); // keeps x < constant; far away (nothing clipped) until needed
+  const clipMall = (root: THREE.Object3D) =>
+    root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) (m as THREE.Material).clippingPlanes = [mallClip];
+    });
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 250);
   camera.rotation.order = "YXZ";
@@ -294,8 +308,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   // (`gapClosed`); `solid` is what the player collides with (the layout's boxes and the closed doorways).
   // Each of the six strip openings (2 x 3 floors) has its own garage (`entranceSeed`), built when first needed; `garage` is
   // the one the player is in (or last was in).
-  type Garage = { layout: GarageLayout; view: GarageView; gapWalls: Box[]; gapClosed: boolean[]; solid: Box[] };
+  type Garage = { layout: GarageLayout; view: GarageView; gapWalls: Box[]; gapClosed: boolean[]; solid: Box[]; pitShut: boolean };
   let garage: Garage | null = null;
+  /** The garage a ramp led to (not cached: a new one every time). */
+  let rampGarage: Garage | null = null;
+  /** The garage above a ramp the player is near: built hidden-behind-the-ceiling, lined up with the ramp, ready to become the world. */
+  let rampPrep: { host: Garage; idx: number; next: Garage; delta: number; tx: number; ty: number } | null = null;
   const garages = new Map<string, Garage>();
   const layouts = new Map<string, GarageLayout>();
   const placeKey = (e: GarageEntrance, f: number) => `${e.id}:${f}`;
@@ -315,7 +333,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   /** In the garage, standing under a working tube counts as light for sanity (like a lit area did). */
   const litByTube = (lay: GarageLayout, x: number, y: number) => lay.lights.some((l) => l.state === "on" && Math.hypot(l.x - x, l.y - y) < 3.5);
   let ringTimer = 0;
-  let startInGarage = params.get("area") === "garage"; // debug: ?area=garage starts there, once everything has loaded
+  let startInGarage = params.get("area") === "garage" || params.get("area") === "ramp"; // debug: ?area=garage (or ramp: up a ramp, see enterRampMap) starts there, once everything has loaded
   // The black of a fail (caught, fainted): a plain overlay, so it works on every quality preset, under the HUD text (z-index 5).
   const blackout = document.createElement("div");
   blackout.style.cssText = "position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2";
@@ -416,11 +434,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         if (kind === "barrier") o.visible = false; // collision only
         if (kind === "glass" || kind === "rails") o.renderOrder = 1;
       });
-      scene.add(gltf.scene);
+      mallRoot.add(gltf.scene);
+      clipMall(gltf.scene);
       blockout = gltf.scene;
       styleBlockout(gltf.scene, QUALITY_PRESETS[quality].detail);
       if (loadedProps) {
-        scene.add(loadedProps.group);
+        mallRoot.add(loadedProps.group);
+        clipMall(loadedProps.group);
         styleBlockout(loadedProps.group, QUALITY_PRESETS[quality].detail); // the kit pieces get the same surface detail
         props = loadedProps;
       }
@@ -430,7 +450,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       load.finish("extra");
       announce();
       noiseWorld = createNoiseWorld({ chair: chairPiece, bin: binPiece });
-      scene.add(noiseWorld.object);
+      mallRoot.add(noiseWorld.object);
+      clipMall(noiseWorld.object);
       styleBlockout(noiseWorld.object, QUALITY_PRESETS[quality].detail);
       if (params.get("noiserest") === "1") {
         // debug (screenshots, where time stands still): a chair tipped back, a bin on its side and a slid chair, already at rest 2 to 4 m ahead
@@ -498,40 +519,47 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     return layout;
   }
+  /** The mall's dressing for one opening and floor: the garage's first column in the mall's frame, its collision, seams and rows. */
+  function makePlace(e: GarageEntrance, f: number, layout: GarageLayout, group: THREE.Group): StripPlace {
+    const door = e.id === "strip_south" && f === STRIP_DOOR.floor; // the floor-2 secret door's gap in the far wall
+    const part = stripPart(layout, door);
+    const view = createGarageView(part, { partial: true });
+    view.group.rotation.y = Math.PI;
+    view.group.position.set(e.x, f * FLOOR_HEIGHT + 0.015, -blockRange(e).y1); // just above the mall's floor, no z-fighting
+    group.add(view.group);
+    // what differs between the strip and the garage's column 0, and the walls both share that can hide it
+    const seams: Seams = { ...stripSeams(layout, door), occluders: stripPart(layout, door, false).boxes.filter((b) => b.kind === "wall" || b.kind === "column") };
+    return { view, boxes: stripBoxes(part, e), seams, rows: stripRows(layout) };
+  }
   /** The whole garage behind an opening on a floor, built (hidden) the first time it is asked for. */
   function garageFor(e: GarageEntrance, f: number): Garage {
     let g = garages.get(placeKey(e, f));
     if (!g) {
-      const layout = layoutOf(e, f);
-      const walls = gapWalls(layout);
-      const view = createGarageView(layout, { gapWalls: walls });
-      view.group.visible = false;
-      scene.add(view.group);
-      g = { layout, view, gapWalls: walls, gapClosed: walls.map(() => false), solid: layout.boxes };
+      g = buildGarage(layoutOf(e, f));
       garages.set(placeKey(e, f), g);
     }
     return g;
+  }
+  /** A garage from a layout, hidden. What the player collides with leaves out the ramps: they walk up them. */
+  function buildGarage(layout: GarageLayout): Garage {
+    const walls = gapWalls(layout);
+    const view = createGarageView(layout, { gapWalls: walls });
+    view.group.visible = false;
+    scene.add(view.group);
+    const g: Garage = { layout, view, gapWalls: walls, gapClosed: walls.map(() => false), solid: [], pitShut: false };
+    refreshSolid(g);
+    return g;
+  }
+  /** What the player collides with: the walls and cars (not the ramps, which are walked), the pit's walls, the doorways that are walled up. */
+  function refreshSolid(g: Garage) {
+    g.solid = [...g.layout.boxes.filter((b) => b.kind !== "ramp"), ...pitBoxes(g.layout, g.pitShut), ...exitPen(g.layout), ...g.gapWalls.filter((_, k) => g.gapClosed[k])];
   }
 
   /** Dresses the mall's parking strip as each garage's first column, in each of the 6 places (2 openings x 3 floors). */
   function buildStrip() {
     const group = new THREE.Group();
     const places = new Map<string, StripPlace>();
-    for (const e of GARAGE_ENTRANCES) {
-      const range = blockRange(e);
-      for (let f = 0; f < 3; f++) {
-        const layout = layoutOf(e, f);
-        const door = e.id === "strip_south" && f === STRIP_DOOR.floor; // the floor-2 secret door's gap in the far wall
-        const part = stripPart(layout, door);
-        const view = createGarageView(part, { partial: true });
-        view.group.rotation.y = Math.PI;
-        view.group.position.set(e.x, f * FLOOR_HEIGHT + 0.015, -range.y1); // just above the mall's floor, no z-fighting
-        group.add(view.group);
-        // what differs between the strip and the garage's column 0, and the walls both share that can hide it
-        const seams: Seams = { ...stripSeams(layout, door), occluders: stripPart(layout, door, false).boxes.filter((b) => b.kind === "wall" || b.kind === "column") };
-        places.set(placeKey(e, f), { view, boxes: stripBoxes(part, e), seams, rows: stripRows(layout) });
-      }
-    }
+    for (const e of GARAGE_ENTRANCES) for (let f = 0; f < 3; f++) places.set(placeKey(e, f), makePlace(e, f, layoutOf(e, f), group));
     group.visible = area === "mall";
     scene.add(group);
     strip = { group, places };
@@ -586,9 +614,24 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const showArea = (next: "mall" | "garage") => {
     area = next;
     const inMall = next === "mall";
-    if (blockout) blockout.visible = inMall;
-    if (props) props.group.visible = inMall;
-    if (noiseWorld) noiseWorld.object.visible = inMall;
+    // a garage reached by a ramp has the mall outside its exit doorway: the mall is drawn in the garage's frame (the half
+    // turn that `garageToStrip` is), clipped at the doorway, so going out is the same place the whole way
+    const beyond = !inMall && !!garage?.layout.arrival;
+    const shown = inMall || beyond;
+    if (beyond) {
+      const o = garageToStrip(stripEntry.e, 0, 0);
+      mallRoot.rotation.y = Math.PI;
+      mallRoot.position.set(o.x, -stripEntry.floor * FLOOR_HEIGHT, -o.y);
+    } else {
+      mallRoot.rotation.y = 0;
+      mallRoot.position.set(0, 0, 0);
+    }
+    mallRoot.updateMatrixWorld(true);
+    setMallFrame(beyond ? mallRoot : null);
+    mallClip.constant = beyond ? -0.16 : 1e6; // (just outside the garage's west wall, whose outer face is at -0.15)
+    if (blockout) blockout.visible = shown;
+    if (props) props.group.visible = shown;
+    if (noiseWorld) noiseWorld.object.visible = shown;
     sky.mesh.visible = inMall;
     if (!inMall) {
       shadowView.object.visible = false;
@@ -614,6 +657,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const half = Math.atan(Math.tan(vFov / 2) * camera.aspect) + THREE.MathUtils.degToRad(6);
     return seamSeen(s.occluders, pick(s), eye, fwd, Math.cos(Math.min(half, Math.PI * 0.95)));
   };
+  /** Whether an arrival garage's exit doorway could be on screen (so the garage behind the player must stay): the doorway's cone plus a margin. */
+  const exitInView = (lay: GarageLayout) => {
+    if (Math.abs(pitch) > THREE.MathUtils.degToRad(50)) return true;
+    const dx = -player.x;
+    const dy = lay.stairDoor.y + player.z;
+    const d = Math.max(0.5, Math.hypot(dx, dy));
+    const cosA = (-Math.sin(yaw) * dx + Math.cos(yaw) * dy) / d;
+    const vFov = THREE.MathUtils.degToRad(Math.max(camera.fov, baseFov + RUN_FOV - FOV));
+    const half = Math.atan(Math.tan(vFov / 2) * camera.aspect) + THREE.MathUtils.degToRad(6) + Math.atan(GARAGE.GAP / d);
+    return cosA > Math.cos(Math.min(half, Math.PI * 0.95));
+  };
   /** The world turns half a turn about the vertical axis at the swap: same view, other level. */
   const turnAround = () => {
     yaw += Math.PI;
@@ -627,7 +681,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     const g = garage;
     g.gapClosed = g.gapWalls.map((_, k) => closed(k));
     g.gapClosed.forEach((c, k) => g.view.setGapWall(k, c));
-    g.solid = [...g.layout.boxes, ...g.gapWalls.filter((_, k) => g.gapClosed[k])];
+    refreshSolid(g);
   };
   /** Mall to garage with nothing changing on screen: the strip's dressing is the garage's first column, closed like it. */
   const swapToGarage = (e: GarageEntrance, f: number) => {
@@ -682,6 +736,113 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     stripEntry = { e: GARAGE_ENTRANCES[1], floor: STRIP_DOOR.floor }; // the spawn is the south opening's block
     garageReleased = false;
     ringTimer = -8; // the phone starts ringing a little after the player arrives
+  };
+  /** A random one of the six strip openings (or the debug ?ramptarget=<north|south>:<floor 1-3>): where a ramp garage's doorway comes out. */
+  const pickStripTarget = () => {
+    const [side, fl] = (params.get("ramptarget") ?? "").split(":");
+    const e = GARAGE_ENTRANCES.find((x) => x.id === `strip_${side}`) ?? GARAGE_ENTRANCES[Math.floor(Math.random() * GARAGE_ENTRANCES.length)];
+    const f = Number.isFinite(parseInt(fl, 10)) ? Math.min(2, Math.max(0, parseInt(fl, 10) - 1)) : Math.floor(Math.random() * 3);
+    return { e, floor: f };
+  };
+  const rampSeed = () => {
+    const seedParam = parseInt(params.get("rampseed") ?? "", 10); // debug: ?rampseed=<n>
+    return Number.isFinite(seedParam) ? seedParam : Math.floor(Math.random() * 1e9);
+  };
+  const dropPrep = () => {
+    rampPrep?.next.view.dispose();
+    rampPrep = null;
+  };
+  /**
+   * The garage above a ramp, built while the player is near it: the next garage's landing (the ramp from below, the same
+   * shape) is turned and placed exactly over this ramp, a ramp's rise above, so what the player sees through the ceiling's
+   * hole is where they are going. Its pit stays hidden (this garage's own ramp is the one on screen).
+   */
+  const prepRamp = (host: Garage, idx: number) => {
+    dropPrep();
+    const layout = generateGarage(rampSeed(), { arrival: true });
+    const r = host.layout.ramps[idx];
+    const l = layout.landing;
+    if (!r || !l) return;
+    const next = buildGarage(layout);
+    const delta = r.rise - l.rise; // the turn from the next garage's frame to this one's
+    const c0 = { x: (r.box.x0 + r.box.x1) / 2, y: (r.box.y0 + r.box.y1) / 2 };
+    const c1 = { x: (l.box.x0 + l.box.x1) / 2, y: (l.box.y0 + l.box.y1) / 2 };
+    const tx = c0.x - (Math.cos(delta) * c1.x - Math.sin(delta) * c1.y);
+    const ty = c0.y - (Math.sin(delta) * c1.x + Math.cos(delta) * c1.y);
+    next.view.group.rotation.y = delta;
+    next.view.group.position.set(tx, GARAGE.RAMP_RISE, -ty);
+    next.view.group.visible = true;
+    next.view.setPit(false);
+    rampPrep = { host, idx, next, delta, tx, ty };
+  };
+  /**
+   * Up a ramp into the next garage, with nothing changing on screen: the garage above (see prepRamp) becomes the world,
+   * its frame turned back to its own axes and the player, their heading, their speed and the eye carried over with it.
+   * The next garage has no booth, no payphone and no ramps; its way out is an open doorway onto a random strip.
+   */
+  const adoptRamp = () => {
+    const p = rampPrep;
+    if (!p) return;
+    const c = Math.cos(-p.delta);
+    const sn = Math.sin(-p.delta);
+    const dx = player.x - p.tx;
+    const dy = -player.z - p.ty;
+    const nx = c * dx - sn * dy;
+    const ny = sn * dx + c * dy;
+    guardScene?.finish();
+    opening = "skip";
+    hiding.reset();
+    shadow?.reset(60);
+    p.host.view.group.visible = false;
+    const previous = rampGarage; // the ramp garage before this one is hidden by now: gone
+    if (previous !== p.next) previous?.view.dispose();
+    rampGarage = p.next;
+    rampPrep = null;
+    p.next.view.group.position.set(0, 0, 0);
+    p.next.view.group.rotation.y = 0;
+    p.next.view.setPit(true);
+    garage = p.next;
+    stripEntry = pickStripTarget(); // the doorway leads out to this opening
+    setGaps(() => false); // the maze is open
+    garageReleased = true; // the doorway is open from the start
+    showArea("garage");
+    floor = 0;
+    player.set(nx, rampHeight(garage.layout, nx, ny), -ny);
+    yaw -= p.delta;
+    const vx = velocity.x;
+    const vy = -velocity.y;
+    velocity.set(c * vx - sn * vy, -(sn * vx + c * vy));
+    if (!Number.isNaN(eyeY)) eyeY -= GARAGE.RAMP_RISE; // the new floor is a ramp's rise lower than the old one's
+    ringTimer = 0;
+    options.onNotice?.("rampArrive");
+  };
+  /** Debug (?area=ramp): starts in an arrival garage, on its ramp, as if the player had come up it. */
+  const enterRampMap = () => {
+    if (!garage) return;
+    guardScene?.finish();
+    opening = "skip";
+    hiding.reset();
+    shadow?.reset(60);
+    dropPrep();
+    garage.view.group.visible = false;
+    const previous = rampGarage;
+    rampGarage = buildGarage(generateGarage(rampSeed(), { arrival: true }));
+    previous?.view.dispose();
+    garage = rampGarage;
+    garage.view.setPit(true);
+    stripEntry = pickStripTarget();
+    setGaps(() => false);
+    garageReleased = true;
+    showArea("garage");
+    const at = garage.layout.arrive;
+    floor = 0;
+    player.set(at.x, 0, -at.y);
+    yaw = headingToYaw(at.heading);
+    pitch = 0;
+    velocity.set(0, 0);
+    eyeY = NaN;
+    ringTimer = 0;
+    options.onNotice?.("rampArrive");
   };
   const leaveGarage = () => {
     if (area !== "garage") return;
@@ -921,7 +1082,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       doors.collide(player, PLAYER_RADIUS, floor); // also when a door closes on a player who is standing still
     } else {
       floor = 0;
-      player.y = 0;
+      player.y = garage ? rampHeight(garage.layout, player.x, -player.z) : 0; // up a ramp, the floor rises
     }
     if (area === "mall" && atrium.update(player.x, -player.z) === "entered") {
       // entering the atrium is the auto-save: the checkpoint the player returns to after being caught (leaving saves nothing)
@@ -935,8 +1096,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     blackout.style.opacity = String(fail.fade);
     if (startInGarage && garage && warmDone) {
       startInGarage = false;
-      enterGarage();
-      garageReleased = params.get("released") === "1"; // debug: as if the payphone had been answered
+      if (params.get("area") === "ramp") enterRampMap();
+      else {
+        enterGarage();
+        garageReleased = params.get("released") === "1"; // debug: as if the payphone had been answered
+      }
       if (params.has("x") && params.has("y")) {
         // debug (screenshots): ?x ?y ?yaw ?pitch place the player inside the garage, in garage plan coordinates
         player.set(num("x", 0), 0, -num("y", 0));
@@ -957,25 +1121,42 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       if (blk && !seamInView(blk, floor, false, (s) => s.opening)) swapToGarage(blk, floor);
     }
     if (strip && area === "mall") for (const p of strip.places.values()) p.view.update(now / 1000);
+    if (rampPrep && area !== "garage") dropPrep(); // left the garage some other way (the strip, a fail's respawn)
     if (area === "garage" && garage) {
       const lay = garage.layout;
-      sanity.setDrain("garage", garageReleased ? 0 : GARAGE_DRAIN);
+      // near a ramp, the garage above it is built and lined up; away from it, it goes
+      if (rampPrep && (garage !== rampPrep.host || pose)) dropPrep();
+      else if (!lay.arrival && !pose && dt > 0) {
+        const near = (b: Box, m: number) => player.x > b.x0 - m && player.x < b.x1 + m && -player.z > b.y0 - m && -player.z < b.y1 + m;
+        const idx = lay.ramps.findIndex((r) => near(r.box, 9));
+        if (idx >= 0) {
+          if (!rampPrep || rampPrep.idx !== idx) prepRamp(garage, idx);
+        } else if (rampPrep && !near(lay.ramps[rampPrep.idx].box, 16)) dropPrep();
+      }
+      // (a garage reached by a ramp keeps draining until the player is out: there is no call to answer)
+      sanity.setDrain("garage", garageReleased && !lay.arrival ? 0 : GARAGE_DRAIN);
       if (dt > 0 && !fail.locked) {
-        if (!garageReleased) {
+        if (!garageReleased || lay.arrival) {
           ringTimer += dt;
           if (ringTimer >= 3.4) {
             ringTimer = 0;
-            audio.ring(lay.goal.x, 1.2, -lay.goal.y);
+            // the payphone rings; in a garage reached by a ramp, the sound comes from the way out (the first column's door)
+            if (garageReleased) audio.ring(0.6, 1.2, -lay.stairDoor.y);
+            else audio.ring(lay.goal.x, 1.2, -lay.goal.y);
           }
         }
         if (!garageReleased && atGoal(lay, player.x, -player.z)) {
           // the call is answered: the line cuts, the drain stops, and the way in is the way out (the strip's first column)
           garageReleased = true;
-          sanity.set(Math.max(sanity.level, 0.75));
-          sanity.snap();
-          options.onNotice?.("garageDone");
+          if (!lay.arrival) {
+            sanity.set(Math.max(sanity.level, 0.75));
+            sanity.snap();
+            options.onNotice?.("garageDone");
+          }
         } else if (sanity.level <= 0.02 && fail.trigger("faint")) options.onNotice?.("caught");
-        else if (strip && !pose) {
+        else if (!lay.arrival && !pose && player.y >= GARAGE.RAMP_SWAP && params.get("rampswap") !== "off") adoptRamp(); // up a ramp, above the ceiling: the garage that was above it
+        else if (lay.arrival && !pose && player.x < -2 && !exitInView(lay)) swapToMall(); // out through the doorway, into the mall drawn beyond it: when the garage is behind the player, the world turns into the mall
+        else if (strip && !pose && !lay.arrival) {
           const { e, floor: f } = stripEntry;
           const inStrip = player.x > 0.5 && player.x < lay.cell - 0.7 && strip.places.get(placeKey(e, f))?.rows.has(Math.floor(-player.z / lay.cell));
           // The mall shifts the doorways to the second column while nobody looks: before the call they open (the maze
@@ -992,7 +1173,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           if (garageReleased && inStrip && garage.gapClosed.every(Boolean) && !seamInView(e, f, true, (s) => s.opening)) swapToMall();
         }
       }
+      if (lay.arrival && lay.landing && !garage.pitShut) {
+        // once the player is out of the ramp's pit, it is closed behind them
+        const b = lay.landing.box;
+        const m = PLAYER_RADIUS + 0.1;
+        if (player.x < b.x0 - m || player.x > b.x1 + m || -player.z < b.y0 - m || -player.z > b.y1 + m) {
+          garage.pitShut = true;
+          refreshSolid(garage);
+        }
+      }
       garage.view.update(now / 1000);
+      if (rampPrep) rampPrep.next.view.update(now / 1000);
     }
     if (shadow && dt > 0 && !fail.locked && area === "mall") {
       const sense = playerSense();

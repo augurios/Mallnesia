@@ -95,8 +95,9 @@ export function stripPart(layout: GarageLayout, doorHole = false, closed = true)
   let boxes = layout.boxes.filter((b) => b.kind !== "door" && b.kind !== "booth" && b.kind !== "phone" && b.x0 >= -0.4 && b.x1 <= C + 0.4);
   // the west wall (the stairwell's) stays, in front of the mall's own wall, with the opening cut out of it
   const half = GARAGE_ENTRANCES[0].half;
-  const oy0 = layout.stairDoor.y - half;
-  const oy1 = layout.stairDoor.y + half;
+  // (a hair wider than the mall's own opening: the cut's end faces would be coplanar with its jambs, and flicker)
+  const oy0 = layout.stairDoor.y - half - 0.04;
+  const oy1 = layout.stairDoor.y + half + 0.04;
   boxes = boxes.flatMap((b) => {
     if (b.kind !== "wall" || b.x0 > 0 || b.y1 <= oy0 || b.y0 >= oy1) return [b];
     return [...(b.y0 < oy0 ? [{ ...b, y1: oy0 }] : []), ...(b.y1 > oy1 ? [{ ...b, y0: oy1 }] : [])];
@@ -219,6 +220,14 @@ export const GARAGE = {
   VANS: 3,
   /** The booth's goal circle radius (m). */
   GOAL_R: 2.4,
+  /** Every garage has at least this many ramps (to other garages). */
+  RAMPS_MIN: 2,
+  /** A ramp rises this high (m) from its foot to the far wall, above the ceiling (2.7): it goes through a hole in it. */
+  RAMP_RISE: 3,
+  /** The ceiling's hole over a ramp starts where the ramp is this high (m): the head is about to reach the slab. */
+  RAMP_HOLE_FROM: 0.9,
+  /** Standing this high (m) on a ramp, the player is above the ceiling, in the dark, and the world swaps to the next garage. */
+  RAMP_SWAP: 1.9,
 };
 
 export type BoxKind = "wall" | "column" | "car" | "van" | "booth" | "ramp" | "door" | "phone";
@@ -293,8 +302,17 @@ export interface GarageLayout {
   /** The payphone beside the booth: the goal is reached within `r` of (x, y). */
   goal: { x: number; y: number; r: number };
   booth: { x0: number; x1: number; y0: number; y1: number };
-  /** Ramps that climb into the ceiling, drawn as wedges: the box and the heading they rise toward. */
+  /** Ramps that climb into the ceiling, drawn as wedges: the box and the heading they rise toward. Each leads to another garage (`rampTouch`). */
   ramps: { box: Box; rise: number }[];
+  /** A garage the player reaches by a ramp (no booth, no payphone, no ramps of its own): the way out is the first column. */
+  arrival: boolean;
+  /**
+   * Arrival garages only: the ramp that comes up from below into a dead-end cell, a pit in the floor. Its top end is
+   * flush with the floor and faces the cell's only doorway. It is the same shape as the ramp it continues (`rise` is the heading it climbs toward).
+   */
+  landing: { box: Box; rise: number } | null;
+  /** A spot on the landing's ramp, and the heading up it (debug starts). */
+  arrive: { x: number; y: number; heading: number };
   /** The guided path, as the cells from the entry to the booth. */
   path: [number, number][];
   /** Which cells each edge opens: `openE[j][i]` is the wall east of cell (i, j); `openN[j][i]` the wall north of it. */
@@ -319,7 +337,8 @@ function rng(seed: number): () => number {
 /** Level signs along the way: the first looks right, then the numbers go wrong. */
 const LEVELS = ["P2", "P2", "P3", "P3", "P7", "P-12", "P2", "P9", "P-3"];
 
-export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
+export function generateGarage(seed: number = GARAGE.SEED, opts: { arrival?: boolean } = {}): GarageLayout {
+  const arrival = !!opts.arrival;
   const { COLS, ROWS, CELL, HEIGHT } = GARAGE;
   const rand = rng(seed);
   const cx = (i: number) => (i + 0.5) * CELL;
@@ -380,22 +399,109 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
   // ---- the guided path: from the entry cell to the farthest cell of the last column
   const dist = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
   const from: ([number, number] | null)[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-  dist[entryRow][0] = 0;
-  const queue: [number, number][] = [[0, entryRow]];
-  for (let q = 0; q < queue.length; q++) {
-    const [i, j] = queue[q];
-    for (const [ni, nj] of neighbours(i, j))
-      if (dist[nj][ni] < 0) {
-        dist[nj][ni] = dist[j][i] + 1;
-        from[nj][ni] = [i, j];
-        queue.push([ni, nj]);
+  const bfs = () => {
+    for (let j = 0; j < ROWS; j++)
+      for (let i = 0; i < COLS; i++) {
+        dist[j][i] = -1;
+        from[j][i] = null;
       }
-  }
+    dist[entryRow][0] = 0;
+    const queue: [number, number][] = [[0, entryRow]];
+    for (let q = 0; q < queue.length; q++) {
+      const [i, j] = queue[q];
+      for (const [ni, nj] of neighbours(i, j))
+        if (dist[nj][ni] < 0) {
+          dist[nj][ni] = dist[j][i] + 1;
+          from[nj][ni] = [i, j];
+          queue.push([ni, nj]);
+        }
+    }
+  };
+  bfs();
+  let goalCol = COLS - 1;
   let goalRow = 0;
   for (let j = 0; j < ROWS; j++) if (dist[j][COLS - 1] > dist[goalRow][COLS - 1]) goalRow = j;
-  const path: [number, number][] = [];
-  for (let c: [number, number] | null = [COLS - 1, goalRow]; c; c = from[c[1]][c[0]]) path.push(c);
-  path.reverse();
+  let path: [number, number][] = [];
+  const trace = () => {
+    path = [];
+    for (let c: [number, number] | null = [goalCol, goalRow]; c; c = from[c[1]][c[0]]) path.push(c);
+    path.reverse();
+  };
+  trace();
+
+  // Ramps lead to other garages, so every garage gets at least RAMPS_MIN dead ends (a ramp needs a cell with one way in):
+  // cells off the guided path are closed off down to one doorway, as long as every cell stays reachable. This uses a
+  // stream of its own, so the rest of the layout is what the seed has always given.
+  const r2 = rng(seed ^ 0x9e3779b9);
+  const reachable = () => {
+    const seenC = new Set<string>([`0,${entryRow}`]);
+    const q: [number, number][] = [[0, entryRow]];
+    for (let k = 0; k < q.length; k++) for (const [ni, nj] of neighbours(q[k][0], q[k][1])) if (!seenC.has(`${ni},${nj}`)) (seenC.add(`${ni},${nj}`), q.push([ni, nj]));
+    return seenC.size === COLS * ROWS;
+  };
+  const closeEdge = (i: number, j: number, ni: number, nj: number, open: boolean) => {
+    if (ni === i + 1) openE[j][i] = open;
+    else if (ni === i - 1) openE[j][ni] = open;
+    else if (nj === j + 1) openN[j][i] = open;
+    else openN[nj][i] = open;
+  };
+  const onPath = new Set(path.map(([i, j]) => `${i},${j}`));
+  const isDead = (i: number, j: number) => neighbours(i, j).length === 1 && !onPath.has(`${i},${j}`);
+  if (!arrival) {
+    const cells: [number, number][] = [];
+    for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) if (!onPath.has(`${i},${j}`)) cells.push([i, j]);
+    for (let k = cells.length - 1; k > 0; k--) {
+      const m = Math.floor(r2() * (k + 1));
+      [cells[k], cells[m]] = [cells[m], cells[k]];
+    }
+    let dead = cells.filter(([i, j]) => isDead(i, j)).length;
+    for (const [i, j] of cells) {
+      if (dead >= GARAGE.RAMPS_MIN) break;
+      const around = neighbours(i, j);
+      if (around.length < 2) continue;
+      const closed: [number, number][] = [];
+      for (const [ni, nj] of around.map((c) => [r2(), c] as const).sort((p, q) => p[0] - q[0]).map(([, c]) => c)) {
+        if (neighbours(i, j).length === 1) break;
+        closeEdge(i, j, ni, nj, false);
+        if (reachable()) closed.push([ni, nj]);
+        else closeEdge(i, j, ni, nj, true);
+      }
+      if (neighbours(i, j).length === 1) dead++;
+      else for (const [ni, nj] of closed) closeEdge(i, j, ni, nj, true); // could not get down to one doorway: leave the cell as it was
+    }
+  }
+  if (arrival) {
+    // A garage reached by a ramp: the ramp comes up in the farthest cell that can be made a dead end (one doorway, which the
+    // ramp's top faces). The cells of the entry keep their doorways (the strip's), so none of their edges is closed.
+    const order: [number, number][] = [];
+    for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) if (dist[j][i] > 0) order.push([i, j]);
+    order.sort((a, b) => dist[b[1]][b[0]] - dist[a[1]][a[0]]);
+    const touchesEntry = (i: number, j: number) => i === 0 && j === entryRow;
+    for (const [i, j] of order) {
+      if (neighbours(i, j).length > 1) {
+        const closed: [number, number][] = [];
+        for (const [ni, nj] of neighbours(i, j).map((c) => [r2(), c] as const).sort((p, q) => p[0] - q[0]).map(([, c]) => c)) {
+          if (neighbours(i, j).length === 1) break;
+          if (touchesEntry(ni, nj)) continue;
+          closeEdge(i, j, ni, nj, false);
+          if (reachable()) closed.push([ni, nj]);
+          else closeEdge(i, j, ni, nj, true);
+        }
+        if (neighbours(i, j).length !== 1) {
+          for (const [ni, nj] of closed) closeEdge(i, j, ni, nj, true);
+          continue;
+        }
+      }
+      goalCol = i;
+      goalRow = j;
+      break;
+    }
+    bfs();
+    trace();
+  }
+  let rampsMade = 0;
+  const rampCells = new Set<string>();
+  let landing: { box: Box; rise: number } | null = null;
 
   const boxes: Box[] = [];
   const W = GARAGE.WALL;
@@ -408,10 +514,11 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
       const x = i * CELL;
       const y0 = j * CELL;
       const y1 = (j + 1) * CELL;
-      const open = i > 0 && i < COLS && openE[j][i - 1];
+      const exitDoor = arrival && i === 0 && j === entryRow; // a garage reached by a ramp: the way out is an open doorway
+      const open = exitDoor || (i > 0 && i < COLS && openE[j][i - 1]);
       if (!open) wallX(x, y0, y1);
       else {
-        const g = wideE[j][i - 1] ? GARAGE.GAP_WIDE : GARAGE.GAP;
+        const g = exitDoor ? GARAGE.GAP : wideE[j][i - 1] ? GARAGE.GAP_WIDE : GARAGE.GAP;
         wallX(x, y0, cy(j) - g);
         wallX(x, cy(j) + g, y1);
       }
@@ -431,7 +538,7 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
     }
   // the stairwell door in the west wall of the entry cell: a frame set into the wall, the player's way in (and not out)
   const stairDoor = { x: 0, y: cy(entryRow) };
-  boxes.push({ kind: "door", x0: -0.1, x1: 0.35, y0: stairDoor.y - 0.9, y1: stairDoor.y + 0.9, top: 2.2 });
+  if (!arrival) boxes.push({ kind: "door", x0: -0.1, x1: 0.35, y0: stairDoor.y - 0.9, y1: stairDoor.y + 0.9, top: 2.2 });
   // columns at every grid corner
   const C = GARAGE.COLUMN;
   for (let j = 0; j <= ROWS; j++) for (let i = 0; i <= COLS; i++) boxes.push({ kind: "column", x0: i * CELL - C / 2, x1: i * CELL + C / 2, y0: j * CELL - C / 2, y1: j * CELL + C / 2, top: HEIGHT });
@@ -445,6 +552,24 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
   const deadEnds: [number, number][] = [];
   const booth = { x0: 0, x1: 0, y0: 0, y1: 0 };
   const goal = { x: 0, y: 0, r: GARAGE.GOAL_R };
+  /** A ramp's plan rectangle in a cell: from the wall opposite `far` (the foot) to the wall at `far` (the top), 6 m wide. */
+  const rampRect = (i: number, j: number, far: "E" | "W" | "N" | "S") => {
+    const x0 = far === "W" ? cx(i) - 5.8 : far === "E" ? cx(i) - 5.6 : cx(i) - 3;
+    const x1 = far === "W" ? cx(i) + 5.6 : far === "E" ? cx(i) + 5.8 : cx(i) + 3;
+    const y0 = far === "S" ? cy(j) - 5.8 : far === "N" ? cy(j) - 5.6 : cy(j) - 3;
+    const y1 = far === "S" ? cy(j) + 5.6 : far === "N" ? cy(j) + 5.8 : cy(j) + 3;
+    const box: Box = { kind: "ramp", x0, x1, y0, y1, top: GARAGE.RAMP_RISE };
+    return { box, rise: far === "E" ? 0 : far === "N" ? Math.PI / 2 : far === "W" ? Math.PI : -Math.PI / 2 };
+  };
+  /** Nothing else stands on a ramp: parked cars (and their stalls) and the tubes over it go. */
+  const clearRamp = (b: Box) => {
+    const { x0, x1, y0, y1 } = b;
+    const hit = (ax0: number, ax1: number, ay0: number, ay1: number, m: number) => ax0 < x1 + m && ax1 > x0 - m && ay0 < y1 + m && ay1 > y0 - m;
+    for (let k = cars.length - 1; k >= 0; k--) if (!cars[k].van && hit(cars[k].x - 0.95, cars[k].x + 0.95, cars[k].y - cars[k].l / 2, cars[k].y + cars[k].l / 2, 0.3)) cars.splice(k, 1);
+    for (let k = boxes.length - 1; k >= 0; k--) if (boxes[k].kind === "car" && hit(boxes[k].x0, boxes[k].x1, boxes[k].y0, boxes[k].y1, 0.3)) boxes.splice(k, 1);
+    for (let k = lines.length - 1; k >= 0; k--) if (hit(Math.min(lines[k].x0, lines[k].x1), Math.max(lines[k].x0, lines[k].x1), Math.min(lines[k].y0, lines[k].y1), Math.max(lines[k].y0, lines[k].y1), 0.1)) lines.splice(k, 1);
+    for (let k = lights.length - 1; k >= 0; k--) if (hit(lights[k].x, lights[k].x, lights[k].y, lights[k].y, 0.6)) lights.splice(k, 1);
+  };
 
   // free-slot test: only the middle of a doorway is kept clear of parked cars, so a car beside it narrows the way but never shuts it
   type Rect = { x0: number; x1: number; y0: number; y1: number };
@@ -463,7 +588,7 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
   /** The parking slots of a cell: along its north and south walls, nose to the wall, none across a doorway. */
   const slotsOf = (i: number, j: number) => {
     const clear = corridors(i, j);
-    const isGoal = i === COLS - 1 && j === goalRow;
+    const isGoal = !arrival && i === goalCol && j === goalRow;
     const slots: { x: number; y: number; north: boolean }[] = [];
     for (const north of [true, false])
       for (const lx of [-4.5, -1.5, 1.5, 4.5]) {
@@ -494,7 +619,7 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
 
   for (let j = 0; j < ROWS; j++)
     for (let i = 0; i < COLS; i++) {
-      const isGoalCell = i === COLS - 1 && j === goalRow;
+      const isGoalCell = i === goalCol && j === goalRow;
       const dead = neighbours(i, j).length === 1 && !isGoalCell && !(i === 0 && j === entryRow);
       if (dead) deadEnds.push([i, j]);
       const slots = slotsOf(i, j);
@@ -531,7 +656,15 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
         const r = rand();
         lights.push({ x: cx(i) + lx, y: cy(j) + ly, state: r < 0.62 ? "on" : r < 0.84 ? "flicker" : "dead" });
       }
-      if (isGoalCell) {
+      if (isGoalCell && arrival) {
+        // the ramp comes up from below in this dead end, its top facing the only doorway; the cell is dark like the ramp it continues
+        const open = neighbours(i, j)[0];
+        const side = open[0] !== i ? (open[0] > i ? "E" : "W") : open[1] > j ? "N" : "S";
+        landing = rampRect(i, j, side);
+        clearRamp(landing.box);
+        goal.x = cx(i);
+        goal.y = cy(j);
+      } else if (isGoalCell) {
         // the attendant's booth against the east wall, a lit window facing west, and the payphone beside it
         const bx = COLS * CELL - W / 2;
         booth.x0 = bx - 3.2;
@@ -545,19 +678,19 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
         // the booth's lights are always on
         for (const l of lights.slice(-4)) l.state = "on";
       } else if (dead) {
-        // a dead end: a ramp that climbs into the ceiling, or a lone "Salida" arrow into the wall
-        if (rand() < 0.5) {
+        // a dead end: a ramp that climbs through the ceiling (the player walks up it), or a lone "Salida" arrow into the wall
+        const coin = rand() < 0.5;
+        if (!arrival && (coin || rampsMade < GARAGE.RAMPS_MIN)) {
+          rampsMade++;
           const open = neighbours(i, j)[0];
           const side = open[0] !== i ? (open[0] > i ? "E" : "W") : open[1] > j ? "N" : "S";
-          // the ramp rises away from the doorway: from the middle of the cell to the far wall
+          // the ramp rises away from the doorway: from the doorway wall (foot) to the far wall, 6 m wide
           const far = side === "E" ? "W" : side === "W" ? "E" : side === "N" ? "S" : "N";
-          const x0 = far === "W" ? cx(i) - 5.8 : far === "E" ? cx(i) + 0.5 : cx(i) - 4;
-          const x1 = far === "W" ? cx(i) - 0.5 : far === "E" ? cx(i) + 5.8 : cx(i) + 4;
-          const y0 = far === "S" ? cy(j) - 5.8 : far === "N" ? cy(j) + 0.5 : cy(j) - 4;
-          const y1 = far === "S" ? cy(j) - 0.5 : far === "N" ? cy(j) + 5.8 : cy(j) + 4;
-          const box: Box = { kind: "ramp", x0, x1, y0, y1, top: HEIGHT - 0.05 };
-          boxes.push(box);
-          ramps.push({ box, rise: far === "E" ? 0 : far === "N" ? Math.PI / 2 : far === "W" ? Math.PI : -Math.PI / 2 });
+          const r = rampRect(i, j, far);
+          boxes.push(r.box);
+          ramps.push(r);
+          rampCells.add(`${i},${j}`);
+          clearRamp(r.box);
         }
       }
     }
@@ -583,7 +716,7 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
     }
   }
   // dead ends point the wrong way as well
-  for (const [i, j] of deadEnds) signs.push({ x: cx(i), y: cy(j), facing: 0, kind: "exit", text: "Salida", arrow: Math.PI, wrong: true });
+  for (const [i, j] of deadEnds) if (!rampCells.has(`${i},${j}`)) signs.push({ x: cx(i), y: cy(j), facing: 0, kind: "exit", text: "Salida", arrow: Math.PI, wrong: true });
 
   return {
     seed,
@@ -601,6 +734,11 @@ export function generateGarage(seed: number = GARAGE.SEED): GarageLayout {
     goal,
     booth,
     ramps,
+    arrival,
+    landing,
+    arrive: landing
+      ? { x: (landing.box.x0 + landing.box.x1) / 2 + Math.cos(landing.rise) * 2.5, y: (landing.box.y0 + landing.box.y1) / 2 + Math.sin(landing.rise) * 2.5, heading: landing.rise }
+      : { x: cx(COLS - 1), y: cy(goalRow), heading: Math.PI },
     path,
     openE,
     openN,
@@ -644,5 +782,79 @@ export function resolveGarage(boxes: Box[], x: number, y: number, radius: number
   return [x, y];
 }
 
+/** How high the floor is at (x, y) (m): 0, or up a ramp (a straight rise from its foot, at the doorway, to the far wall). */
+export function rampHeight(layout: GarageLayout, x: number, y: number): number {
+  let h = 0;
+  const l = layout.landing;
+  if (l && x >= l.box.x0 && x <= l.box.x1 && y >= l.box.y0 && y <= l.box.y1) {
+    // the ramp from below: its top is the floor, its foot is `top` under it
+    const horizontal = Math.abs(Math.cos(l.rise)) > 0.5;
+    const len = horizontal ? l.box.x1 - l.box.x0 : l.box.y1 - l.box.y0;
+    const along = horizontal ? (Math.cos(l.rise) > 0 ? x - l.box.x0 : l.box.x1 - x) : Math.sin(l.rise) > 0 ? y - l.box.y0 : l.box.y1 - y;
+    return (along / len - 1) * l.box.top;
+  }
+  for (const { box: b, rise } of layout.ramps) {
+    if (x < b.x0 || x > b.x1 || y < b.y0 || y > b.y1) continue;
+    const horizontal = Math.abs(Math.cos(rise)) > 0.5;
+    const len = horizontal ? b.x1 - b.x0 : b.y1 - b.y0;
+    const along = horizontal ? (Math.cos(rise) > 0 ? x - b.x0 : b.x1 - x) : Math.sin(rise) > 0 ? y - b.y0 : b.y1 - y;
+    h = Math.max(h, (along / len) * b.top);
+  }
+  return h;
+}
+
+/** The part of a ramp that goes through the ceiling (plan rectangle): from where it is `RAMP_HOLE_FROM` high to its top end. */
+export function rampHole(r: { box: Box; rise: number }): { x0: number; x1: number; y0: number; y1: number } {
+  const b = r.box;
+  const t0 = GARAGE.RAMP_HOLE_FROM / b.top;
+  const horizontal = Math.abs(Math.cos(r.rise)) > 0.5;
+  if (horizontal) {
+    const len = b.x1 - b.x0;
+    return Math.cos(r.rise) > 0 ? { ...b, x0: b.x0 + t0 * len } : { ...b, x1: b.x1 - t0 * len };
+  }
+  const len = b.y1 - b.y0;
+  return Math.sin(r.rise) > 0 ? { ...b, y0: b.y0 + t0 * len } : { ...b, y1: b.y1 - t0 * len };
+}
+
 /** Whether the player is at the payphone. */
 export const atGoal = (layout: GarageLayout, x: number, y: number) => Math.hypot(x - layout.goal.x, y - layout.goal.y) <= layout.goal.r;
+
+/**
+ * What closes the pit of an arrival garage's landing: the walls along its sides and foot (the top end is the way out);
+ * once the player has stepped out of it, `shut` also covers the pit itself, so nobody walks back down.
+ */
+export function pitBoxes(layout: GarageLayout, shut: boolean): Box[] {
+  const l = layout.landing;
+  if (!l) return [];
+  const b = l.box;
+  const T = 0.3;
+  const out: Box[] = [];
+  const add = (x0: number, x1: number, y0: number, y1: number) => out.push({ kind: "wall", x0, x1, y0, y1, top: layout.height });
+  if (Math.abs(Math.cos(l.rise)) > 0.5) {
+    const east = Math.cos(l.rise) > 0; // the top is at the east
+    add(b.x0 - T, b.x1 + T, b.y0 - T, b.y0);
+    add(b.x0 - T, b.x1 + T, b.y1, b.y1 + T);
+    if (east) add(b.x0 - T, b.x0, b.y0, b.y1);
+    else add(b.x1, b.x1 + T, b.y0, b.y1);
+  } else {
+    const north = Math.sin(l.rise) > 0;
+    add(b.x0 - T, b.x0, b.y0 - T, b.y1 + T);
+    add(b.x1, b.x1 + T, b.y0 - T, b.y1 + T);
+    if (north) add(b.x0, b.x1, b.y0 - T, b.y0);
+    else add(b.x0, b.x1, b.y1, b.y1 + T);
+  }
+  if (shut) out.push({ ...b, kind: "wall", top: layout.height });
+  return out;
+}
+
+/**
+ * An arrival garage's exit doorway opens onto the mall, drawn but not part of this level's collision: a short pen outside
+ * the doorway (as wide as it, 2.8 m deep) keeps the player where the mall's hall really is until the world swaps.
+ */
+export function exitPen(layout: GarageLayout): Box[] {
+  if (!layout.arrival) return [];
+  const sd = layout.stairDoor.y;
+  const G = GARAGE.GAP;
+  const add = (x0: number, x1: number, y0: number, y1: number): Box => ({ kind: "wall", x0, x1, y0, y1, top: layout.height });
+  return [add(-2.8, 0, sd + G, sd + G + 0.3), add(-2.8, 0, sd - G - 0.3, sd - G), add(-3.1, -2.8, sd - G - 0.3, sd + G + 0.3)];
+}
