@@ -285,7 +285,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const girlDirector = new GirlDirector();
   girlDirector.enabled = girlMode !== "off";
   if (girlMode === "now") girlDirector.soon(3);
-  const girlView = createGirlView();
+  const girlView = createGirlView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
   const girlVoice = audio.girl();
   scene.add(girlView.object);
   let apparition: Apparition | null = null;
@@ -374,7 +374,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       return;
     }
     const t0 = performance.now();
-    const asleep = [shadowView.object, guardView.object, ...(garage ? [garage.view.group] : [])].filter((o) => !o.visible);
+    const asleep = [shadowView.object, guardView.object, girlView.object, ...(garage ? [garage.view.group] : [])].filter((o) => !o.visible);
     asleep.forEach((o) => (o.visible = true));
     // A loose chair and a bin of each kind: they are plain meshes, a different shader variant from the instanced kit pieces.
     const mute = { onImpact: () => {}, onScrape: () => {}, walkable: () => true };

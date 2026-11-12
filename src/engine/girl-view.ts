@@ -1,9 +1,17 @@
 import * as THREE from "three";
 import { FLOOR_HEIGHT } from "./walk";
 
-// How the girl in white looks: a child-sized figure (about 1.3 m) in a long pale dress, head a little bowed under
-// long dark hair, arms hanging. A few primitives, unlit and cold, so she is a pale shape in the dark that fades in
-// and out (opacity). Placeholder shape for Augusto to judge by playing. Feet at y = 0, facing local +x.
+// How the girl in white looks. The real model (public/models/girl.glb, built by scripts/girl/build.sh: an MPFB child,
+// CC0, in a first communion dress, veil and wreath modeled by script, with a "cry" clip authored over Quaternius' idle,
+// CC0) is fetched with `load`; until it arrives, or if it fails, a stand-in made of a few primitives is drawn. Either
+// way she fades in and out (opacity), and gives off a faint cold glow of her own, so the girl in white is a pale shape
+// in the dark even with the flashlight off. Feet at y = 0, facing local +x.
+
+export const GIRL_URL = "./models/girl.glb";
+/** Sobs per second in the cry clip (scripts/girl/cry.py: 6 in 8 s); the crying sound pulses at the same rate. */
+export const GIRL_SOB_HZ = 0.75;
+/** How much of her own color she gives off: the dress more than her skin and hair. */
+const GLOW = { dress: 0.11, skin: 0.035 };
 
 export interface GirlView {
   object: THREE.Object3D;
@@ -12,7 +20,106 @@ export interface GirlView {
   dispose(): void;
 }
 
-export function createGirlView(): GirlView {
+/** A loaded glTF, as GLTFLoader returns it (only what is used here). */
+export interface GirlGltf {
+  scene: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+}
+
+/** One way of drawing her: the stand-in or the real model. */
+interface GirlBody {
+  object: THREE.Object3D;
+  setOpacity(opacity: number): void;
+  animate(seconds: number): void;
+  dispose(): void;
+}
+
+export function createGirlView(load?: (url: string) => Promise<GirlGltf>): GirlView {
+  const root = new THREE.Group();
+  root.visible = false;
+  let current: GirlBody = createStandIn();
+  root.add(current.object);
+  let disposed = false;
+  load?.(GIRL_URL)
+    .then((gltf) => {
+      if (disposed) return;
+      const real = createModelBody(gltf);
+      root.remove(current.object);
+      current.dispose();
+      current = real;
+      root.add(real.object);
+    })
+    .catch((err) => console.warn("girl model failed to load; using the stand-in", err));
+  return {
+    object: root,
+    update(x, y, floor, facing, opacity, seconds) {
+      root.visible = opacity > 0.003;
+      if (!root.visible) return;
+      root.position.set(x, floor * FLOOR_HEIGHT, -y);
+      root.rotation.y = facing;
+      current.setOpacity(opacity);
+      current.animate(seconds);
+    },
+    dispose() {
+      disposed = true;
+      current.dispose();
+    },
+  };
+}
+
+function createModelBody(gltf: GirlGltf): GirlBody {
+  const model = gltf.scene;
+  model.rotation.y = Math.PI / 2; // the model faces +z; she faces local +x
+  const object = new THREE.Group();
+  object.add(model);
+  const mats: THREE.MeshStandardMaterial[] = [];
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.frustumCulled = false; // skinned: the bind-pose bounds do not follow the animation
+    for (const m of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]) {
+      if (mats.includes(m)) continue;
+      mats.push(m);
+      m.userData.base = m.transparent ? m.opacity : 1;
+      // Opaque and cut-out materials fade by dithering (no sorting trouble); the tulle veil is blended as it is.
+      if (!m.transparent) m.alphaHash = true;
+      else m.depthWrite = false;
+      const body = /skin|braid|eyebrow|eyelash|eyes/.test(m.name);
+      m.emissive = new THREE.Color(0.86, 0.9, 1.0).multiplyScalar(body ? GLOW.skin : GLOW.dress);
+      m.emissiveMap = m.map;
+      m.needsUpdate = true;
+    }
+  });
+  const mixer = new THREE.AnimationMixer(model);
+  const cry = gltf.animations.find((a) => a.name === "cry") ?? gltf.animations.find((a) => a.name === "idle");
+  if (cry) mixer.clipAction(cry).play();
+  let last = -1;
+  return {
+    object,
+    setOpacity(opacity) {
+      for (const m of mats) m.opacity = (m.userData.base as number) * opacity;
+    },
+    animate(seconds) {
+      const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, seconds - last));
+      last = seconds;
+      mixer.update(dt);
+    },
+    dispose() {
+      mixer.stopAllAction();
+      model.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) mesh.geometry.dispose();
+      });
+      for (const m of mats) {
+        m.map?.dispose();
+        m.dispose();
+      }
+    },
+  };
+}
+
+/** The stand-in: a child-sized figure (about 1.3 m) in a long pale dress, head a little bowed, arms hanging. */
+function createStandIn(): GirlBody {
   const mats: THREE.MeshBasicMaterial[] = [];
   const mat = (color: number, base: number) => {
     const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
@@ -29,7 +136,6 @@ export function createGirlView(): GirlView {
     return geo;
   };
   const root = new THREE.Group();
-  root.visible = false;
   const body = new THREE.Group();
   root.add(body);
 
@@ -70,13 +176,11 @@ export function createGirlView(): GirlView {
 
   return {
     object: root,
-    update(x, y, floor, facing, opacity, seconds) {
-      root.visible = opacity > 0.003;
-      if (!root.visible) return;
-      root.position.set(x, floor * FLOOR_HEIGHT, -y);
-      root.rotation.y = facing;
-      body.rotation.z = 0.04 * Math.sin(seconds * 0.7); // never quite still
+    setOpacity(opacity) {
       for (const m of mats) m.opacity = opacity * (m.userData.base as number);
+    },
+    animate(seconds) {
+      body.rotation.z = 0.04 * Math.sin(seconds * 0.7); // never quite still
     },
     dispose() {
       geos.forEach((geo) => geo.dispose());

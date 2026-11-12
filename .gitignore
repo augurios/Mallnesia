@@ -50,3 +50,5 @@ next-env.d.ts
 /public/models/nav.json
 /public/models/kit/
 /backrooms-main
+# Python bytecode (Blender writes it next to the build scripts it imports)
+__pycache__/

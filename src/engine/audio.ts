@@ -191,7 +191,7 @@ export function createAudio(): Audio {
         const sob = c.createGain();
         sob.gain.value = 0;
         const pulse = c.createOscillator();
-        pulse.frequency.value = 0.7;
+        pulse.frequency.value = 0.75; // in step with the sobs of her cry clip (GIRL_SOB_HZ in girl-view.ts)
         const pulseDepth = c.createGain();
         pulseDepth.gain.value = 0.16;
         pulse.connect(pulseDepth).connect(sob.gain);

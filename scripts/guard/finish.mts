@@ -15,9 +15,16 @@ const doc = await io.read(input);
 const root = doc.getRoot();
 
 for (const m of root.listMaterials()) {
-  const cutout = /short|hair|eyebrow|eyelash/i.test(m.getName());
+  const name = m.getName();
+  // the girl in white's tulle veil is see-through: blended, both sides
+  if (/veil$/i.test(name)) {
+    m.setAlphaMode("BLEND").setDoubleSided(true);
+    continue;
+  }
+  const cutout = /short|hair|braid|eyebrow|eyelash|lace|collar|cuff/i.test(name);
   m.setAlphaMode(cutout ? "MASK" : "OPAQUE");
   if (cutout) m.setAlphaCutoff(0.45).setDoubleSided(true);
+  if (/skirt|sash/i.test(name)) m.setDoubleSided(true); // seen from below and inside
 }
 for (const ext of root.listExtensionsUsed()) if (ext instanceof KHRMaterialsSpecular || ext instanceof KHRMaterialsIOR) ext.dispose();
 

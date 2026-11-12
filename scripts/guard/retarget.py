@@ -3,6 +3,13 @@
 #
 # Run after build_guard.py:
 #   blender -b <guard.blend> --python scripts/guard/retarget.py -- <AnimationLibrary_Godot_Standard.glb> <out.glb>
+# Other characters on the same skeleton (the girl in white) add options after the two paths:
+#   --rig <armature object>   (default: guard)
+#   --clips Lib_Clip:name,... (default: the guard's clips below)
+#   --limb-swing yes          swing only the limbs' rest directions onto the library's (the spine, neck and head keep
+#                             their own rest: on a child the library's spine directions bend the chest forward)
+#   --post <script.py>        run after the clips are baked and before export, with `rig`, `made` (the baked actions)
+#                             and `scene` in its namespace; it may append more actions to `made`.
 #
 # How: both rigs face -y. For every frame, each target bone gets the world rotation the source bone has turned through
 # since its own rest pose, applied on top of the target's rest, after first swinging the target's rest direction onto
@@ -18,6 +25,7 @@ FINGER_CURL = 0.5  # how much of the library's finger curl the free hand keeps
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 LIBRARY, OUT_GLB = argv[0], argv[1]
+opts = dict(zip(argv[2::2], argv[3::2]))
 
 # clip in the library -> name in our file
 CLIPS = {
@@ -27,6 +35,8 @@ CLIPS = {
     "Walk_Loop": "walk",
     "Walk_Formal_Loop": "walk_formal",
 }
+if "--clips" in opts:
+    CLIPS = dict(pair.split(":") for pair in opts["--clips"].split(","))
 
 # guard (MPFB game_engine) bone -> library (Rigify DEF) bone
 MAP = {"pelvis": "DEF-hips", "spine_01": "DEF-spine.001", "spine_02": "DEF-spine.002", "spine_03": "DEF-spine.003",
@@ -43,7 +53,7 @@ for s, S in (("l", "L"), ("r", "R")):
     for i in (1, 2, 3):
         MAP[f"thumb_0{i}_{s}"] = f"DEF-thumb.0{i}.{S}"
 
-guard = bpy.data.objects["guard"]
+guard = bpy.data.objects[opts.get("--rig", "guard")]
 before = set(bpy.data.objects)
 bpy.ops.import_scene.gltf(filepath=LIBRARY)
 imported = [o for o in bpy.data.objects if o not in before]
@@ -61,6 +71,8 @@ def rest_dir(ob, bone):
     return (ob.matrix_world @ bone.tail_local) - (ob.matrix_world @ bone.head_local)
 
 
+TORSO = {"pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head"}
+
 # per bone: the source's rest rotation, the target's, and the swing from the target's rest direction onto the source's
 info = {}
 for tname, sname in MAP.items():
@@ -73,7 +85,7 @@ for tname, sname in MAP.items():
         "src": sname,
         "s_rest": rest_world(src, sb).to_quaternion(),
         "t_rest": rest_world(guard, tb).to_quaternion(),
-        "swing": rest_dir(guard, tb).normalized().rotation_difference(rest_dir(src, sb).normalized()),
+        "swing": Quaternion() if opts.get("--limb-swing") == "yes" and tname in TORSO else rest_dir(guard, tb).normalized().rotation_difference(rest_dir(src, sb).normalized()),
     }
 
 
@@ -164,6 +176,9 @@ for clip, name in CLIPS.items():
                 pb.keyframe_insert("location", frame=f - f0, group=b.name)
     made.append(out)
     print("baked", name, f1 - f0 + 1, "frames")
+
+if "--post" in opts:
+    exec(compile(open(opts["--post"]).read(), opts["--post"], "exec"), {"rig": guard, "made": made, "scene": scene, "__name__": "post"})
 
 # drop the library: its rig, its mesh and its actions, so only the guard and our clips are exported
 for o in imported:

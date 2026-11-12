@@ -90,7 +90,7 @@ Backstory (revealed gradually through notes): the land was a coffee plantation, 
 ## Threats
 
 - **The shadow:** appears on security camera feeds, approaches figures; radio voice warns to look behind. Later appears on the feed of the player's own room. **It is the only threat that can catch the player** (see "Failure").
-- **The girl in white:** brief, sparing apparitions in elevators, mirrors, bathroom corridors. Never chases.
+- **The girl in white:** a lost child crying for her parents. She appears out of the player's view (behind them, or ahead but hidden behind something), crying and calling; seeing her drains sanity, more the closer the player is, and seeing her from right next to her takes all of it (a faint). She leaves only once the player has looked and walked away. Never moves, never chases. **Look (decided):** an eight-year-old in a first communion dress (white lace, short veil on a flower wreath, white socks and shoes, dark braid), pale with hollow eyes, crying with her hands over her face. Later: elevators, mirrors, bathroom corridors.
 - **The watchers:** ordinary-looking people who never attack; they move closer when not observed, freeze when looked at directly, and drain sanity while watching.
 
 ## Save, load, and checkpoints
@@ -176,7 +176,7 @@ Some legends are tied to real tragedies and real people. When writing notes, dia
 ## Repository conventions
 
 - **No Git LFS (decided):** binaries are committed as plain files. Everything `npm run assets` writes (`public/models/mall_blockout.glb`, `ao.png`, `props.json`, `nav.json` and `kit/*.glb`) is generated from `docs/floorplans/` and `scripts/`, so it is gitignored and rebuilt by `predev` (if any is missing) and `prebuild`. A hand-modeled file that replaces a generated one has to be committed and taken out of `.gitignore`. Revisit LFS if the repo passes about 500 MB.
-- **Characters (decided):** realistic, built with Blender + MPFB (MakeHuman, CC0) and animated with CC0 clips (Quaternius' Universal Animation Library), all scripted (`scripts/guard/`); no Adobe/Mixamo. The built `public/models/guard.glb` is committed, since it needs Blender to rebuild.
+- **Characters (decided):** realistic, built with Blender + MPFB (MakeHuman, CC0) and animated with CC0 clips (Quaternius' Universal Animation Library), all scripted (`scripts/guard/`, `scripts/girl/`); no Adobe/Mixamo. Clothing MakeHuman lacks is modeled by script. The built `public/models/guard.glb` and `girl.glb` are committed, since they need Blender to rebuild.
 - Reference photos of the real mall: `reference/photos/`.
 - Design docs, floor plans, and legend notes: `docs/`.
 - Update this file when decisions change (license status, seed choice, language, priorities).
