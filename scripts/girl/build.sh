@@ -9,7 +9,7 @@ set -e
 cd "$(dirname "$0")/../.."
 UAL=${UAL:-"$HOME/Downloads/ual/ual1/Animation Library[Standard]/Godot/AnimationLibrary_Godot_Standard.glb"}
 TMP=${KEEP:-$(mktemp -d)}
-blender -b --python scripts/girl/build_girl.py -- "$TMP/girl.glb" "$TMP/girl.blend" | grep -E "lifted|outfit|skirt:|hidden|exported|Error" || true
+blender -b --python scripts/girl/build_girl.py -- "$TMP/girl.glb" "$TMP/girl.blend" | grep -E "lifted|outfit|skirt:|veil:|hidden|exported|Error|Traceback|line [0-9]" || true
 blender -b "$TMP/girl.blend" --python scripts/guard/retarget.py -- "$UAL" "$TMP/girl_anim.glb" --rig girl --clips Idle_Loop:idle --limb-swing yes --post scripts/girl/cry.py,scripts/girl/hair.py | grep -E "baked|hair:|exported|unmapped|Error|Traceback|line [0-9]" || true
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/guard/finish.mts "$TMP/girl_anim.glb" public/models/girl.glb
 ls -la public/models/girl.glb

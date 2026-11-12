@@ -21,7 +21,7 @@ for (const m of root.listMaterials()) {
     m.setAlphaMode("BLEND").setDoubleSided(true);
     continue;
   }
-  const cutout = /short|hair|braid|eyebrow|eyelash|lace|collar|cuff/i.test(name);
+  const cutout = /short|hair|braid|eyebrow|eyelash|lace|collar|cuff|rags/i.test(name);
   m.setAlphaMode(cutout ? "MASK" : "OPAQUE");
   if (cutout) m.setAlphaCutoff(0.45).setDoubleSided(true);
   if (/skirt|sash/i.test(name)) m.setDoubleSided(true); // seen from below and inside

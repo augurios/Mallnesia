@@ -4,6 +4,14 @@
 #     two-tier gathered skirt to mid-calf, scalloped lace at both hems, a lace collar and lace cuffs, a satin sash with
 #     a bow and two tails at the back, and four pearl buttons down the back;
 #   - a short tulle veil with a lace edge, hanging from a wreath of small white flowers with pearl centers.
+# All of it ragged and dirty, years worn in the mall:
+#   - torn: both hems ripped (V tears, slits, bites and a few holes, cut out of a band of texture at the bottom of each
+#     tier), strips hanging loose from the deep tears, the hem lace torn away in places and hanging in loops in others,
+#     a piece gone from the collar and a flap of it loose, a third of one cuff gone, one sash tail torn short, the veil's
+#     bottom ragged and holed with only scraps of its lace left;
+#   - dirty (soil): the white aged to ivory and dusty, mud below an uneven tide line over the hems with spatter above
+#     it, grime in the folds and along every torn edge, stains (where she knelt, old spills, a smear where she sat),
+#     the lace, tulle and sash dingy, the flowers wilted.
 # Imported by build_girl.py. Everything is skinned: the bodice keeps the body's own weights, the skirt follows the
 # pelvis and (lower down) the thighs, the wreath and veil follow the head.
 import math
@@ -184,11 +192,82 @@ def rasterize(tri_uv, tri_pos, h, w):
     return pos
 
 
+def noise3(P, scale, seed):
+    """Smooth 3D value noise in [0, 1] at world positions P (..., 3); `scale` is the size of its features in metres."""
+    S = 64
+    g = np.random.default_rng(seed).random((S, S, S))
+    q = np.asarray(P, float) / scale
+    i = np.floor(q).astype(np.int64)
+    f = q - i
+    f = f * f * (3 - 2 * f)
+    x0, y0, z0 = i[..., 0] % S, i[..., 1] % S, i[..., 2] % S
+    x1, y1, z1 = (x0 + 1) % S, (y0 + 1) % S, (z0 + 1) % S
+    fx, fy, fz = f[..., 0], f[..., 1], f[..., 2]
+
+    def lerp(a, b, t):
+        return a + (b - a) * t
+
+    near = lerp(lerp(g[x0, y0, z0], g[x1, y0, z0], fx), lerp(g[x0, y1, z0], g[x1, y1, z0], fx), fy)
+    far = lerp(lerp(g[x0, y0, z1], g[x1, y0, z1], fx), lerp(g[x0, y1, z1], g[x1, y1, z1], fx), fy)
+    return lerp(near, far, fz)
+
+
+def fbm3(P, scale, seed, octaves=3):
+    """noise3 with finer octaves on top, in [0, 1]."""
+    total, amp, norm = 0.0, 1.0, 0.0
+    for o in range(octaves):
+        total = total + amp * noise3(P, scale / 2 ** o, seed + o)
+        norm += amp
+        amp *= 0.5
+    return total / norm
+
+
+def mix(rgb, color, amount):
+    amount = np.asarray(amount)[..., None]
+    return rgb * (1 - amount) + np.asarray(color) * amount
+
+
 # ---- fabric colors (sRGB) ---------------------------------------------------------------------------------------------
 
 SATIN = np.array([0.905, 0.895, 0.87])
 LACE = np.array([0.93, 0.915, 0.875])
 DUST = np.array([0.47, 0.43, 0.38])
+# what years in the mall did to it
+AGED = np.array([0.95, 0.93, 0.86])  # the white gone ivory (a multiplier)
+GRIME = np.array([0.5, 0.47, 0.42])  # dust
+MUD = np.array([0.34, 0.3, 0.25])  # dried mud
+TIDE = np.array([0.25, 0.21, 0.17])  # the dark edge where dirty water dried
+STAIN = np.array([0.56, 0.46, 0.34])  # old brown stains
+
+
+def soil(rgb, P, cy, hem, stains):
+    """Dirt painted through the surface, by world position P (..., 3), so it runs on across pieces: the white aged and
+    dusty; below an uneven tide line over the hem, mud that darkens toward the hem, with a dark dried edge and spatter
+    above it; and the stains (cylindrical round her: angle `th` from the back through her left, height `z`, radius `r`
+    in metres, `tall` stretches it down, `ring` dried with a dark rim, `smudge` rubbed-in grime)."""
+    z = P[..., 2]
+    broad = fbm3(P, 0.16, 101)
+    mid = fbm3(P, 0.04, 111)
+    rgb = rgb * (1 - (0.55 + 0.45 * broad)[..., None] * (1 - AGED))
+    rgb = mix(rgb, GRIME, 0.1 + 0.22 * smoothstep(0.4, 0.75, mid) * (0.6 + 0.4 * broad))
+    line = hem + 0.11 + 0.13 * broad + 0.025 * (mid - 0.5)
+    below = smoothstep(line + 0.002, line - 0.012, z)
+    rgb = mix(rgb, MUD, below * np.clip(0.4 + 0.3 * smoothstep(line, hem, z) + 0.25 * (mid - 0.5), 0, 1))
+    rgb = mix(rgb, TIDE, 0.3 * np.exp(-(((z - line) / 0.005) ** 2)))
+    spat = smoothstep(0.74, 0.82, noise3(P, 0.006, 131)) * smoothstep(0.5, 0.7, noise3(P, 0.05, 137)) * smoothstep(hem + 0.3, hem + 0.05, z)
+    rgb = mix(rgb, MUD * 0.8, 0.6 * spat)
+    th = np.arctan2(P[..., 0], P[..., 1] - cy)
+    rad = np.hypot(P[..., 0], P[..., 1] - cy)
+    for st in stains:
+        dth = (th - st["th"] + np.pi) % (2 * np.pi) - np.pi
+        dz = z - st["z"]
+        dz = np.where(dz < 0, dz / st.get("tall", 1.0), dz)
+        d = np.hypot(dth * rad, dz) / st["r"] + 0.8 * (fbm3(P, 0.035, st["seed"]) - 0.5)
+        if st["kind"] == "ring":
+            rgb = mix(rgb, STAIN * 0.85, 0.28 * smoothstep(1.0, 0.85, d) * (0.7 + 0.3 * mid) + 0.22 * np.exp(-(((d - 0.95) / 0.09) ** 2)))
+        else:
+            rgb = mix(rgb, MUD * 1.1, 0.55 * smoothstep(1.0, 0.3, d) * (0.6 + 0.4 * mid))
+    return rgb * (0.96 + 0.08 * noise3(P, 0.006, 121))[..., None]
 
 
 def satin_tile(size=256, seed=1):
@@ -201,9 +280,10 @@ def satin_tile(size=256, seed=1):
     return SATIN[None, None, :] * (weave * sheen * speck)[..., None]
 
 
-def lace_tile():
+def lace_tile(dirt=0.0, color=GRIME, seed=0):
     """512x256 lace (RGBA), two scallops wide, the scalloped edge at the bottom (v = 0), the tape at the top.
-    Alpha 0 is a hole: the scallop's outline, the eyelets, the net between the flowers, the flower centers."""
+    Alpha 0 is a hole: the scallop's outline, the eyelets, the net between the flowers, the flower centers.
+    `dirt` mixes in `color` unevenly (more toward the scalloped edge)."""
     W, H = 512, 256
     x = np.arange(W)[None, :] + 0.5
     y = np.arange(H)[:, None] + 0.5
@@ -256,7 +336,10 @@ def lace_tile():
     shade[np.abs(Y - 238) < 1.2] = 0.78
     bead = tape & (np.hypot((X % 20) - 10, Y - 247) < 3.5)
     alpha[bead] = 0
-    rgb = LACE[None, None, :] * shade[..., None]
+    rgb = LACE[None, None, :] * AGED * shade[..., None]
+    if dirt:
+        amt = dirt * (0.55 + 0.45 * noise(H, W, 8, seed)) * (1 - 0.4 * Y / H)
+        rgb = np.round(mix(rgb, color, amt) * 63) / 63
     return np.concatenate([rgb, alpha[..., None]], axis=2)
 
 
@@ -271,7 +354,7 @@ def tulle_tile():
     d = np.hypot((hx - np.round(hx)) * 8, (hy - row - 0.5) * 8 * 0.866)
     a = np.where(d > 3.0, 0.5, 0.07)
     a = np.broadcast_to(a, (S, S))
-    rgb = np.broadcast_to(LACE, (S, S, 3)) * 0.98
+    rgb = np.broadcast_to(LACE * AGED * 0.88, (S, S, 3))  # gone grey
     return np.concatenate([rgb, a[..., None]], axis=2)
 
 
@@ -319,7 +402,23 @@ def add_outfit(rig, body, hair, eyes):
             best, waist_z = width, z
     cy = float(np.mean(co[torso_mask & (np.abs(co[:, 2] - waist_z) < 0.01), 1]))
     hem_z = knee[2] - 0.5 * (knee[2] - ankle[2])
+    upper_bot = waist_z - 0.62 * (waist_z - hem_z)  # the upper tier's hem
     print(f"outfit: waist {waist_z:.3f}, hem {hem_z:.3f}, neck {neck[2]:.3f}, height {co[:, 2].max():.3f}")
+    # the stains on her (see soil): where she knelt on a dirty floor, old dried spills, a smear where she sat
+    stains = [
+        {"th": np.pi - 0.28, "z": knee[2] + 0.01, "r": 0.045, "kind": "smudge", "seed": 201},
+        {"th": np.pi + 0.3, "z": knee[2] - 0.005, "r": 0.04, "kind": "smudge", "seed": 202},
+        {"th": 2.3, "z": upper_bot + 0.1, "r": 0.055, "kind": "ring", "seed": 203},
+        {"th": np.pi + 0.55, "z": waist_z + 0.09, "r": 0.03, "tall": 1.8, "kind": "ring", "seed": 204},
+        {"th": 0.25, "z": waist_z - 0.16, "r": 0.08, "kind": "smudge", "seed": 205},
+        {"th": -1.9, "z": waist_z - 0.3, "r": 0.05, "kind": "ring", "seed": 206},
+        {"th": np.pi - 0.15, "z": waist_z + 0.05, "r": 0.035, "kind": "smudge", "seed": 207},
+        {"th": -1.45, "z": neck[2] - 0.07, "r": 0.04, "kind": "smudge", "seed": 208},
+        {"th": 1.3, "z": waist_z + 0.17, "r": 0.04, "kind": "ring", "seed": 209},
+    ]
+
+    def dirty(rgb, P):
+        return soil(rgb, P, cy, hem_z, stains)
 
     src = WeightSource(co, weights, [i for i in range(len(co)) if torso_mask[i] or is_leg[i]])
     pieces = []
@@ -502,8 +601,9 @@ def add_outfit(rig, body, hair, eyes):
     for s in "lr":
         a, _ = sides[s]
         under = np.maximum(under, np.clip(1 - np.linalg.norm(P - (a - [0, 0, 0.035]), axis=2) / 0.045, 0, 1))
-    rgb = rgb * (1 - 0.12 * under[..., None]) + DUST * 0.12 * under[..., None]
-    rgb = np.where(valid[..., None], rgb, SATIN)
+    rgb = rgb * (1 - 0.2 * under[..., None]) + DUST * 0.2 * under[..., None]
+    rgb = dirty(rgb, P)
+    rgb = np.where(valid[..., None], rgb, SATIN * AGED)
     bodice = mesh_object("girl_bodice", bverts, bfaces, buvs, rig)
     bodice.data.materials.append(material("girl_bodice", image("girl_bodice", rgb), rough=0.55))
     # the weights are smoothed too (the edges keep the skin's, so they move with it): cloth moves as one piece, and the
@@ -600,29 +700,190 @@ def add_outfit(rig, body, hair, eyes):
                 uvs += [uvs_v[q] for q in quad]
         return np.array(verts), faces, uvs, np.array(ts), (ph1, ph2, folds)
 
-    knee_z = knee[2]
-    upper_bot = waist_z - 0.62 * (waist_z - hem_z)
     lower = tier(waist_z + 0.005, hem_z, r_waist, flare, 22, 34, 11, 0.5, 0.0)
     upper_need = float(np.hypot(lower[0][:, 0], lower[0][:, 1] - cy)[lower[0][:, 2] >= upper_bot - 0.01].max())
     upper = tier(waist_z + 0.008, upper_bot, r_waist + 0.004, upper_need + 0.012, 16, 30, 23, 1.0, 0.5, extra=0.004)
-    # the skirt's texture: satin with the gathers shaded in (deeper in the folds), the tier seams, and a little dust
-    # along the lower hem from the floors she wanders
-    SK = 1024
-    u = (np.arange(SK)[None, :] + 0.5) / SK
-    v = (np.arange(SK)[:, None] + 0.5) / SK
-    sk = np.tile(satin_tile(256, 5), (SK // 256, SK // 256, 1))
-    th = u * 2 * np.pi
-    for (ph1, ph2, folds), lo, hi in ((lower[4], 0.0, 0.5), (upper[4], 0.5, 1.0)):
-        t = (hi - v) / (hi - lo)
-        fold = gathers(folds, ph1, ph2, th)
+
+    def tier_pos(td, t, u):
+        """World position on a tier at t (0 at its top, 1 at its hem) and u (round it from the back, 0 to 1)."""
+        g = td[0].reshape(-1, N + 1, 3)
+        rows = len(g) - 1
+        rf = np.clip(t * rows, 0, rows - 1e-6)
+        cf = np.clip(u * N, 0, N - 1e-6)
+        r0, c0 = rf.astype(int), cf.astype(int)
+        fr, fc = (rf - r0)[..., None], (cf - c0)[..., None]
+        top = g[r0, c0] * (1 - fc) + g[r0, c0 + 1] * fc
+        bot = g[r0 + 1, c0] * (1 - fc) + g[r0 + 1, c0 + 1] * fc
+        return top * (1 - fr) + bot * fr
+
+    def skirt_rgb(td, t, u, base):
+        """A tier's colour: satin with the gathers shaded in (deeper toward the hem, with dust settled in them), in the
+        shadow of the sash or of the tier above, and soiled."""
+        ph1, ph2, folds = td[4]
+        fold = gathers(folds, ph1, ph2, u * 2 * np.pi)
         depth = (0.3 + 0.7 * t) * np.clip(-fold, 0, 1)
-        band = (v >= lo) & (v < hi)
-        sk *= np.where(band, 1 - 0.2 * depth + 0.05 * np.clip(fold, 0, 1) * t, 1.0)[..., None]
-    hem_dust = np.clip(1 - v / 0.07, 0, 1) ** 1.6 * (0.55 + 0.45 * noise(SK, SK, 40, 9))
-    sk = sk * (1 - 0.35 * hem_dust[..., None]) + DUST * 0.35 * hem_dust[..., None]
-    waist_shadow = np.clip((v - 0.93) / 0.07, 0, 1) + np.clip((v - 0.43) / 0.07, 0, 1) * (v < 0.5)
-    sk *= (1 - 0.18 * waist_shadow)[..., None]
+        rgb = base * (1 - 0.2 * depth + 0.05 * np.clip(fold, 0, 1) * t)[..., None]
+        P = tier_pos(td, t, u)
+        rgb = mix(dirty(rgb, P), GRIME * 0.8, 0.22 * depth)
+        if td is upper:
+            rgb = rgb * (1 - 0.18 * smoothstep(0.08, 0.0, t))[..., None]
+        else:
+            rgb = rgb * (1 - 0.2 * smoothstep(upper_bot - 0.07, upper_bot - 0.005, P[..., 2]))[..., None]
+        return rgb
+
+    # the skirt's texture. Its UVs run down each tier: the lower from its top (v = 0) to its hem (v = 0.5), the upper
+    # from its top (v = 0.5) to its hem (v = 1).
+    SK = 1024
+    u = np.broadcast_to((np.arange(SK)[None, :] + 0.5) / SK, (SK // 2, SK))
+    tv = np.broadcast_to((np.arange(SK // 2)[:, None] + 0.5) / (SK // 2), (SK // 2, SK))
+    sk = np.tile(satin_tile(256, 5), (SK // 256, SK // 256, 1))
+    sk[: SK // 2] = skirt_rgb(lower, tv, u, sk[: SK // 2])
+    sk[SK // 2:] = skirt_rgb(upper, tv, u, sk[SK // 2:])
     skirt_mat = material("girl_skirt", image("girl_skirt", sk), rough=0.55, double=True)
+
+    # ---- rags: each hem torn, cut out of a band of texture (with alpha) on the tier's last rows; strips torn loose ----
+    # The rags texture: the lower tier's band in rows 0-60, the upper's in 63-95, the hanging strips in 98-128.
+    RAG_W, RAG_H = 1024, 128
+    BANDS = {"lower": (lower, 5, 0, 60, 13), "upper": (upper, 3, 63, 95, 9)}  # tier, rows of it, texture rows, seed
+    STRIP_ROWS, STRIP_LEN = (98, 128), 0.16
+
+    def circle(th, h):
+        """Points round a circle (by angle) at heights: where the tears' noise is sampled."""
+        return np.stack([np.sin(th) * 0.25, np.cos(th) * 0.25, h], axis=-1)
+
+    def make_tears(seed, kinds, holes=()):
+        """kinds: (kind, half width range, height range); spread round the hem in a random order."""
+        rng = np.random.default_rng(seed)
+        start = rng.uniform(0, 2 * np.pi)
+        out = []
+        for i, j in enumerate(rng.permutation(len(kinds))):
+            kind, (w0, w1), (d0, d1) = kinds[j]
+            th0 = (start + (i + rng.uniform(0.2, 0.8)) / len(kinds) * 2 * np.pi) % (2 * np.pi)
+            out.append((th0, kind, rng.uniform(w0, w1), rng.uniform(d0, d1), int(rng.integers(1000, 9000))))
+        for (w0, w1), (d0, d1) in holes:  # radius, height of the centre
+            out.append((rng.uniform(0, 2 * np.pi), "hole", rng.uniform(w0, w1), rng.uniform(d0, d1), int(rng.integers(1000, 9000))))
+        return out
+
+    tears = {
+        "lower": make_tears(71, [("v", (0.012, 0.025), (0.06, 0.12))] * 4 + [("bite", (0.02, 0.04), (0.025, 0.05))] * 3
+                            + [("slit", (0.003, 0.006), (0.07, 0.115))] * 4 + [("bite", (0.035, 0.05), (0.012, 0.02))] * 2,
+                            holes=[((0.006, 0.014), (0.03, 0.085))] * 3),
+        "upper": make_tears(72, [("v", (0.01, 0.02), (0.03, 0.055))] * 3 + [("bite", (0.015, 0.03), (0.015, 0.035))] * 3
+                            + [("slit", (0.003, 0.005), (0.035, 0.058))] * 3),
+    }
+
+    def hem_cut(th, h, tear_list, r_hem, seed, edge=True):
+        """True where a hem is torn away, at angles round the skirt and heights (m) above the hem."""
+        C = circle(th, h)
+        cut = np.zeros(np.shape(h), bool)
+        if edge:  # the hem itself, frayed unevenly
+            C0 = circle(th, np.zeros_like(h))
+            e = 0.002 + 0.006 * noise3(C0, 0.03, seed) + 0.003 * noise3(C0, 0.007, seed + 1)
+            cut |= h + 0.0018 * (noise3(C, 0.0035, seed + 2) - 0.5) < e
+        for th0, kind, W, D, s in tear_list:
+            ds = ((th - th0 + np.pi) % (2 * np.pi) - np.pi) * r_hem
+            jag = 0.004 * (noise3(C, 0.004, s + 1) - 0.5)
+            if kind == "hole":
+                cut |= np.hypot(ds + jag, h - D) / W + 0.4 * (noise3(C, 0.006, s + 2) - 0.5) < 1
+                continue
+            wander = 0.7 * W * (noise3(circle(np.full(np.shape(h), th0), h), 0.02, s) - 0.5)
+            x = np.abs(ds - wander + jag)
+            opening = np.clip(1 - h / D, 0, 1)
+            if kind == "v":
+                cut |= x < W * opening ** 1.2
+            elif kind == "slit":
+                cut |= x < W * opening ** 0.5
+            else:  # a bite out of the hem
+                cut |= (x / W) ** 2 + (h / D) ** 2 < 1
+        return cut
+
+    def edge_near(cut, steps=4):
+        """How close (within a few texels) each kept texel is to a torn edge: frayed edges hold the dirt."""
+        m = cut.copy()
+        acc = np.zeros(cut.shape)
+        for _ in range(steps):
+            m = m | np.vstack([m[1:], m[-1:]]) | np.vstack([m[:1], m[:-1]]) | np.roll(m, 1, 1) | np.roll(m, -1, 1)
+            acc += m
+        return acc / steps * ~cut
+
+    rags = np.zeros((RAG_H, RAG_W, 4))
+    band_info = {}
+    for key, (td, kb, r0, r1, seed) in BANDS.items():
+        g = td[0].reshape(-1, N + 1, 3)
+        rows = len(g) - 1
+        z_top, z_hem = g[0, 0, 2], g[-1, 0, 2]
+        band = g[rows - kb, 0, 2] - z_hem
+        r_hem = float(np.hypot(g[-1, :, 0], g[-1, :, 1] - cy).mean())
+        n_ = r1 - r0
+        h = np.broadcast_to((np.arange(n_)[:, None] + 0.5) / n_ * band, (n_, RAG_W))
+        u = np.broadcast_to((np.arange(RAG_W)[None, :] + 0.5) / RAG_W, (n_, RAG_W))
+        rgb = skirt_rgb(td, (z_hem + h - z_top) / (z_hem - z_top), u, np.broadcast_to(SATIN * 0.98, (n_, RAG_W, 3)))
+        cut = hem_cut(u * 2 * np.pi, h, tears[key], r_hem, seed)
+        rags[r0:r1, :, :3] = mix(rgb, MUD * 0.75, 0.4 * edge_near(cut))
+        rags[r0:r1, :, 3] = ~cut
+        band_info[key] = (kb, r0, r1, band, z_hem, r_hem)
+        print(f"skirt: {key} hem torn, {len(tears[key])} tears in a {band:.3f} m band")
+
+    # strips torn loose at the side of the deep tears, hanging from the hem
+    hem_ring = lower[0].reshape(-1, N + 1, 3)[-1]
+    r_low = band_info["lower"][5]
+    rng = np.random.default_rng(81)
+    sv, sf, suv, strips_info = [], [], [], []
+    for i, (th0, _, W, _, s) in enumerate([tr for tr in tears["lower"] if tr[1] == "v"][:4]):
+        th_s = (th0 + rng.choice([-1, 1]) * 0.9 * W / r_low) % (2 * np.pi)
+        L, Wd, twist = rng.uniform(0.08, 0.145), rng.uniform(0.022, 0.034), rng.uniform(-0.8, 0.8)
+        cf = th_s / (2 * np.pi) * N
+        k0 = int(cf) % N
+        c = hem_ring[k0] * (1 - (cf - int(cf))) + hem_ring[k0 + 1] * (cf - int(cf))
+        out = np.array([np.sin(th_s), np.cos(th_s), 0.0])
+        tang = np.array([np.cos(th_s), -np.sin(th_s), 0.0])
+        T = 8
+        b = len(sv)
+        for a in range(T + 1):
+            sl = a / T * (L + 0.012)  # from 12 mm up the skirt, down past the hem
+            tw = twist * a / T
+            across = tang * np.cos(tw) + out * np.sin(tw)
+            p = c + [0, 0, 0.012 - sl] + out * 0.003
+            for col in (-1, 0, 1):
+                sv.append(p + across * col * Wd / 2 + out * 0.003 * (1 - col * col))
+        for a in range(T):
+            for col in range(2):
+                q = b + a * 3 + col
+                quad = [q, q + 1, q + 4, q + 3]
+                sf.append(quad)
+                for qq in quad:
+                    aa, cc = divmod(qq - b, 3)
+                    suv.append(((i + aa / T * (L + 0.012) / STRIP_LEN) / 4, (STRIP_ROWS[0] + cc / 2 * (STRIP_ROWS[1] - STRIP_ROWS[0])) / RAG_H))
+        strips_info.append((L, Wd, s, c, tang))
+    n_ = STRIP_ROWS[1] - STRIP_ROWS[0]
+    for i, (L, Wd, s, c, tang) in enumerate(strips_info):
+        sl = np.broadcast_to((np.arange(256)[None, :] + 0.5) / 256 * STRIP_LEN, (n_, 256))
+        cw = np.broadcast_to((np.arange(n_)[:, None] + 0.5) / n_, (n_, 256))
+        P = c + (0.012 - sl)[..., None] * [0, 0, 1] + (cw - 0.5)[..., None] * Wd * tang
+        rgb = mix(dirty(np.broadcast_to(SATIN * 0.98, (n_, 256, 3)), P), MUD * 0.7, 0.35 * np.clip(sl / (L + 0.012), 0, 1))
+        C = np.stack([sl, cw * Wd, np.full(sl.shape, s * 0.01)], axis=-1)
+        width = np.where(sl < 0.014, 1.0, (1 - 0.35 * np.clip((sl - 0.012) / L, 0, 1)) * (0.8 + 0.2 * noise3(C, 0.02, s)))
+        keep = (np.abs(cw - 0.5 + 0.08 * (noise3(C, 0.003, s + 1) - 0.5)) < 0.5 * width) & (sl < L + 0.012 - 0.02 * noise3(C, 0.006, s + 2))
+        rags[STRIP_ROWS[0]:, i * 256:(i + 1) * 256, :3] = mix(rgb, MUD * 0.75, 0.4 * edge_near(~keep))
+        rags[STRIP_ROWS[0]:, i * 256:(i + 1) * 256, 3] = keep
+    # gutters between the regions: each one's edge row repeated, so mipmaps do not bleed across
+    rags[60:62], rags[62], rags[95], rags[96:98] = rags[59], rags[63], rags[94], rags[98]
+    rags[..., :3] = np.round(rags[..., :3] * 63) / 63  # fewer levels: a much smaller PNG, no visible banding in the dirt
+    rags_mat = material("girl_skirt_rags", image("girl_skirt_rags", rags), rough=0.6, alpha=True, double=True)
+
+    def band_uvs(td, key):
+        """The tier's UVs, with its last rows (the band) mapped onto the rags texture; and each face's material."""
+        verts, faces, uvs, _, _ = td
+        kb, r0, r1, band, z_hem, _ = band_info[key]
+        rows = len(verts) // (N + 1) - 1
+        uvs = list(uvs)
+        mats = []
+        for f, quad in enumerate(faces):
+            mats.append(int(f // N >= rows - kb))
+            if mats[-1]:
+                for k, q in enumerate(quad):
+                    uvs[4 * f + k] = ((q % (N + 1)) / N, (r0 + (verts[q][2] - z_hem) / band * (r1 - r0)) / RAG_H)
+        return uvs, mats
 
     def skirt_weights(verts, ts):
         out = []
@@ -639,22 +900,34 @@ def add_outfit(rig, body, hair, eyes):
             out.append(w)
         return out
 
-    for name, (verts, faces, uvs, ts, _) in (("girl_skirt_lower", lower), ("girl_skirt_upper", upper)):
+    for key, name, td in (("lower", "girl_skirt_lower", lower), ("upper", "girl_skirt_upper", upper)):
+        verts, faces, _, ts, _ = td
+        uvs, mats = band_uvs(td, key)
         o = mesh_object(name, verts, faces, uvs, rig)
         o.data.materials.append(skirt_mat)
+        o.data.materials.append(rags_mat)
+        for p, m in zip(o.data.polygons, mats):
+            p.material_index = m
         set_weights(o, skirt_weights(verts, ts))
         pieces.append(o)
-    # the body under the skirt is never seen: hidden from the waist down to just above the hem
+    strips = mesh_object("girl_skirt_strips", sv, sf, suv, rig)
+    strips.data.materials.append(rags_mat)
+    set_weights(strips, skirt_weights(sv, np.ones(len(sv))))
+    pieces.append(strips)
+    # the body under the skirt is never seen: hidden from the waist down to above the hem (the legs show through the
+    # tears, which reach up to 12 cm)
     for i in range(len(co)):
-        if not is_arm[i] and not is_head[i] and not helper[i] and hem_z + 0.1 < co[i, 2] < waist_z + 0.01:
+        if not is_arm[i] and not is_head[i] and not helper[i] and hem_z + 0.16 < co[i, 2] < waist_z + 0.01:
             hidden.add(i)
 
-    # ---- lace: both hems, the collar, the cuffs, the veil's edge (one tiling texture) --------------------------------
-    lace_mat = material("girl_lace", image("girl_lace", lace_tile()), rough=0.75, alpha=True, double=True)
+    # ---- lace: both hems, the collar, the cuffs, the veil's edge (one tiling texture; a muddy one at the lower hem) ---
+    lace_mat = material("girl_lace", image("girl_lace", lace_tile(0.38, GRIME * 0.9, 2)), rough=0.75, alpha=True, double=True)
+    lace_hem_mat = material("girl_lace_hem", image("girl_lace_hem", lace_tile(0.95, MUD * 0.85, 3)), rough=0.8, alpha=True, double=True)
     PERIOD = 0.07  # one texture width (two scallops) in metres
 
-    def strip(name, rows, weights_of, period=PERIOD):
-        """rows: list of (M, 3) arrays, from the attached edge (v = 1) to the scalloped edge (v = 0)."""
+    def strip(name, rows, weights_of, period=PERIOD, skip=(), mat=None):
+        """rows: list of (M, 3) arrays, from the attached edge (v = 1) to the scalloped edge (v = 0). `skip`: the
+        segments (k to k + 1) torn away."""
         R = len(rows)
         M = len(rows[0])
         verts = np.concatenate(rows)
@@ -664,30 +937,61 @@ def add_outfit(rig, body, hair, eyes):
         faces, uvs = [], []
         for j in range(R - 1):
             for k in range(M - 1):
+                if k in skip:
+                    continue
                 a = j * M + k
                 faces.append([a, a + M, a + M + 1, a + 1])
                 for q in (a, a + M, a + M + 1, a + 1):
                     uvs.append((us[q % M], 1 - (q // M) / (R - 1)))
-        o = mesh_object(name, verts, faces, uvs, rig)
-        o.data.materials.append(lace_mat)
+        kept = sorted({q for f in faces for q in f})
+        index = {q: i for i, q in enumerate(kept)}
+        verts = verts[kept]
+        o = mesh_object(name, verts, [[index[q] for q in f] for f in faces], uvs, rig)
+        o.data.materials.append(mat or lace_mat)
         set_weights(o, [weights_of(p) for p in verts])
         pieces.append(o)
         return o
 
-    def hem_lace(name, tierdata, depth):
+    def hem_lace(name, tierdata, depth, key, seed, mat):
+        """The lace along a hem: gone where the hem is torn and in a few more places, come loose in others, where it
+        hangs below the hem in a loop."""
         verts, _, _, _, _ = tierdata
         ring = verts[-(N + 1):]
         prev = verts[-2 * (N + 1):-(N + 1)]
         down = ring - prev
         down /= np.linalg.norm(down, axis=1)[:, None]
+        out = (ring - [0, cy, 0]) * [1, 1, 0]
+        out /= np.linalg.norm(out, axis=1)[:, None]
         rows = [ring + down * depth * f + (ring - [0, cy, ring[0, 2]]) * [1, 1, 0] * 0.04 * f * f for f in (0, 0.5, 1)]
         rows[0] = ring - down * 0.006  # tucked just under the hem
-        t_hem = np.ones(len(ring))
-        w_ring = skirt_weights(ring, t_hem)
-        return strip(name, rows, lambda p: w_ring[int(np.argmin(np.linalg.norm(ring - p, axis=1)))])
+        torn = hem_cut(theta, np.full(N + 1, 0.006), tears[key], band_info[key][5], 0, edge=False)
+        skip = set(np.nonzero(torn[:-1] | torn[1:])[0].tolist())
+        rng = np.random.default_rng(seed)
+        for _ in range(2):  # torn off
+            k0, m = int(rng.integers(0, N)), int(rng.integers(2, 6))
+            skip |= {(k0 + i) % N for i in range(m)}
+        for _ in range(1):  # come loose
+            m = int(rng.integers(6, 11))
+            for _try in range(30):
+                k0 = int(rng.integers(0, N - m))
+                if not any(k in skip for k in range(k0 - 1, k0 + m + 1)):
+                    break
+            sag = rng.uniform(0.012, 0.025)
+            for i in range(m + 1):
+                d = sag * np.sin(np.pi * i / m)
+                for r in rows:
+                    r[k0 + i] = r[k0 + i] + down[k0 + i] * d + out[k0 + i] * 0.25 * d
+        for k in range(N + 1):  # where it is torn off, the end is torn on a slant, not cut straight
+            if ((k - 1) % N in skip) != (k % N in skip):
+                f = rng.uniform(0.15, 0.55)
+                rows[2][k] = rows[0][k] + (rows[2][k] - rows[0][k]) * f
+                rows[1][k] = rows[0][k] + (rows[1][k] - rows[0][k]) * min(1.0, f + 0.25)
+        print(f"skirt: {name} torn away on {len(skip)} of {N} segments")
+        w_ring = skirt_weights(ring, np.ones(len(ring)))
+        return strip(name, rows, lambda p: w_ring[int(np.argmin(np.linalg.norm(ring - p, axis=1)))], skip=skip, mat=mat)
 
-    hem_lace("girl_lace_lower", lower, 0.05)
-    hem_lace("girl_lace_upper", upper, 0.055)
+    hem_lace("girl_lace_lower", lower, 0.05, "lower", 5, lace_hem_mat)  # in the mud
+    hem_lace("girl_lace_upper", upper, 0.055, "upper", 6, lace_mat)
 
     bod_tree = BVHTree.FromPolygons([tuple(p) for p in bverts], [tuple(f) for f in bfaces])
     body_tree = bvh_of([body])
@@ -717,8 +1021,13 @@ def add_outfit(rig, body, hair, eyes):
         out[:, 2] = 0
         out /= np.linalg.norm(out, axis=1)[:, None]
         rows.append(np.array([onto(p + o * f + [0, 0, -0.35 * f], bod_tree, 0.004) for p, o in zip(ring, out)]))
+    # torn: a piece gone over her left collarbone, and a flap come loose over her right, hanging off the shoulder
+    for k in range(42, 51):
+        sag = 0.018 * np.sin(np.pi * (k - 42) / 8)
+        for j in (1, 2, 3):
+            rows[j][k] = rows[j][k] + (out[k] * 0.5 + [0, 0, -0.85]) * sag * j / 3
     # split the collar at the back (two halves meet at the buttons), so u runs front to back on each side
-    strip("girl_collar", rows, lambda p: src.at(p), period=0.06)
+    strip("girl_collar", rows, lambda p: src.at(p), period=0.06, skip=set(range(24, 29)))
 
     # cuffs: a frill of lace round the end of each puff sleeve
     for s in "lr":
@@ -732,11 +1041,11 @@ def add_outfit(rig, body, hair, eyes):
         ringc = np.array([c + (np.cos(q) * e1 + np.sin(q) * e2) * rad for q in np.linspace(0, 2 * np.pi, 41)])
         rows = [ringc - d * 0.006, ringc + d * 0.012 + (ringc - c) * 0.12, ringc + d * 0.026 + (ringc - c) * 0.25]
         arm_w = {f"upperarm_{s}": 1.0}
-        strip(f"girl_cuff_{s}", rows, lambda p, w=arm_w: w, period=0.05)
+        strip(f"girl_cuff_{s}", rows, lambda p, w=arm_w: w, period=0.05, skip=set(range(4, 15)) if s == "l" else ())  # a third of her left cuff torn off
 
     # ---- the sash, the bow and its tails ------------------------------------------------------------------------------
-    satin = image("girl_satin", satin_tile(256, 7))
-    sash_mat = material("girl_sash", satin, rough=0.38)
+    satin = image("girl_satin", mix(satin_tile(256, 7) * AGED, GRIME, 0.12 + 0.22 * noise(256, 256, 6, 77)))  # dull and dirty
+    sash_mat = material("girl_sash", satin, rough=0.5)
     SH = 0.05
     skirt_pts = np.concatenate([lower[0], upper[0]])
     sk_ang = (np.arctan2(skirt_pts[:, 0], skirt_pts[:, 1] - cy) % (2 * np.pi)) / (2 * np.pi) * N
@@ -789,24 +1098,25 @@ def add_outfit(rig, body, hair, eyes):
         for i in range(L):
             faces.append([b + i, b + i + 1, b + L + 2 + i, b + L + 1 + i])
             uvs += [(i / L, 0), ((i + 1) / L, 0), ((i + 1) / L, 1), (i / L, 1)]
-    # tails: hanging from the knot, spreading a little, cut in a V at the ends
+    # tails: hanging from the knot, spreading a little; one torn short, both ends torn ragged
+    rng = np.random.default_rng(61)
     for s in (-1, 1):
         T = 10
         b = base + sum(len(x) for x in allv[1:])
+        length = 0.24 if s < 0 else 0.14
         left, right = [], []
         for i in range(T + 1):
             f = i / T
-            c = knot + [s * (0.006 + 0.05 * f), 0.008 + 0.012 * f + 0.004 * np.sin(f * 7), -0.24 * f]
+            c = knot + [s * (0.006 + 0.05 * f), 0.008 + 0.012 * f + 0.004 * np.sin(f * 7), -length * f]
             tw = 0.15 * s * f
             half = np.array([np.cos(tw), np.sin(tw), 0]) * RW / 2
-            cut = 0.018 if i == T else 0.0
-            left.append(c - half + [0, 0, 0])
-            right.append(c + half + [0, 0, cut * 0])
+            left.append(c - half)
+            right.append(c + half)
         left, right = np.array(left), np.array(right)
-        left[-1, 2] -= 0.018 if s > 0 else 0.0
-        right[-1, 2] -= 0.018 if s < 0 else 0.0
         mid = (left + right) / 2
-        mid[-1, 2] += 0.012  # the V notch
+        for edge in (left, mid, right):
+            edge[-1, 2] += rng.uniform(-0.022, 0.012)
+            edge[-2, 2] += rng.uniform(-0.006, 0.006)
         allv += [left, mid, right]
         for i in range(T):
             for col in range(2):
@@ -830,7 +1140,7 @@ def add_outfit(rig, body, hair, eyes):
     pieces.append(sash)
 
     # pearl buttons down the back of the bodice
-    pearl_mat = material("girl_pearl", None, color=(0.86, 0.85, 0.8), rough=0.25)
+    pearl_mat = material("girl_pearl", None, color=(0.74, 0.72, 0.66), rough=0.4)  # gone dull
     pv, pf = [], []
     for i in range(4):
         z = waist_z + 0.04 + i * 0.03
@@ -873,8 +1183,8 @@ def add_outfit(rig, body, hair, eyes):
         r = 0.2 - hit[3] if hit[0] is not None else 0.08
         wring.append(wc + d * (r + 0.004))
     wring = np.array(wring)
-    petal_mat = material("girl_petal", None, color=(0.93, 0.92, 0.89), rough=0.6)
-    leaf_mat = material("girl_leaf", None, color=(0.62, 0.66, 0.58), rough=0.6)
+    petal_mat = material("girl_petal", None, color=(0.78, 0.75, 0.66), rough=0.7)  # wilted, browning
+    leaf_mat = material("girl_leaf", None, color=(0.47, 0.48, 0.4), rough=0.7)
     fv, ff, fmat = [], [], []
 
     def disc(centre, normal, radius, sides_, lift=0.0, sx=1.0, rot=0.0, tip=0.0):
@@ -952,15 +1262,38 @@ def add_outfit(rig, body, hair, eyes):
             row.append(q)
         vrows.append(np.array(row))
     Mv = len(top_row)
-    verts = np.concatenate(vrows)
+    grid = np.array(vrows)  # (row, column, xyz)
+    # torn: the bottom ragged (each column of faces ends at its own row), and a few holes
+    rng = np.random.default_rng(91)
+    reach = np.interp(np.arange(Mv - 1) / (Mv - 2), np.linspace(0, 1, 7), rng.random(7)) * 4.2 + rng.random(Mv - 1) - 1.4
+    ends = VR - np.clip(reach, 0, 4.4).astype(int)  # how many rows of faces each column keeps
+    holes = set()
+    for _ in range(3):
+        j, k = int(rng.integers(3, VR - 4)), int(rng.integers(2, Mv - 4))
+        holes |= {(j, k), (j, k + 1)} | ({(j + 1, k)} if rng.random() < 0.5 else set())
+    cells = [(j, k) for j in range(VR) for k in range(Mv - 1) if j < ends[k] and (j, k) not in holes]
+    # the torn edges are not cut straight: their corners pulled about a little
+    edge_use = {}
+    for j, k in cells:
+        for e in (((j, k), (j, k + 1)), ((j, k + 1), (j + 1, k + 1)), ((j + 1, k + 1), (j + 1, k)), ((j + 1, k), (j, k))):
+            edge_use[tuple(sorted(e))] = edge_use.get(tuple(sorted(e)), 0) + 1
+    for j, k in sorted({v for e, n_ in edge_use.items() if n_ == 1 for v in e if v[0] > 0 and 0 < v[1] < Mv - 1}):
+        grid[j, k] += [rng.uniform(-0.004, 0.004), rng.uniform(-0.002, 0.002), rng.uniform(-0.007, 0.005)]
+    print("veil: torn,", int((ends < VR).sum()), "of", Mv - 1, "columns shorter,", len(holes), "faces holed")
+
+    def vv(jj):
+        return (1 - jj / VR) * 14  # tulle: about 14 repeats down, 30 across
+
+    def uu(kk):
+        return kk / (Mv - 1) * 30
+
+    kept = sorted({v for j, k in cells for v in ((j, k), (j, k + 1), (j + 1, k + 1), (j + 1, k))})
+    index = {v: i for i, v in enumerate(kept)}
+    verts = np.array([grid[v] for v in kept])
     faces, uvs = [], []
-    for j in range(VR):
-        for k in range(Mv - 1):
-            a = j * Mv + k
-            faces.append([a, a + 1, a + Mv + 1, a + Mv])
-            vv = lambda jj: (1 - jj / VR) * 14  # noqa: E731  tulle: about 14 repeats down, 30 across
-            uu = lambda kk: kk / (Mv - 1) * 30  # noqa: E731
-            uvs += [(uu(k), vv(j)), (uu(k + 1), vv(j)), (uu(k + 1), vv(j + 1)), (uu(k), vv(j + 1))]
+    for j, k in cells:
+        faces.append([index[(j, k)], index[(j, k + 1)], index[(j + 1, k + 1)], index[(j + 1, k)]])
+        uvs += [(uu(k), vv(j)), (uu(k + 1), vv(j)), (uu(k + 1), vv(j + 1)), (uu(k), vv(j + 1))]
     veil = mesh_object("girl_veil", verts, faces, uvs, rig)
     veil.data.materials.append(material("girl_veil", image("girl_veil", tulle_tile()), rough=0.8, alpha=True, double=True))
 
@@ -971,10 +1304,12 @@ def add_outfit(rig, body, hair, eyes):
 
     set_weights(veil, [veil_w(p) for p in verts])
     pieces.append(veil)
-    last = vrows[-1]
-    prev = vrows[-2]
+    last = grid[-1]
+    prev = grid[-2]
     down = last - prev
     down /= np.linalg.norm(down, axis=1)[:, None]
-    strip("girl_veil_lace", [last - down * 0.004, last + down * 0.018, last + down * 0.036], veil_w, period=0.06)
+    # the lace edge is left only on the columns that kept their full length, and not on all of those
+    lace_skip = {k for k in range(Mv - 1) if ends[k] < VR or rng.random() < 0.15}
+    strip("girl_veil_lace", [last - down * 0.004, last + down * 0.018, last + down * 0.036], veil_w, period=0.06, skip=lace_skip)
 
     return pieces, hidden, {"waist": waist_z, "hem": hem_z, "cy": cy}

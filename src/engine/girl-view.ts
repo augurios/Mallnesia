@@ -2,9 +2,9 @@ import * as THREE from "three";
 import { FLOOR_HEIGHT } from "./walk";
 
 // How the girl in white looks. The real model (public/models/girl.glb, built by scripts/girl/build.sh: an MPFB child,
-// CC0, in a first communion dress, veil and wreath modeled by script, loose messy hair grown over her in her crying
-// pose, with a "cry" clip authored over Quaternius' idle, CC0) is fetched with `load`; until it arrives, or if it fails,
-// a stand-in made of a few primitives is drawn. Feet at y = 0, facing local +x.
+// CC0, in a ragged, dirty first communion dress, veil and wreath modeled by script, loose messy hair grown over her in
+// her crying pose, with a "cry" clip authored over Quaternius' idle, CC0) is fetched with `load`; until it arrives, or if
+// it fails, a stand-in made of a few primitives is drawn. Feet at y = 0, facing local +x.
 //
 // She is a ghost: a little see-through even when fully there, glowing faintly cold from within and more at her edges,
 // with a soft aura round her and a dim cold light on what is near her. All of it breathes slowly and swells with each

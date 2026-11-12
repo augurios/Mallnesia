@@ -237,14 +237,15 @@ skin[..., :3] = rgb
 body.data.materials.clear()
 body.data.materials.append(simple("girl_skin", skin, 0.6))
 
-# shoes: the brown leather becomes white patent with scuffed toes; the white socks stay as they are
+# shoes: the brown leather becomes white patent, scuffed and dulled; the white socks gone grey-brown with dirt
 sh = pixels(sized(diffuse_of(shoes), 512)).copy()
 sat = sh[..., :3].max(-1) - sh[..., :3].min(-1)
 Ls = lum(sh[..., :3])
 leather = sat > 0.08
-white = np.clip(0.9 * (Ls / max(1e-3, float(Ls[leather].mean()))) ** 0.35, 0.55, 0.97)[..., None] * np.array([0.98, 0.97, 0.95])
-sock = np.clip(0.93 * (Ls / max(1e-3, float(Ls[~leather].mean()))) ** 0.3, 0.75, 0.97)[..., None] * np.array([0.96, 0.96, 0.95])
+white = np.clip(0.9 * (Ls / max(1e-3, float(Ls[leather].mean()))) ** 0.35, 0.55, 0.97)[..., None] * np.array([0.82, 0.79, 0.74])
+sock = np.clip(0.93 * (Ls / max(1e-3, float(Ls[~leather].mean()))) ** 0.3, 0.75, 0.97)[..., None] * np.array([0.82, 0.78, 0.71])
 sh[..., :3] = np.where(leather[..., None], white, sock)
+sh[..., :3] = dress.mix(sh[..., :3], dress.MUD, 0.15 + 0.3 * dress.noise(512, 512, 12, 4))
 shoes.data.materials.clear()
 shoes.data.materials.append(simple("girl_shoes", sh, 0.3))
 
