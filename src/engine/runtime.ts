@@ -650,11 +650,22 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let locked = false;
   let charge = 1;
   const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: flashOn && charge > 0, hidden: hiding.hidden });
+  /**
+   * The girl is gone at once (she has left, the player fainted or loaded a save, the mall was left): her model, her
+   * light, her voice and her drain. Without the model and light, the view would stay drawn where she last stood.
+   */
+  const dismissGirl = () => {
+    apparition = null;
+    sanity.setDrain("girl", 0);
+    girlView.update(0, 0, 0, 0, 0, 0);
+    girlVoice.update(0, 0, 0, 0);
+  };
   const restore = (slot: SaveSlot): boolean => {
     const saved = store.read(slot);
     if (!saved || saved.area !== "mall") return false; // the garage is its own level, not built yet
     hiding.reset();
     guardScene?.finish(); // a load is not the opening
+    dismissGirl();
     opening = "skip";
     player.set(saved.x, saved.height, -saved.y);
     yaw = saved.yaw;
@@ -713,9 +724,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (noiseWorld) noiseWorld.object.visible = shown;
     sky.mesh.visible = inMall;
     if (!inMall) {
-      apparition = null;
-      sanity.setDrain("girl", 0);
-      girlView.update(0, 0, 0, 0, 0, 0);
+      dismissGirl();
       shadowView.object.visible = false;
       guardView.update(0, 0, 0, 0, false, "idle", 0);
     }
@@ -945,8 +954,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const placePlayer = (toFloor: number, x: number, y: number, toYaw: number) => {
     hiding.reset();
     guardScene?.finish();
-    apparition = null;
-    sanity.setDrain("girl", 0);
+    dismissGirl(); // fainting at her feet: she does not wait there for the player to come back
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -1362,12 +1370,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         }
         girlVoice.update(a.spot.x, gy + 1.0, -a.spot.y, a.opacity);
         girlView.update(a.spot.x, a.spot.y, floor, a.spot.facing, a.opacity, now / 1000);
-        if (a.done) {
-          apparition = null;
-          girlView.update(0, 0, 0, 0, 0, 0);
-          sanity.setDrain("girl", 0);
-          girlVoice.update(0, 0, 0, 0);
-        }
+        if (a.done) dismissGirl();
       } else girlVoice.update(0, 0, 0, 0);
       if (girlSubtitleUntil > 0 && now > girlSubtitleUntil) {
         girlSubtitleUntil = 0;
