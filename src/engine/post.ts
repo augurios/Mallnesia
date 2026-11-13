@@ -101,6 +101,12 @@ export interface Post {
   setLook(look: PostLook): void;
   setSize(width: number, height: number, pixelRatio: number): void;
   setSettings(settings: PostSettings): void;
+  /**
+   * Where the scene is drawn with the current settings: a render target when any pass is on, the screen (null)
+   * otherwise. Shaders differ between the two (tone mapping happens in the last pass), so a warm-up has to compile
+   * against this to build the programs the frames will really use.
+   */
+  compileTarget(): THREE.WebGLRenderTarget | null;
   render(seconds: number): void;
   dispose(): void;
 }
@@ -130,6 +136,9 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
       settings = next;
       bloom.enabled = next.bloom;
       film.enabled = next.film;
+    },
+    compileTarget() {
+      return settings.bloom || settings.film ? composer.readBuffer : null; // the render pass draws into the read buffer
     },
     render(seconds) {
       if (!settings.bloom && !settings.film) {

@@ -170,7 +170,9 @@ Record each non-original asset here so licences are traceable.
 
 | Asset | Source (service or library) | Date | Licence / terms checked |
 |---|---|---|---|
-| | | | |
+| Guard character (`public/models/guard.glb`): body, skin, hair, clothes | MPFB + MakeHuman system assets pack | 2026-11-08 | CC0 (MakeHuman assets and output) |
+| Guard animations (idle, talk, torch idle, walk) | Quaternius, Universal Animation Library (Standard), via OpenGameArt | 2026-11-08 | CC0 (License.txt in the pack) |
+| Guard cap ("SEGURIDAD") and chest badge | Our own, modeled by script (`scripts/guard/gear.py`); nothing fitting on Poly Haven or in MakeHuman | 2026-11-08 | Ours |
 
 ## Kit piece detail standard (decided by Augusto, 2026-11-06; strengthened the same day)
 

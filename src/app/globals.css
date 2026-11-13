@@ -57,6 +57,28 @@ body {
   transition: width 0.2s ease-out;
 }
 
+.game-loading-wait {
+  width: 30%;
+  animation: game-loading-wait 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes game-loading-wait {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(233%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-loading-wait {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+
 .game-loading-percent {
   font-size: 13px;
   color: #8a8575;
@@ -119,23 +141,78 @@ body {
   pointer-events: none;
 }
 
-.game-flashlight {
+.game-vitals {
   position: absolute;
-  left: 12px;
-  bottom: 14px;
-  width: 120px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.12);
+  left: 24px;
+  bottom: 22px;
+  display: grid;
+  gap: 9px;
+  font: 10px ui-monospace, "IBM Plex Mono", monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #e2ddbd;
+  text-shadow: 0 2px 4px #000;
   pointer-events: none;
 }
 
-.game-flashlight-fill {
-  height: 100%;
-  background: #777;
+.game-vitals label {
+  display: grid;
+  grid-template-columns: 70px 120px 36px;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.75;
 }
 
-.game-flashlight-fill.on {
-  background: #e8d9a0;
+.game-vitals meter {
+  width: 120px;
+  height: 5px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+}
+
+.game-vitals meter::-webkit-meter-bar {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 0;
+}
+
+.game-vitals meter::-webkit-meter-optimum-value,
+.game-vitals meter::-webkit-meter-suboptimum-value,
+.game-vitals meter::-webkit-meter-even-less-good-value {
+  background: #cabe88;
+  transition: width 0.15s linear;
+}
+
+.game-vitals meter::-moz-meter-bar {
+  background: #cabe88;
+}
+
+.game-vitals label.lit meter::-webkit-meter-optimum-value,
+.game-vitals label.lit meter::-webkit-meter-suboptimum-value {
+  background: #f0e2a8;
+}
+
+.game-vitals label.critical {
+  opacity: 1;
+  color: #d9604a;
+  animation: vitals-pulse 1s ease-in-out infinite;
+}
+
+.game-vitals label.critical meter::-webkit-meter-optimum-value,
+.game-vitals label.critical meter::-webkit-meter-suboptimum-value,
+.game-vitals label.critical meter::-webkit-meter-even-less-good-value {
+  background: #d9604a;
+}
+
+.game-vitals label.critical meter::-moz-meter-bar {
+  background: #d9604a;
+}
+
+@keyframes vitals-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 
 .game-prompt {
@@ -148,6 +225,21 @@ body {
   text-shadow: 0 0 6px #000;
   pointer-events: none;
   z-index: 5; /* above the black of a fail */
+}
+
+.game-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: #d8d2c0;
+  background: rgba(0, 0, 0, 0.4);
+  text-shadow: 0 0 6px #000;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .game-subtitle {
@@ -167,9 +259,10 @@ body {
 }
 
 .game-root[data-hud="off"] .game-subtitle,
+.game-root[data-hud="off"] .game-tip,
 .game-root[data-hud="off"] .game-hint,
 .game-root[data-hud="off"] .game-status,
-.game-root[data-hud="off"] .game-flashlight,
+.game-root[data-hud="off"] .game-vitals,
 .game-root[data-hud="off"] .game-prompt {
   display: none;
 }
