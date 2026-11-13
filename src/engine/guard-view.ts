@@ -88,6 +88,8 @@ export interface GuardView {
   object: THREE.Object3D;
   /** The warm light of his flashlight. */
   light: THREE.PointLight;
+  /** Fetches the real model, once; resolves when it is in, or when it failed and the stand-in stays. */
+  load(): Promise<void>;
   /** Places and animates him. `facing` is the plan heading; `visible` false hides him and darkens his light. */
   update(x: number, y: number, floor: number, facing: number, visible: boolean, pose: GuardPose, seconds: number): void;
   dispose(): void;
@@ -112,10 +114,11 @@ export interface GuardGltf {
 
 /**
  * The guard. The real model (public/models/guard.glb: an MPFB character with clips retargeted from Quaternius'
- * Universal Animation Library, both CC0; built by scripts/guard/build.sh) is fetched with `load`; until it arrives, or
- * if it fails, the procedural stand-in below is drawn instead.
+ * Universal Animation Library, both CC0; built by scripts/guard/build.sh) is fetched by `load` (the runtime does it
+ * after the mall, as part of the loading screen: he is the first thing the player sees); until it arrives, or if it
+ * fails, the procedural stand-in below is drawn instead.
  */
-export function createGuardView(load?: (url: string) => Promise<GuardGltf>): GuardView {
+export function createGuardView(fetchModel?: (url: string) => Promise<GuardGltf>): GuardView {
   const root = new THREE.Group(); // always visible, so the light is always counted
   const holder = new THREE.Group(); // placed and turned each frame
   holder.visible = false;
@@ -125,20 +128,24 @@ export function createGuardView(load?: (url: string) => Promise<GuardGltf>): Gua
   let current: GuardBody = createStandIn();
   holder.add(current.object);
   let disposed = false;
-  load?.(GUARD_URL)
-    .then((gltf) => {
-      if (disposed) return;
-      const real = createModelBody(gltf);
-      holder.remove(current.object);
-      current.dispose();
-      current = real;
-      holder.add(real.object);
-    })
-    .catch((err) => console.warn("guard model failed to load; using the stand-in", err));
+  let loading: Promise<void> | null = null;
   const lensAt = new THREE.Vector3();
   return {
     object: root,
     light,
+    load() {
+      loading ??= (fetchModel?.(GUARD_URL) ?? Promise.reject(new Error("no loader")))
+        .then((gltf) => {
+          if (disposed) return;
+          const real = createModelBody(gltf);
+          holder.remove(current.object);
+          current.dispose();
+          current = real;
+          holder.add(real.object);
+        })
+        .catch((err) => console.warn("guard model failed to load; using the stand-in", err));
+      return loading;
+    },
     update(x, y, floor, facing, visible, pose, seconds) {
       holder.visible = visible;
       light.intensity = visible ? 6 : 0; // never removed: only dimmed to nothing, so the shader count never changes

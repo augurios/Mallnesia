@@ -146,6 +146,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.localClippingEnabled = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // Checking each new program for errors reads its log, which waits until the driver has finished compiling it: a stall
+  // on the main thread. Only worth it while developing.
+  renderer.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
   root.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -285,12 +288,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const girlDirector = new GirlDirector();
   girlDirector.enabled = girlMode !== "off";
   if (girlMode === "now") girlDirector.soon(3);
-  const girlView = createGirlView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
+  const girlView = createGirlView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // fetched once the game is ready (see the loading below)
   const girlVoice = audio.girl();
   scene.add(girlView.object, girlView.light); // her light stays in the scene (dimmed to nothing), so shaders never recompile
   let apparition: Apparition | null = null;
   let girlSubtitleUntil = 0;
-  const guardView = createGuardView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the stand-in until the model arrives
+  const guardView = createGuardView((url) =>
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url, (e) => {
+      load.report("guard", e.loaded, e.lengthComputable && e.total > 0 ? e.total : GUARD_BYTES_GUESS);
+      announce();
+    }),
+  ); // fetched after the mall, as part of the loading screen (see the loading below)
   scene.add(guardView.object); // with its light (at intensity 0 until he is on stage), so no shader recompiles when he appears
   // The opening: the guard is the first thing the player sees. Skipped by any debug start (?x ?y ?floor), by ?guard=off, and on a
   // game that has already met him; ?guard=now plays it from wherever the game starts.
@@ -362,12 +370,35 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   // Shader warm-up (card "Compile shaders at load time"): three.js builds a material's program the first time it is
   // drawn, which can freeze a frame mid-game (the first frame the shadow, the guard or a fallen chair shows up).
   // After loading, everything that can ever appear is made visible once and compiled, then hidden again, and the
-  // post-processing passes render one frame. ?precompile=off skips it (to compare); ?stats=1 shows how long it took.
+  // post-processing passes render one frame. The compile runs in parallel off the main thread (compileAsync), against
+  // the render target the frames really draw into (`post.compileTarget`: on medium and high the scene goes through the
+  // post-processing chain, and those programs differ from the on-screen ones), and nothing is drawn until it is over:
+  // a frame drawn earlier would compile everything in it on the main thread, one program at a time (a long freeze on a
+  // first visit, when the browser has no compiled shaders cached). ?precompile=off skips it (to compare);
+  // ?precompile=sync is for headless screenshots (`npm run shots`): headless Chrome's virtual time races ahead whenever
+  // the page waits on something (a parallel compile, an image decode) and the budget would run out before loading ends,
+  // so it compiles on the main thread and keeps drawing while loading, which paces virtual time to the real work.
+  // ?stats=1 shows how long it took; `npm run bench:load` counts the programs.
   let warmMs = -1;
   let worstNow = 0; // ms
   let worstShown = 0;
   let worstSince = performance.now();
   let warmDone = false; // the warm-up changes what is visible while it runs, so nothing else may show or hide areas until it is over
+  const syncCompile = params.get("precompile") === "sync";
+  /** Compiles everything `root` holds, for the target the frames draw into (`targetScene`: whose lights and fog count). */
+  const compileFor = (root: THREE.Object3D, targetScene: THREE.Scene | null = null): Promise<unknown> => {
+    const target = renderer.getRenderTarget();
+    renderer.setRenderTarget(post.compileTarget()); // the programs are made inside the calls below, for the current target
+    try {
+      if (syncCompile) {
+        renderer.compile(root, camera, targetScene);
+        return Promise.resolve();
+      }
+      return renderer.compileAsync(root, camera, targetScene);
+    } finally {
+      renderer.setRenderTarget(target);
+    }
+  };
   const warmUp = async () => {
     if (params.get("precompile") === "off") {
       warmDone = true;
@@ -381,7 +412,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     noiseWorld?.spawn("chair_tip", { x: 0, y: 0, heading: 0 }, 0, mute, () => true);
     noiseWorld?.spawn("bin_tip", { x: 0, y: 0, heading: 0 }, 0, mute, () => true);
     try {
-      await renderer.compileAsync(scene, camera);
+      await compileFor(scene);
     } catch (err) {
       console.error("Shader warm-up failed", err);
     }
@@ -391,25 +422,48 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     warmMs = performance.now() - t0;
     warmDone = true;
   };
+  /**
+   * The warm-up for a model that arrives after it (the girl): its programs compiled in parallel, for the target the
+   * frames draw into, and its textures uploaded one a frame, so the first frame it shows in does not stall.
+   */
+  const prepareLate = async (model: THREE.Object3D) => {
+    await compileFor(model, scene); // with the scene's lights: the programs depend on them
+    const textures = new Set<THREE.Texture>();
+    model.traverse((o) => {
+      const material = (o as THREE.Mesh).material;
+      for (const m of Array.isArray(material) ? material : material ? [material] : [])
+        for (const value of Object.values(m)) if (value instanceof THREE.Texture) textures.add(value);
+    });
+    for (const texture of textures) {
+      renderer.initTexture(texture);
+      await new Promise((next) => requestAnimationFrame(next));
+    }
+  };
 
   // Loading progress (load-progress.ts): the weights are about each part's share of the wait (the mall is 1.2 MB, the kit
-  // pieces about 1 MB, the rest small, then the shader warm-up).
+  // pieces about 1 MB, the guard about 1 MB after them, the rest small, then the shader warm-up).
+  // The order matters on a slow connection: the mall, the kit pieces and the baked occlusion first, side by side; the
+  // guard once they are in (he is the first thing the player sees, so he is part of the wait, but he must not slow the
+  // mall down); the girl only after the game is ready (she is not needed for minutes), with her own warm-up.
   const load = new LoadProgress([
     { name: "mall", weight: 5 },
     { name: "props", weight: 4 },
     { name: "ao", weight: 0.3 },
     { name: "nav", weight: 0.3 },
     { name: "extra", weight: 0.6 },
+    { name: "guard", weight: 4 },
     { name: "warm", weight: 2 },
   ]);
   let lastAnnounced = -1;
+  // Told only when the shown percent changes (each download reports many times a second, and each tell re-renders the HUD).
   const announce = (error = false) => {
-    const progress = load.value;
-    if (!error && progress === lastAnnounced) return;
+    const progress = Math.floor(load.value * 100) / 100;
+    if (!error && !load.complete && progress === lastAnnounced) return;
     lastAnnounced = progress;
-    options.onLoad?.({ progress, ready: load.complete && !error, error });
+    options.onLoad?.({ progress: load.complete ? 1 : progress, ready: load.complete && !error, error });
   };
   const MALL_BYTES_GUESS = 1_300_000; // when the server does not say how long the file is
+  const GUARD_BYTES_GUESS = 1_100_000;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   announce();
   void (async () => {
@@ -441,6 +495,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           })
           .then((t) => (load.finish("ao"), announce(), t)),
       ]);
+      // the guard now that the big files are in (he must be here before the warm-up, which compiles his shaders); the
+      // girl too when ?girlat places her (screenshots: she is then in place, warmed up, the moment the game is ready)
+      const guardIn = guardView.load().then(() => {
+        load.finish("guard");
+        announce();
+      });
+      const girlIn = girlAtPending ? girlView.load() : null;
       setBakedAO(ao); // before the first styled frame: the shader samples it
       gltf.scene.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
@@ -515,9 +576,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           return null;
         }
       })();
+      await guardIn;
+      await girlIn;
       await warmUp();
       load.finish("warm");
       announce();
+      // the girl, now that the game is ready (only if she can appear: ?girl=off skips her)
+      if (girlDirector.enabled && !girlIn) void girlView.load(prepareLate);
     } catch (err) {
       console.error("Could not load the mall blockout", err);
       announce(true);
@@ -1123,7 +1188,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (charge === 0) flashOn = false;
     if (fail.update(dt) === "move") relocate();
     blackout.style.opacity = String(fail.fade);
-    if (girlAtPending && nav && warmDone) {
+    if (girlAtPending && nav && warmDone && girlView.ready) {
       girlAtPending = false;
       const at = (params.get("girlat") ?? "").split(",").map(parseFloat);
       if (at.length === 2 && at.every(Number.isFinite)) {
@@ -1276,7 +1341,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     // The girl in white: out of view, crying; seeing her costs sanity, more the closer the player is.
     if (area === "mall") {
       if (dt > 0 && !fail.locked) {
-        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready";
+        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready" || !girlView.ready; // not ready: her model is still on its way
         if (girlDirector.update(dt, sanity.shift, busy) && !summonGirl()) girlDirector.soon(8); // nowhere to put her: try again soon
       }
       if (apparition) {
@@ -1355,7 +1420,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (area === "mall") props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
-    post.render(now / 1000);
+    if (warmDone || syncCompile) post.render(now / 1000); // nothing is drawn while loading: see the warm-up
     if (stats && statusTimer === 1) stats.textContent = `${renderer.info.render.triangles.toLocaleString()} tris · ${renderer.info.render.calls} calls · zona ${area} (${player.x.toFixed(1)}, ${(-player.z).toFixed(1)}) · cordura ${sanity.level.toFixed(2)} · peor cuadro ${worstShown.toFixed(0)} ms · precarga ${warmMs < 0 ? "-" : warmMs.toFixed(0) + " ms"}${shadow ? ` · sombra ${shadow.state} ${shadow.awareness.toFixed(2)}` : ""}`;
 
     if (++statusTimer >= 10) {

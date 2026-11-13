@@ -52,6 +52,6 @@ In the game she is a ghost (`src/engine/girl-view.ts`): a little see-through, wi
    bakes the idle (the rest-pose swing only on the limbs: on a child the library's spine directions bend the chest
    forward), authors `cry`, grows the loose hair in that pose, and exports.
 3. `scripts/guard/finish.mts`: lace, rags, hair and lashes alpha-tested, the veil blended, the skirt and sash two-sided;
-   meshopt compression.
+   the vertex data quantized, then meshopt compression.
 
 `KEEP=<dir> scripts/girl/build.sh` keeps the intermediate files.

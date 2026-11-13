@@ -9,7 +9,21 @@ import { rampHole, type Box, type GarageLayout, type Sign } from "./garage-gen";
 
 const CAR_COLORS = [0x6c8a7c, 0x8c2b2b, 0x2b3f5c, 0x9a9a98, 0x1e1e20, 0xb5ad8f, 0x5a4a3a]; // 0 is the van's faded green
 
-function concrete(repeatX: number, repeatY: number, base: number): THREE.CanvasTexture {
+/** The concrete of each shade, drawn once and shared by every view: they get clones (one image, their own repeat). */
+const concretes = new Map<number, THREE.Texture>();
+
+function concrete(repeatX: number, repeatY: number, base: number): THREE.Texture {
+  let shared = concretes.get(base);
+  if (!shared) {
+    shared = drawConcrete(base);
+    concretes.set(base, shared);
+  }
+  const t = shared.clone();
+  t.repeat.set(repeatX, repeatY);
+  return t;
+}
+
+function drawConcrete(base: number): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const g = c.getContext("2d")!;
@@ -37,7 +51,6 @@ function concrete(repeatX: number, repeatY: number, base: number): THREE.CanvasT
   g.strokeRect(0, 0, 256, 256);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(repeatX, repeatY);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;

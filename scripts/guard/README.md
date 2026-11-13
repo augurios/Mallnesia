@@ -40,7 +40,9 @@ curl -L -A "Mozilla/5.0" -o ual1.zip https://opengameart.org/sites/default/files
    the T-pose / A-pose difference corrected; hips scaled by leg length) and exports with the clips. Fingers follow
    the library's finger directions only, with no twist, and the free hand keeps half the library's curl (it clenches
    otherwise); the torch clip keeps its full grip.
-3. `finish.mts` (Node): hair, eyebrows and eyelashes alpha-tested, everything else opaque; meshopt compression.
+3. `finish.mts` (Node): hair, eyebrows and eyelashes alpha-tested, everything else opaque; the vertex data quantized
+   (KHR_mesh_quantization), then meshopt compression. It refuses a file that is quantized already (finish the file
+   Blender wrote).
 
 The game plays `walk`, `talk` or `idle` on the body, and always the left arm of `torch` (the flashlight hand); the
 flashlight itself is added in code (`src/engine/guard-view.ts`).

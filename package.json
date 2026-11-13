@@ -24,6 +24,7 @@
     "test:stamina": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-stamina.mts",
     "test:sanity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-sanity.mts",
     "shots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/shots.mts",
+    "bench:load": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/load-bench.mts",
     "pieces": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/piece-shots.mts",
     "props": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-props.mts",
     "nav": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-nav.mts",
