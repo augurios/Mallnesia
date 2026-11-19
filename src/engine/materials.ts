@@ -42,6 +42,17 @@ const white = new THREE.DataTexture(new Uint8Array([255]), 1, 1, THREE.RedFormat
 white.needsUpdate = true;
 const bakedAO = { value: white as THREE.Texture };
 
+/**
+ * Where the mall is drawn when it is seen from another frame (through a ramp garage's exit doorway: the mall turned and
+ * moved). The surface shaders look their patterns and the baked occlusion up by the mall's own world position, so they
+ * map back through this matrix (the identity while the mall is where it belongs).
+ */
+const mallFrame = { value: new THREE.Matrix4() };
+export function setMallFrame(root: THREE.Object3D | null) {
+  if (root) mallFrame.value.copy(root.matrixWorld).invert();
+  else mallFrame.value.identity();
+}
+
 /** Gives the floors and ceilings their baked occlusion map (or back the white one for null). */
 export function setBakedAO(texture: THREE.Texture | null) {
   if (texture) {
@@ -349,11 +360,12 @@ function patch(material: THREE.Material, kind: Kind, wear: boolean, leaf: boolea
   const m = material as THREE.MeshStandardMaterial;
   const varyings = `varying vec3 vWPos;${wear ? "\nvarying vec3 vWear;" : ""}${leaf ? "\nvarying vec2 vLeaf;" : ""}`;
   m.onBeforeCompile = (shader) => {
+    shader.uniforms.mallFrame = mallFrame;
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>\n${varyings}${wear ? "\nattribute vec3 _wear;" : ""}`)
+      .replace("#include <common>", `#include <common>\nuniform mat4 mallFrame;\n${varyings}${wear ? "\nattribute vec3 _wear;" : ""}`)
       .replace("#include <uv_vertex>", `#include <uv_vertex>${wear ? "\nvWear = _wear;" : ""}${leaf ? "\nvLeaf = uv;" : ""}`)
       // instanced pieces (the kit) are placed by their instance matrix, so it counts toward the world position
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvec4 wp = vec4(position, 1.0);\n#ifdef USE_INSTANCING\nwp = instanceMatrix * wp;\n#endif\nvWPos = (modelMatrix * wp).xyz;");
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvec4 wp = vec4(position, 1.0);\n#ifdef USE_INSTANCING\nwp = instanceMatrix * wp;\n#endif\nvWPos = (mallFrame * modelMatrix * wp).xyz;");
     // Floors and ceilings are double-sided: their back is a slab seen from the other floor.
     const back = BACK[kind];
     let color = back ? `if (!gl_FrontFacing) { diffuseColor.rgb = ${back}; } else ${COLOR[kind]}` : COLOR[kind];

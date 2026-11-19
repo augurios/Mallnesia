@@ -54,6 +54,20 @@ export class NavGrid {
     return new NavGrid(data.nx, data.ny, data.cell, data.floors.map((f) => ({ walk: decode(f.walk, n), opaque: decode(f.opaque, n) })));
   }
 
+  /** Closes a rectangle (plan meters) on every floor: nobody walks there and sight does not enter (the parking strip, dressed as the garage). */
+  blockRect(x0: number, y0: number, x1: number, y1: number) {
+    const i0 = Math.max(0, Math.floor(x0 / this.cell));
+    const i1 = Math.min(this.nx - 1, Math.ceil(x1 / this.cell) - 1);
+    const j0 = Math.max(0, Math.floor(y0 / this.cell));
+    const j1 = Math.min(this.ny - 1, Math.ceil(y1 / this.cell) - 1);
+    for (let f = 0; f < this.walk.length; f++)
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          this.walk[f][j * this.nx + i] = 0;
+          this.opaque[f][j * this.nx + i] = 1;
+        }
+  }
+
   get floorCount() {
     return this.walk.length;
   }
