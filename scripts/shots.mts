@@ -91,6 +91,9 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "girl_near", floor: 1, x: 72, y: 28, yaw: 0, pitch: -16, extra: "&girlat=72,29.9&girl=off&shadow=off&guard=off&noise=off&ambient=6" },
   // the watchers: four looks (the last in a guard-like uniform), standing where the player looks (?watchersat=x,y,look); watchers=off so no more come
   { name: "watchers_lit", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=70,28,shopper&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
+  // sitting: on a food court chair, and on a red bench (watchersat=...,sit takes the seat nearest the point)
+  { name: "watchers_seated_table", floor: 2, x: 62.4, y: 14.8, yaw: 0, pitch: -6, extra: "&watchersat=63.5,18.7,jacket,sit&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "watchers_seated_bench", floor: 2, x: 49.8, y: 171.5, yaw: 270, pitch: -8, extra: "&watchersat=53.5,170.25,hoodie,sit&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "watchers_guardlike", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=72,28,guardlike&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look

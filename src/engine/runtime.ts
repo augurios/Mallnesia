@@ -34,7 +34,7 @@ import {
   type GarageLayout,
 } from "./garage-gen";
 import { createGarageView, type GarageView } from "./garage-view";
-import { Watchers } from "./watchers";
+import { Watchers, seatsFromProps } from "./watchers";
 import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
 import { createGirlView } from "./girl-view";
@@ -288,7 +288,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   // ?girl=now brings the first in 3 s, key U calls her now, ?girlat=x,y places her there on the starting floor (screenshots).
   // The watchers (watchers.ts): ordinary-looking people who creep closer when the player does not look at them and freeze
   // when they do; sanity drains while they are in view. They come as sanity falls. ?watchers=off disables them,
-  // key Y adds one 20 m away now, ?watchersat=x,y,look places one (screenshots).
+  // key Y adds one 20 m away now (Shift+Y one sitting on a chair or bench), ?watchersat=x,y,look places one (,sit: on the seat nearest x,y) (screenshots).
   const watchers = new Watchers();
   watchers.enabled = params.get("watchers") !== "off";
   const watchersView = createWatchersView();
@@ -548,6 +548,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         for (let i = 0; i < 300; i++) noiseWorld.update(1 / 60, mute);
       }
       if (loadedProps) hiding.spots = spotsFromProps(loadedProps.instances, FLOOR_HEIGHT);
+      if (loadedProps) watchers.seats = seatsFromProps(loadedProps.instances, FLOOR_HEIGHT); // the chairs and benches they can sit on
       if (params.get("hide") === "1") {
         // debug: ?hide=1 starts already hidden in the first spot on the starting floor (for screenshots, where time stands still)
         const first = hiding.spots.find((s) => s.floor === floor);
@@ -1020,9 +1021,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
     if (e.code === "KeyU" && !e.repeat && locked) summonGirl(); // debug: the girl in white now
     if (e.code === "KeyY" && !e.repeat && locked && nav && area === "mall") {
-      // debug: a watcher, 20 m away out of sight if there is such a place, now
-      const spot = nav.randomSpot(floor, player.x, -player.z, 14, 26, Math.random, (x, y) => unseen(x, y, floor));
-      if (spot) watchers.add(spot[0], spot[1], floor, "shopper", 0);
+      // debug: a watcher, 20 m away out of sight if there is such a place, now; Shift+Y: one sitting, on a free seat out of sight
+      if (e.shiftKey) {
+        const seat = watchers.freeSeat({ nav, px: player.x, py: -player.z, floor, sanity: sanity.level, observed: (x, y) => !unseen(x, y, floor) }, 6, 40);
+        if (seat) watchers.sit(seat);
+        else console.warn("No free seat out of sight within 40 m");
+      } else {
+        const spot = nav.randomSpot(floor, player.x, -player.z, 14, 26, Math.random, (x, y) => unseen(x, y, floor));
+        if (spot) watchers.add(spot[0], spot[1], floor, "shopper", 0);
+      }
     }
     if (e.code === "KeyG" && !e.repeat && locked) fail.trigger("faint"); // debug: faint now (the same thing running out of sanity does)
     if (e.code === "KeyP" && !e.repeat && locked && garage) {
@@ -1221,7 +1228,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       const y = parseFloat(at[1]);
       if (Number.isFinite(x) && Number.isFinite(y)) {
         const look = (["shopper", "jacket", "hoodie", "guardlike"] as const).find((l) => l === at[2]) ?? "shopper";
-        watchers.add(x, y, floor, look, Math.atan2(-player.z - y, player.x - x));
+        // ...,sit puts it on the seat nearest that point instead (screenshots of the sitting pose)
+        const seat = at[3] === "sit" ? watchers.seats.filter((st) => st.floor === floor).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0] : undefined;
+        if (seat) watchers.sit(seat, look);
+        else watchers.add(x, y, floor, look, Math.atan2(-player.z - y, player.x - x));
       }
     }
     if (girlAtPending && nav && warmDone && girlView.ready) {
