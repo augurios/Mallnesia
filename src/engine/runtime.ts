@@ -34,6 +34,8 @@ import {
   type GarageLayout,
 } from "./garage-gen";
 import { createGarageView, type GarageView } from "./garage-view";
+import { NOTES, noteInReach, type Note } from "./notes";
+import { createNotesView } from "./notes-view";
 import { Watchers, seatsFromProps } from "./watchers";
 import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
@@ -73,7 +75,7 @@ export interface PlayerStatus {
   exhausted: boolean;
   sanity: number;
   /** What E would do right now, if anything: use a door, crawl into a hiding spot, or crawl out of one. */
-  prompt: "interact" | "hide" | "leave" | null;
+  prompt: "interact" | "hide" | "leave" | "read" | "close" | null;
 }
 
 export interface RuntimeOptions {
@@ -85,6 +87,8 @@ export interface RuntimeOptions {
   onSubtitle?: (text: string | null) => void;
   /** A controls tip to show (after the guard's opening), or null to clear it. */
   onTip?: (tip: "move" | "flashlight" | null) => void;
+  /** The note being read (title and lines of text), or null when it is closed. */
+  onNote?: (note: { title: string; body: string[] } | null) => void;
   /** Loading progress for the loading screen: 0 to 1, `ready` once everything is loaded and warmed up, `error` if the mall could not load. */
   /** The game lowered the graphics preset by itself because frames were slow. */
   onQualityChange?: (level: QualityLevel) => void;
@@ -293,6 +297,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   watchers.enabled = params.get("watchers") !== "off";
   const watchersView = createWatchersView();
   scene.add(watchersView.object);
+  // Notes lying about the mall (notes.ts): E reads one, E again closes it; the player stands still while reading, and the
+  // world goes on. Which were read is saved in `progress.notesRead`.
+  const notesView = createNotesView(NOTES);
+  scene.add(notesView.object);
+  let reading: Note | null = null;
+  const closeNote = () => {
+    if (!reading) return;
+    reading = null;
+    options.onNote?.(null);
+  };
   const girlMode = params.get("girl");
   const girlDirector = new GirlDirector();
   girlDirector.enabled = girlMode !== "off";
@@ -685,6 +699,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     velocity.set(0, 0);
     eyeY = NaN;
     progress.notesRead = [...saved.notesRead];
+    notesView.setRead(progress.notesRead);
     progress.guard = saved.guard;
     progress.exits = [...saved.exits];
     stamina.reset();
@@ -734,8 +749,10 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (props) props.group.visible = shown;
     if (noiseWorld) noiseWorld.object.visible = shown;
     sky.mesh.visible = inMall;
+    notesView.object.visible = inMall;
     if (!inMall) {
       dismissGirl();
+      closeNote();
       watchers.clear();
       shadowView.object.visible = false;
       guardView.update(0, 0, 0, 0, false, "idle", 0);
@@ -969,6 +986,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     dismissGirl(); // fainting at her feet: she does not wait there for the player to come back
     apparition = null;
     watchers.clear();
+    closeNote();
     floor = toFloor;
     player.set(x, toFloor * FLOOR_HEIGHT, -y);
     yaw = toYaw;
@@ -1043,11 +1061,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     if ((e.code === "KeyZ" || e.code === "KeyX") && !e.repeat) sanity.set(sanity.level + (e.code === "KeyX" ? 0.1 : -0.1)); // debug
     if (e.code === "KeyE" && !e.repeat && locked) {
-      if (hiding.state === "in") hiding.leave();
+      if (reading) closeNote();
+      else if (hiding.state === "in") hiding.leave();
       else if (!hiding.active) {
-        const spot = hiding.usable(player.x, -player.z, floor, yawToHeading(yaw));
-        const door = spot ? null : doors.usable(player.x, player.z, floor, yaw);
-        if (spot) {
+        const note = area === "mall" ? noteInReach(NOTES, player.x, -player.z, floor, yawToHeading(yaw)) : null;
+        const spot = note ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw));
+        const door = note || spot ? null : doors.usable(player.x, player.z, floor, yaw);
+        if (note) {
+          reading = note;
+          if (!progress.notesRead.includes(note.id)) {
+            progress.notesRead.push(note.id);
+            notesView.setRead(progress.notesRead);
+          }
+          velocity.set(0, 0);
+          options.onNote?.(es.notes[note.id] ?? { title: note.id, body: [] });
+        } else if (spot) {
           hiding.enter(spot, player.x, -player.z, yaw);
           flashOn = false; // hiding is done in the dark
         } else if (door) doors.use(door.id);
@@ -1093,6 +1121,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onLockChange = () => {
     locked = document.pointerLockElement === renderer.domElement;
     skipMouse = true;
+    closeNote();
     keys.clear();
     velocity.set(0, 0); // resume from standing still, never mid-stride
     options.onLockChange?.(locked);
@@ -1166,8 +1195,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
     const frozen = fail.locked || (guardScene?.controlLocked ?? false);
-    const forward = frozen ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-    const strafe = frozen ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+    const stand = fail.locked || reading !== null; // reading a note, or going down: no walking
+    const forward = stand || frozen ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+    const strafe = stand || frozen ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
     const running = stamina.update(exploration ? 0 : dt, moving && (keys.has("ShiftLeft") || keys.has("ShiftRight")));
     let targetX = 0;
@@ -1485,7 +1515,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
 
     if (++statusTimer >= 10) {
       statusTimer = 1;
-      const prompt = area === "garage" ? null : hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
+      const prompt = reading ? "close" : area === "garage" ? null : noteInReach(NOTES, player.x, -player.z, floor, yawToHeading(yaw)) && !hiding.active ? "read" : hiding.state === "in" ? "leave" : hiding.active ? null : hiding.usable(player.x, -player.z, floor, yawToHeading(yaw)) ? "hide" : doors.usable(player.x, player.z, floor, yaw) ? "interact" : null;
       options.onStatus?.({ floor: floor + 1, x: player.x, y: -player.z, charge, flashlightOn: flashOn, stamina: stamina.level, exhausted: stamina.exhausted, sanity: sanity.level, prompt });
     }
   };
@@ -1537,6 +1567,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       stats?.remove();
       blackout.remove();
       guardView.dispose();
+      notesView.dispose();
       girlView.dispose();
       watchersView.dispose();
       noiseWorld?.dispose();

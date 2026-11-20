@@ -18,6 +18,7 @@ export default function GameCanvas() {
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
   const [tip, setTip] = useState<"move" | "flashlight" | null>(null);
+  const [note, setNote] = useState<{ title: string; body: string[] } | null>(null);
   // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
   const hold = typeof window !== "undefined" ? parseFloat(new URLSearchParams(window.location.search).get("loading") ?? "") : NaN;
   const [load, setLoad] = useState<{ progress: number; ready: boolean; error: boolean }>({ progress: 0, ready: false, error: false });
@@ -36,6 +37,7 @@ export default function GameCanvas() {
       onStatus: setStatus,
       onSubtitle: setSubtitle,
       onTip: setTip,
+      onNote: setNote,
       onLoad: setLoad,
       onQualityChange: (level) => {
         setQuality(level);
@@ -110,6 +112,14 @@ export default function GameCanvas() {
         </div>
       )}
       {locked && tip && <div className="game-tip">{es.tips[tip]}</div>}
+      {locked && note && (
+        <div className="game-note" role="dialog" aria-label={note.title}>
+          <h2>{note.title}</h2>
+          {note.body.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      )}
       {locked && subtitle && <div className="game-subtitle">{subtitle}</div>}
       {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}
       {locked && !status?.prompt && notice && <div className="game-prompt">{notice}</div>}
