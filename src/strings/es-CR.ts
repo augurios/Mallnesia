@@ -8,7 +8,7 @@ export const es = {
   debugFloors: "1, 2, 3: saltar de piso (provisional)",
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
   debugSanity: "Z / X: bajar / subir la cordura (provisional)",
-  prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir", read: "Presiona E para leer", close: "Presiona E para cerrar" },
+  prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir", read: "Presiona E para leer", close: "Presiona E para cerrar", monitor: "Presiona E para ver las cámaras" },
   // Controls hints after the guard's opening: the movement ones once he has spoken, the flashlight one once he is gone.
   tips: { move: "WASD para moverse · Ratón para mirar · Shift para correr", flashlight: "F para linterna" },
   doorLocked: "No cede",
@@ -32,6 +32,8 @@ export const es = {
     servicio: { title: "Nota de mantenimiento", body: ["Los pasillos grises abren en orden, uno detrás del otro.", "No fuercen ninguno. Esperen a que el edificio los deje pasar.", "La última puerta no se toca."] },
     miradas: { title: "Mensaje en una servilleta", body: ["Si alguien se queda mirando, mírelo de frente.", "Mientras usted lo ve, no se mueve.", "Nunca le dé la espalda para ver si lo siguen."] },
   } as Record<string, { title: string; body: string[] }>,
+  radioBehind: "(radio) ...mire atrás... mire atrás...",
+  monitorHelp: "← → o A D: cambiar de cámara · E o Esc: salir",
   caught: "Algo te alcanzó",
   debugFaint: "G: desmayarse ahora (provisional)",
   debugShadow: "H: llamar a la sombra (provisional); ?shadow=off la desactiva",

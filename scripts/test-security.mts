@@ -1,0 +1,80 @@
+// Security test: the cameras, the console and the lying feeds (src/engine/security.ts), on the real mall.
+// Run: npm run test:security   (the placement check needs npm run assets)
+import { existsSync, readFileSync } from "node:fs";
+import { CAMERAS, CONSOLE, Monitoring, SECURITY, consoleInReach } from "../src/engine/security.ts";
+import { NavGrid, type NavData } from "../src/engine/nav.ts";
+
+let failed = 0;
+const check = (name: string, ok: boolean, detail = "") => {
+  if (!ok) failed++;
+  console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` (${detail})` : ""}`);
+};
+
+const m = new Monitoring();
+check("starts closed on the first camera", !m.active && m.index === 0);
+m.next();
+check("next camera", m.index === 1);
+m.prev();
+m.prev();
+check("previous wraps around", m.index === CAMERAS.length - 1);
+for (let i = 0; i < CAMERAS.length; i++) m.next();
+check("a full turn comes back", m.index === CAMERAS.length - 1);
+
+check("calm: a feed never lies", Array.from({ length: 2000 }, (_, t) => new Monitoring().shown(0.9, t)).every((i) => i === 0));
+{
+  const lies = (sanity: number) => {
+    let n = 0;
+    const total = 4000;
+    for (let w = 0; w < total; w++) {
+      const mm = new Monitoring();
+      mm.index = w % CAMERAS.length;
+      if (mm.shown(sanity, w * SECURITY.LIE_WINDOW + 1) !== mm.index) n++;
+    }
+    return n / total;
+  };
+  const mid = lies(0.3);
+  const low = lies(0);
+  check("lower sanity, more lies", low > mid && mid > 0, `${(mid * 100).toFixed(0)}% at 0.3, ${(low * 100).toFixed(0)}% at 0`);
+  check("but never always: the truth is still there most of the time", low < 0.75);
+  const mm = new Monitoring();
+  const a = mm.shown(0.1, 13.2);
+  check("a lie holds for its whole window", [13.3, 14, 16, 17.9].every((t) => mm.shown(0.1, t) === a));
+  check("a lie is another camera, never the same index twice over", Array.from({ length: 500 }, (_, w) => {
+    const q = new Monitoring();
+    q.index = 2;
+    const s = q.shown(0, w * SECURITY.LIE_WINDOW);
+    return s >= 0 && s < CAMERAS.length;
+  }).every(Boolean));
+  check("static grows as sanity falls", Monitoring.glitch(1) === 0 && Monitoring.glitch(0.3) > 0.4 && Monitoring.glitch(0) === 1);
+}
+{
+  const ex = Math.cos(CONSOLE.facing);
+  const ey = Math.sin(CONSOLE.facing);
+  const px = CONSOLE.x + ex * 1.4;
+  const py = CONSOLE.y + ey * 1.4;
+  check("the console is usable from its front, looking at it", consoleInReach(px, py, CONSOLE.floor, Math.atan2(CONSOLE.y - py, CONSOLE.x - px)));
+  check("not looking at it", !consoleInReach(px, py, CONSOLE.floor, Math.atan2(py - CONSOLE.y, px - CONSOLE.x)));
+  check("not from far", !consoleInReach(CONSOLE.x + ex * 4, CONSOLE.y + ey * 4, CONSOLE.floor, Math.atan2(-ey, -ex)));
+  check("not from another floor", !consoleInReach(px, py, CONSOLE.floor + 1, Math.atan2(CONSOLE.y - py, CONSOLE.x - px)));
+}
+check("camera ids and labels are unique", new Set(CAMERAS.map((c) => c.id)).size === CAMERAS.length && new Set(CAMERAS.map((c) => c.label)).size === CAMERAS.length);
+check("cameras cover all three floors", new Set(CAMERAS.map((c) => c.floor)).size === 3);
+
+if (existsSync("public/models/nav.json")) {
+  const nav = NavGrid.fromData(JSON.parse(readFileSync("public/models/nav.json", "utf8")) as NavData);
+  check("every camera hangs over open floor", CAMERAS.every((c) => nav.walkable(c.floor, c.x, c.y)), CAMERAS.filter((c) => !nav.walkable(c.floor, c.x, c.y)).map((c) => c.id).join(","));
+  const reach = (c: (typeof CAMERAS)[number]) => {
+    let d = 0;
+    const a = (c.heading * Math.PI) / 180;
+    while (d < 80 && nav.sees(c.floor, c.x, c.y, c.x + Math.cos(a) * (d + 2), c.y + Math.sin(a) * (d + 2))) d += 2;
+    return d;
+  };
+  check("every camera looks down a long view (20 m or more)", CAMERAS.every((c) => reach(c) >= 20), CAMERAS.map((c) => `${c.id}:${reach(c)}`).join(" "));
+  let free = true;
+  for (let dx = -CONSOLE.hx - 0.3; dx <= CONSOLE.hx + 0.3; dx += 0.25) for (let dy = -CONSOLE.hy - 0.3; dy <= CONSOLE.hy + 0.3; dy += 0.25) if (!nav.walkable(CONSOLE.floor, CONSOLE.x + dx, CONSOLE.y + dy)) free = false;
+  check("the console and its surroundings are on open floor", free);
+  check("the player's spot in front of it is open", nav.walkable(CONSOLE.floor, CONSOLE.x + Math.cos(CONSOLE.facing) * 1.4, CONSOLE.y + Math.sin(CONSOLE.facing) * 1.4));
+}
+
+console.log(failed ? `\n${failed} FAILED` : "\nall good");
+process.exit(failed ? 1 : 0);

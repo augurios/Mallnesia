@@ -241,6 +241,71 @@ body {
   pointer-events: none;
   z-index: 5
 }
+
+.game-monitor {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  font-family: ui-monospace, Menlo, monospace;
+  color: #b8ffcf;
+  text-shadow: 0 0 4px #0f0;
+  /* night vision green over the picture, scanlines, and static that grows with the glitch variable */
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0, rgba(0, 0, 0, 0.22) 1px, transparent 1px, transparent 3px),
+    rgba(30, 140, 70, 0.22);
+  mix-blend-mode: normal;
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.7);
+  animation: monitor-flicker 0.18s steps(2) infinite;
+}
+
+.game-monitor::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: calc(var(--glitch, 0) * 0.35);
+  background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0, rgba(255, 255, 255, 0.5) 1px, transparent 1px, transparent 5px);
+  animation: monitor-roll 1.4s linear infinite;
+}
+
+@keyframes monitor-flicker {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(0.94); }
+}
+
+@keyframes monitor-roll {
+  0% { transform: translateY(-6%); }
+  100% { transform: translateY(6%); }
+}
+
+.game-monitor-top {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 24px;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+
+.game-monitor-rec {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #f33;
+  box-shadow: 0 0 6px #f33;
+}
+
+.game-monitor-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .game-note {
   position: absolute;
   left: 50%;
@@ -284,6 +349,7 @@ body {
   z-index: 5;
 }
 
+.game-root[data-hud="off"] .game-monitor,
 .game-root[data-hud="off"] .game-note,
 .game-root[data-hud="off"] .game-subtitle,
 .game-root[data-hud="off"] .game-tip,
