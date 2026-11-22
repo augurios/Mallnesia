@@ -1,5 +1,5 @@
 // Failing and coming back (CLAUDE.md, "Failure"). There is no health: the player fails by being caught by the shadow
-// (back to the last checkpoint) or by running out of sanity in the garage (wakes up somewhere else in the mall, nothing
+// (back to the last checkpoint) or by running out of sanity anywhere (wakes up somewhere else in the mall, nothing
 // is lost). Either way the screen goes black, the runtime moves the player while it is black, and the screen comes back.
 // No DOM and no Three.js, so scripts/test-fail.mts runs the exact code the game runs.
 import type { NavGrid } from "./nav";

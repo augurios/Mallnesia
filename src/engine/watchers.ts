@@ -28,7 +28,56 @@ export const WATCH = {
   DRAIN: 0.008,
   SEEN_RANGE: 25,
   REPATH: 1.5,
+  /** Some sit instead, on a food court chair or a bench: this share of new ones, when there is a free seat out of sight. */
+  SEATED_CHANCE: 0.4,
+  /** A seated one never walks: while nobody looks, it is suddenly on another seat, every HOP seconds (a random time in
+   *  the range), usually one nearer the player, but never one closer than HOP_MIN. */
+  HOP: [3, 7] as [number, number],
+  HOP_MIN: 4,
+  /** How far a seated one can turn its head toward the player (radians either way); its body faces where the seat does. */
+  HEAD_TURN: 1.4,
 };
+
+/** A place to sit: the hips' plan point, the heading the sitter faces, the seat's height above the floor. */
+export interface Seat {
+  x: number;
+  y: number;
+  floor: number;
+  heading: number;
+  height: number;
+}
+
+/** Where a sitter's hips go on each sittable piece, in the piece's own frame (it faces +x; +z is the piece's z). */
+const SEATS: Record<string, { x: number; z: number; yaw: number; height: number }[]> = {
+  // the four chairs of a table set (scripts/kit/pieces.mts, tableSet): at x = +-0.24, z = +-0.6, facing the table
+  table_set: [-0.24, 0.24].flatMap((x) => [1, -1].map((side) => ({ x, z: side * (0.6 + 0.08), yaw: side > 0 ? Math.PI / 2 : -Math.PI / 2, height: 0.45 }))),
+  // three places along the red bench (bench): its cushion top is about 0.5 m up
+  bench_red: [-0.55, 0, 0.55].map((z) => ({ x: 0.04, z, yaw: 0, height: 0.5 })),
+};
+
+/** The seats among the placed props. `instances` is the props manifest: per piece, flat [x, height, -y, yaw] groups. */
+export function seatsFromProps(instances: Record<string, number[]>, floorHeight: number): Seat[] {
+  const out: Seat[] = [];
+  for (const [piece, places] of Object.entries(SEATS)) {
+    const flat = instances[piece];
+    if (!flat) continue;
+    for (let i = 0; i + 3 < flat.length; i += 4) {
+      const [X, h, Z, yaw] = [flat[i], flat[i + 1], flat[i + 2], flat[i + 3]];
+      const c = Math.cos(yaw);
+      const sn = Math.sin(yaw);
+      for (const p of places) {
+        // three.js turns (x, z) about y by yaw: (x cos + z sin, -x sin + z cos); plan y is -z
+        const wx = X + p.x * c + p.z * sn;
+        const wz = Z - p.x * sn + p.z * c;
+        const a = p.yaw + yaw; // the sitter faces local +x turned by both
+        out.push({ x: wx, y: -wz, floor: Math.round(h / floorHeight), heading: Math.atan2(Math.sin(a), Math.cos(a)), height: p.height });
+      }
+    }
+  }
+  return out;
+}
+
+const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export type WatcherLook = "shopper" | "jacket" | "hoodie" | "guardlike";
 const LOOKS: WatcherLook[] = ["shopper", "jacket", "hoodie", "guardlike"];
@@ -49,6 +98,14 @@ export interface Watcher {
   seen: boolean;
   path: Pt[];
   repath: number;
+  /** Set when it sits: the seat it is on. A seated one never walks; it changes seats while nobody looks. */
+  seat?: Seat;
+  /** Seated: seconds left before it changes seats (counts only while unobserved). */
+  hop?: number;
+  /** How far the head is turned from the body toward the player (radians; 0 for a standing one, which faces the player). */
+  headTurn?: number;
+  /** Debug/test watchers: kept regardless of sanity (the sanity cull would remove them at once). */
+  pinned?: boolean;
 }
 
 export interface WatchContext {
@@ -66,6 +123,8 @@ export const targetCount = (sanity: number): number => (WATCH.COUNTS.find((r) =>
 export class Watchers {
   readonly list: Watcher[] = [];
   enabled = true;
+  /** The places to sit (seatsFromProps); none means everyone stands. */
+  seats: Seat[] = [];
   private nextId = 1;
   private spawnTimer = 0;
   private rand: () => number;
@@ -83,9 +142,37 @@ export class Watchers {
     this.list.length = 0;
   }
 
+  /** Puts one on a seat now (debug, tests). */
+  sit(seat: Seat, look: WatcherLook = "shopper"): Watcher {
+    const w = this.add(seat.x, seat.y, seat.floor, look, seat.heading);
+    w.seat = seat;
+    w.hop = this.hopTime();
+    w.headTurn = 0;
+    return w;
+  }
+
+  private hopTime() {
+    return WATCH.HOP[0] + this.rand() * (WATCH.HOP[1] - WATCH.HOP[0]);
+  }
+
+  /** A free seat on the floor, out of sight, between `min` and `max` meters from the player; `nearer` (when given) prefers
+   *  ones closer to the player than that distance. */
+  freeSeat(ctx: WatchContext, min: number, max: number, nearer?: number): Seat | null {
+    const taken = new Set(this.list.map((w) => w.seat).filter(Boolean));
+    const ok = this.seats.filter((s) => {
+      if (s.floor !== ctx.floor || taken.has(s)) return false;
+      const d = Math.hypot(s.x - ctx.px, s.y - ctx.py);
+      return d >= min && d <= max && !ctx.observed(s.x, s.y);
+    });
+    if (!ok.length) return null;
+    const closer = nearer === undefined ? [] : ok.filter((s) => Math.hypot(s.x - ctx.px, s.y - ctx.py) < nearer);
+    const pool = closer.length && this.rand() < 0.75 ? closer : ok;
+    return pool[Math.floor(this.rand() * pool.length)];
+  }
+
   /** Puts one at a spot now (debug, tests). */
   add(x: number, y: number, floor: number, look: WatcherLook = "shopper", facing = 0): Watcher {
-    const w: Watcher = { id: this.nextId++, x, y, floor, facing, look, height: 1, frozen: false, seen: false, path: [], repath: 0 };
+    const w: Watcher = { id: this.nextId++, x, y, floor, facing, look, height: 1, frozen: false, seen: false, path: [], repath: 0, pinned: true };
     this.list.push(w);
     return w;
   }
@@ -102,12 +189,18 @@ export class Watchers {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const w = this.list[i];
       const far = Math.hypot(w.x - ctx.px, w.y - ctx.py) > WATCH.FAR;
-      if ((far || this.list.length > want) && !ctx.observed(w.x, w.y)) this.list.splice(i, 1);
+      if (!w.pinned && (far || this.list.length > want) && !ctx.observed(w.x, w.y)) this.list.splice(i, 1);
     }
     // a new one, now and then, where the player cannot see
     this.spawnTimer -= dt;
     if (this.list.length < want && this.spawnTimer <= 0) {
-      const spot = ctx.nav.randomSpot(ctx.floor, ctx.px, ctx.py, WATCH.SPAWN_MIN, WATCH.SPAWN_MAX, this.rand, (x, y) => !ctx.observed(x, y));
+      const seat = this.rand() < WATCH.SEATED_CHANCE ? this.freeSeat(ctx, WATCH.SPAWN_MIN, WATCH.SPAWN_MAX) : null;
+      if (seat) {
+        const w = this.sit(seat, LOOKS[Math.floor(this.rand() * LOOKS.length)]);
+        w.pinned = false;
+        w.height = 0.94 + this.rand() * 0.14;
+      }
+      const spot = seat ? null : ctx.nav.randomSpot(ctx.floor, ctx.px, ctx.py, WATCH.SPAWN_MIN, WATCH.SPAWN_MAX, this.rand, (x, y) => !ctx.observed(x, y));
       if (spot) {
         this.list.push({
           id: this.nextId++,
@@ -127,10 +220,29 @@ export class Watchers {
     }
     for (const w of this.list) {
       const dist = Math.hypot(ctx.px - w.x, ctx.py - w.y);
-      w.facing = Math.atan2(ctx.py - w.y, ctx.px - w.x);
+      const toPlayer = Math.atan2(ctx.py - w.y, ctx.px - w.x);
       const looked = ctx.observed(w.x, w.y);
       w.frozen = looked;
       w.seen = looked && dist <= WATCH.SEEN_RANGE;
+      if (w.seat) {
+        // seated: the body faces where the seat does, the head turns toward the player as far as a neck can
+        w.facing = w.seat.heading;
+        w.headTurn = Math.max(-WATCH.HEAD_TURN, Math.min(WATCH.HEAD_TURN, wrapAngle(toPlayer - w.seat.heading)));
+        if (looked) continue; // while watched it stays put; the hop clock runs only while nobody looks
+        w.hop = (w.hop ?? 0) - dt;
+        if (w.hop > 0) continue;
+        w.hop = this.hopTime();
+        const next = this.freeSeat(ctx, WATCH.HOP_MIN, WATCH.SPAWN_MAX, dist);
+        if (next) {
+          w.seat = next;
+          w.x = next.x;
+          w.y = next.y;
+          w.facing = next.heading;
+          w.headTurn = Math.max(-WATCH.HEAD_TURN, Math.min(WATCH.HEAD_TURN, wrapAngle(Math.atan2(ctx.py - next.y, ctx.px - next.x) - next.heading)));
+        }
+        continue;
+      }
+      w.facing = toPlayer;
       if (looked || dist <= WATCH.STOP_DISTANCE) continue; // frozen while watched; and it never comes closer than this
       w.repath -= dt;
       if (w.repath <= 0 || w.path.length === 0) {

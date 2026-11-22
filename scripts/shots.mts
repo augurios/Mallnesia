@@ -1,9 +1,11 @@
 // Screenshots of fixed views of the built game, for checking a change by eye. Needs a build first:
 //   npm run build && npm run shots        (writes shots/*.png; open them or compare with the last run)
 // Uses headless Chrome with software rendering, so the look is close to the game's but not identical to a real GPU.
+// Each view is captured after 15 s of virtual time (BUDGET=<ms> changes it), which stands still while files download
+// and while the page works, so a shot shows the same moment every run. ONLY=a,b shoots just those views.
 // CHROME=/path/to/chrome overrides the default macOS location.
 import { createServer } from "node:http";
-import { mkdirSync, readFileSync, existsSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { extname, join } from "node:path";
 import { plans } from "./blockout/grid.mts";
@@ -65,12 +67,33 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "garage_hall", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
   { name: "garage_van", floor: 1, x: 31, y: 7, yaw: 270, pitch: -3, extra: "&area=garage&shadow=off&guard=off&noise=off" },
   { name: "garage_booth", floor: 1, x: 68, y: 8, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off" },
+  // the parking strip dressed as the garage's first column (?stripswap=off keeps the mall there), and the same place in the garage
+  { name: "strip_from_hall", floor: 1, x: 22, y: 114, yaw: 90, pitch: 0, extra: "&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_inside", floor: 1, x: 11, y: 114, yaw: 90, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_inside_match", floor: 1, x: 4, y: 18, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_inside_back", floor: 1, x: 7, y: 120, yaw: 270, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
+  // the moment of the swap, turned left from the entry cell: the same view in the strip (mall) and in the garage
+  { name: "strip_turn_mall", floor: 1, x: 11, y: 112.4, yaw: 180, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_turn_garage", floor: 1, x: 4, y: 19.6, yaw: 0, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14" },
+  // ramps: from the doorway, halfway up, and the arrival garage's open doorway
+  { name: "ramp_foot", floor: 1, x: 51, y: 42, yaw: 90, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "ramp_up", floor: 1, x: 42, y: 42, yaw: 90, pitch: 6, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14&forcerun=1" },
+  // the same pose just over the swap height, without and with the swap (the two must look the same)
+  { name: "ramp_above_prep", floor: 1, x: 40.1, y: 42, yaw: 90, pitch: 12, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14&forcerun=1&rampseed=5&rampswap=off" },
+  { name: "ramp_above_swapped", floor: 1, x: 40.1, y: 42, yaw: 90, pitch: 12, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=14&forcerun=1&rampseed=5" },
+  { name: "ramp_exit_door", floor: 1, x: 6, y: 18, yaw: 90, pitch: 0, extra: "&area=ramp&rampseed=5&ramptarget=north:3&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "strip_floor3", floor: 3, x: 11, y: 162, yaw: 90, pitch: 0, extra: "&stripswap=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "garage_lit", floor: 1, x: 24, y: 6, yaw: 270, pitch: 0, extra: "&area=garage&shadow=off&guard=off&noise=off&ambient=12&stats=1" },
-  // the girl in white, 9 m ahead of the start (?girlat=x,y)
-  { name: "girl_dark", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,37&girl=off&shadow=off&guard=off&noise=off&ambient=2" },
+  // the girl in white ahead of the start (?girlat=x,y): 5 m in the dark, 7 m lit, 3 m close, 1.9 m (her hair and face)
+  { name: "girl_dark", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,33&girl=off&shadow=off&guard=off&noise=off&ambient=2" },
   { name: "girl_lit", floor: 1, x: 72, y: 28, yaw: 0, pitch: 0, extra: "&girlat=72,35&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "girl_close", floor: 1, x: 72, y: 28, yaw: 0, pitch: -10, extra: "&girlat=72,31&girl=off&shadow=off&guard=off&noise=off&ambient=10" },
+  { name: "girl_near", floor: 1, x: 72, y: 28, yaw: 0, pitch: -16, extra: "&girlat=72,29.9&girl=off&shadow=off&guard=off&noise=off&ambient=6" },
   // the watchers: four looks (the last in a guard-like uniform), standing where the player looks (?watchersat=x,y,look); watchers=off so no more come
   { name: "watchers_lit", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=70,28,shopper&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
+  // sitting: on a food court chair, and on a red bench (watchersat=...,sit takes the seat nearest the point)
+  { name: "watchers_seated_table", floor: 2, x: 62.4, y: 14.8, yaw: 0, pitch: -6, extra: "&watchersat=63.5,18.7,jacket,sit&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
+  { name: "watchers_seated_bench", floor: 2, x: 49.8, y: 171.5, yaw: 270, pitch: -8, extra: "&watchersat=53.5,170.25,hoodie,sit&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   { name: "watchers_guardlike", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=72,28,guardlike&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   // a note on the floor at the start (notes.ts), seen from 2 m
   { name: "note_floor", floor: 1, x: 66, y: 22, yaw: 0, pitch: -35, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=4" },
@@ -98,23 +121,67 @@ const server = createServer((req, res) => {
 await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
 const port = (server.address() as { port: number }).port;
 
+// One Chrome, driven over the DevTools protocol (Node's built-in WebSocket). Each view: navigate, then run 15 s of
+// virtual time (it stands still while files download and while the page works, so the shot is taken the same time
+// after loading every run), then capture. Async throughout: the server above lives in this process and has to answer
+// Chrome while it waits.
+const PORT = 9300 + Math.floor(Math.random() * 400);
+const BUDGET = parseInt(process.env.BUDGET ?? "15000", 10) || 15000; // virtual ms before the capture (BUDGET=3000: sooner)
+const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1280,720", `--remote-debugging-port=${PORT}`, "about:blank"], { stdio: "ignore" });
+let endpoint: string | null = null;
+for (let i = 0; i < 100 && !endpoint; i++) {
+  await new Promise((r) => setTimeout(r, 100));
+  try {
+    endpoint = ((await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json()) as { webSocketDebuggerUrl: string }).webSocketDebuggerUrl;
+  } catch {
+    // not up yet
+  }
+}
+if (!endpoint) throw new Error("Chrome did not start");
+const socket = new WebSocket(endpoint);
+await new Promise((r) => (socket.onopen = r));
+let nextId = 0;
+const pending = new Map<number, (result: Record<string, unknown>) => void>();
+const expired = new Set<string>(); // sessions whose virtual time ran out
+socket.onmessage = (m) => {
+  const msg = JSON.parse(String(m.data)) as { id?: number; method?: string; sessionId?: string; result?: Record<string, unknown> };
+  if (msg.id !== undefined) {
+    pending.get(msg.id)?.(msg.result ?? {});
+    pending.delete(msg.id);
+  }
+  if (msg.method === "Emulation.virtualTimeBudgetExpired" && msg.sessionId) expired.add(msg.sessionId);
+};
+function send(method: string, params: object = {}, session?: string): Promise<Record<string, unknown>> {
+  return new Promise((resolve) => {
+    const id = ++nextId;
+    pending.set(id, resolve);
+    socket.send(JSON.stringify({ id, method, params, sessionId: session }));
+  });
+}
+
 mkdirSync(SHOTS, { recursive: true });
 const only = process.env.ONLY?.split(","); // e.g. ONLY=ao_hall,chair_closeup: just those views
 for (const v of VIEWS) {
   if (only && !only.includes(v.name)) continue;
-  const url = `http://127.0.0.1:${port}/?hud=off&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}${v.extra?.includes("quality=") ? "" : "&quality=high"}${v.extra ?? ""}`; // pinned: headless Chrome has a software renderer, which the automatic preset would put on low
+  // quality pinned: headless Chrome has a software renderer, which the automatic preset would put on low.
+  // precompile=sync: see the warm-up in runtime.ts (virtual time and a parallel compile do not mix).
+  const url = `http://127.0.0.1:${port}/?hud=off&precompile=sync&floor=${v.floor}&x=${v.x}&y=${v.y}&yaw=${v.yaw}&pitch=${v.pitch}${v.extra?.includes("quality=") ? "" : "&quality=high"}${v.extra ?? ""}`;
   const file = `${SHOTS}/${v.name}.png`;
-  // Async, not spawnSync: the server above lives in this process and has to answer Chrome while it waits.
-  const code = await new Promise<number | null>((done) => {
-    const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1280,720", "--virtual-time-budget=15000", `--screenshot=${file}`, url], { stdio: "ignore" });
-    const timer = setTimeout(() => chrome.kill(), 90_000);
-    chrome.on("exit", (c) => {
-      clearTimeout(timer);
-      done(c);
-    });
-  });
-  const ok = code === 0 && existsSync(file);
+  const { targetId } = await send("Target.createTarget", { url: "about:blank" });
+  const { sessionId } = (await send("Target.attachToTarget", { targetId, flatten: true })) as { sessionId: string };
+  await send("Page.enable", {}, sessionId);
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false }, sessionId);
+  const navigating = send("Page.navigate", { url }, sessionId);
+  await send("Emulation.setVirtualTimePolicy", { policy: "pauseIfNetworkFetchesPending", budget: BUDGET }, sessionId); // after navigating: set before, it runs out on the blank page
+  await navigating;
+  const started = Date.now();
+  while (!expired.has(sessionId) && Date.now() - started < 180_000) await new Promise((r) => setTimeout(r, 100));
+  const ok = expired.has(sessionId);
+  if (ok) writeFileSync(file, Buffer.from(((await send("Page.captureScreenshot", { format: "png" }, sessionId)) as { data: string }).data, "base64"));
+  await send("Target.closeTarget", { targetId });
   console.log(`${ok ? "ok  " : "FAIL"} ${file}`);
   if (!ok) process.exitCode = 1;
 }
+chrome.kill();
+socket.close();
 server.close();
