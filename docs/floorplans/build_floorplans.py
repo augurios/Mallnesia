@@ -116,8 +116,8 @@ BALCONIES = [
 
 COLORS = {"void": "#cfe3ff", "hall": "#f4f4f4", "elevator": "#ff9a9a", "stairs": "#e0c8a0",
           "escalator": "#ffe680", "shop": "#dcdcdc", "bath": "#9be29b", "garage": "#c9c9d8",
-          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc", "restaurant_open": "#fbd9c8", "bridge": "#fff6e0"}
-WALKABLE = {"cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony", "restaurant_open", "bridge"}
+          "secret": "#e3c9f0", "intermittent": "#d6b3ff", "cinema_lobby": "#e4dcf5", "cinema": "#8a8aa8", "kiosk": "#f7d774", "machines": "#f0a8d0", "foodcourt": "#fff0cc", "restaurant": "#f2b8a0", "balcony": "#bfe6dc", "restaurant_open": "#fbd9c8", "bridge": "#fff6e0", "office": "#b9d3e8"}
+WALKABLE = {"office", "cinema_lobby", "void", "hall", "bath", "garage", "secret", "foodcourt", "balcony", "restaurant_open", "bridge"}
 
 
 def north_floor2(items):
@@ -242,6 +242,10 @@ def floor_items(floor):
         # the floor 3 floor over the white beams between the column pairs, joining the extensions (glass rails around)
         items.append(("bridge_strip_w", "Floor 3 hall over the west beam, between the bridge's west columns", ("box", (51, 53.5, 135, 148.5)), "hall"))
         items.append(("bridge_strip_e", "Floor 3 hall over the east beam, between the bridge's east columns", ("box", (75.5, 78, 135, 148.5)), "hall"))
+        # the guard's office (decided by Augusto, 2026-11-22): the north end of W1 N, walled by the 0.5 m of store block left
+        # around it, open only through a doorway onto the north hall. The camera console stands inside (src/engine/security.ts).
+        items.append(("security_office", "Security guard's office (north end of W1 N): desk with the camera monitors", ("box", (15.5, 26.5, 150, 158.5)), "office"))
+        items.append(("security_office_door", "Open doorway from the north hall into the security office", ("box", (23, 25, 158.5, 159)), "hall"))
         items.append(("atrium_b_ext_e", "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column", ("box", (72, 78, 148.5, 153)), "hall"))
     return items
 
@@ -294,7 +298,7 @@ LABELS = {"secret_2_room": "open rest.", "atrium_b": "Atrium B", "atrium_a": "At
           "a_escalators": "escalators", "n_hall_up": "wide hall", "east_stores": "east stores", "ne_end_store": "store",
           "south_hall": "south hall", "south_shop_1": "shop", "south_shop_3": "shop",
           "east_hall": "east hall", "west_hall_inner": "west hall", "west_hall_outer": "west hall",
-          "hall_ew_garage": "garage hall", "cinema_food": "cinema food", "boxoffice": "", "w2n_wood_kiosk": "", "main_entrance_kiosk": "", "bank": "bank", "atrium_b_bridge": "", "boxoffice_floor": "",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony"}
+          "hall_ew_garage": "garage hall", "cinema_food": "cinema food", "boxoffice": "", "w2n_wood_kiosk": "", "main_entrance_kiosk": "", "bank": "bank", "atrium_b_bridge": "", "boxoffice_floor": "",  "int_elevator_w2n": "i-elev", "int_elevator_w1n": "i-elev", "int_stairs_w1s": "i-stairs", "balcony_south": "balcony", "balcony_side": "balcony", "security_office": "security", "security_office_door": ""}
 VERTICAL = ("parking", "secret_hall", "east_hall", "west_hall_inner", "west_hall_outer", "west_2n", "west_2s")
 
 

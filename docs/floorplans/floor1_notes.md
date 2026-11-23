@@ -272,3 +272,7 @@ The north hall (y 159 to 165) in front of the cinemas keeps a normal low ceiling
 ## Floor 3 over the bridge columns (decided by Augusto)
 
 The space between the column tops on floor 3 is hall floor: two strips, `bridge_strip_w` (x 51 to 53.5) and `bridge_strip_e` (x 75.5 to 78), both y 135 to 148.5. Each runs along the white beam joining its pair of columns (the beam stops at the side of the hoods) and joins the floor 3 extension to the north. Glass rails run around the open sides (the atrium side, and the south end), the same as the rest of the floor 3 atrium edge. The hoods stand just outside the rail. My reading of "between the columns": the strip between each pair of columns and the hall; the span across the atrium between the west and east pairs stays open.
+
+## Floor 3 security office (decided by Augusto, 2026-11-22)
+
+The guard's office, with the security console (desk, three CRT monitors, chair; see `src/engine/security.ts`), is the north end of the W1 N store block on floor 3 only: `security_office`, x 15.5 to 26.5, y 150 to 158.5, kind `office` (walkable). The 0.5 m of W1 N left around it are its walls, toward the parking strip (x 15), the outer west hall (x 27) and the rest of the store block (y 150). Its only way in is an open doorway (no door leaf), 2 m wide, onto the north hall: `security_office_door`, x 23 to 25, y 158.5 to 159. The desk stands against the south wall with its screens facing the doorway. On floors 1 and 2, W1 N stays a plain store block.

@@ -266,7 +266,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const hunted = () => (shadow?.hunting ?? false) || fail.state !== "playing"; // manual saves are refused while it hunts, and during a fail
   const snapshot = () => ({ area: "mall" as const, x: player.x, y: -player.z, height: player.y, yaw, notesRead: [...progress.notesRead], guard: progress.guard, exits: [...progress.exits] });
   let walked = 0; // meters, drives the head bob phase
-  let flashOn = false; // the game starts with the flashlight off
+  let flashOn = params.get("flash") === "1"; // the game starts with the flashlight off (debug: ?flash=1 starts with it on, for screenshots)
   let crouch = 0; // 0 standing, 1 fully hidden: lowers the eye
   let bob = 0; // current head bob height, eased toward the target
 
@@ -307,7 +307,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   // camera moves to the CCTV spot, in night vision); left and right change camera; E or Esc leaves. ?monitor=1 starts
   // looking through the feeds (?cam=<n> picks the camera), for screenshots.
   const monitoring = new Monitoring();
-  const securityView = createSecurityView();
+  const securityView = createSecurityView((url) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)); // the furniture is fetched once the game is ready
   scene.add(securityView.object);
   let monitorKey = ""; // what the HUD last got, so it is only told when something changes
   let radioWarned = false;
@@ -549,6 +549,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         announce();
       });
       const girlIn = girlAtPending ? girlView.load() : null;
+      // screenshots (precompile=sync): the security office furniture alongside the guard, before the warm-up, so it is in
+      // every shot (headless virtual time races ahead while images decode, so a late load never lands in time)
+      const securityIn = syncCompile ? securityView.load((model) => void clipMall(model)) : null;
       setBakedAO(ao); // before the first styled frame: the shader samples it
       gltf.scene.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
@@ -625,12 +628,19 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         }
       })();
       await guardIn;
+      await securityIn;
       await girlIn;
       await warmUp();
       load.finish("warm");
       announce();
       // the girl, now that the game is ready (only if she can appear: ?girl=off skips her)
       if (girlDirector.enabled && !girlIn) void girlView.load(prepareLate);
+      // the security office furniture (floor 3, far from the start): after the game is ready too, warmed up the same way
+      if (!syncCompile)
+        void securityView.load(async (model) => {
+          clipMall(model);
+          await prepareLate(model);
+        });
     } catch (err) {
       console.error("Could not load the mall blockout", err);
       announce(true);
@@ -1583,7 +1593,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     if (tip === "flashlight" && (flashOn || now - tipAt > TIP_TIME)) setTip(null, now); // used, or shown long enough
     const preset = QUALITY_PRESETS[quality];
-    if (area === "mall") props?.update(camera, Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance, preset.fogFar);
+    if (area === "mall") {
+      const lodDistance = Number.isFinite(lodOverride) ? lodOverride : preset.lodDistance;
+      props?.update(camera, lodDistance, preset.fogFar);
+      securityView.lod(camera, lodDistance);
+    }
     audio.setListener(player.x, player.y + EYE_HEIGHT, player.z, yaw);
     if (stats) renderer.info.reset();
     if (warmDone || syncCompile) post.render(now / 1000); // nothing is drawn while loading: see the warm-up

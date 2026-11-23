@@ -724,6 +724,24 @@
    "kind": "hall"
   },
   {
+   "id": "security_office",
+   "label": "Security guard's office (north end of W1 N): desk with the camera monitors",
+   "x0": 15.5,
+   "x1": 26.5,
+   "y0": 150,
+   "y1": 158.5,
+   "kind": "office"
+  },
+  {
+   "id": "security_office_door",
+   "label": "Open doorway from the north hall into the security office",
+   "x0": 23,
+   "x1": 25,
+   "y0": 158.5,
+   "y1": 159,
+   "kind": "hall"
+  },
+  {
    "id": "atrium_b_ext_e",
    "label": "East hall extension over the NE corner of Atrium B, held by the bridge's north-east column",
    "x0": 72,

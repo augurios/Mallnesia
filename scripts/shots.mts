@@ -97,11 +97,15 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "watchers_guardlike", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&watchersat=72,28,guardlike&watchers=off&girl=off&shadow=off&guard=off&noise=off&ambient=14" },
   // a note on the floor at the start (notes.ts), seen from 2 m
   { name: "note_floor", floor: 1, x: 66, y: 22, yaw: 0, pitch: -35, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=4" },
-  // the security console from the player's side, and a monitor feed (?monitor=1&cam=n; the overlay is hidden by hud=off)
-  { name: "console", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: -8, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=8" },
-  { name: "feed_lobby", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: 0, extra: "&monitor=1&cam=1&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
-  { name: "feed_shadow", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: 0, extra: "&monitor=1&cam=1&girl=off&watchers=off&shadow=off&guard=off&noise=off&shadowat=76,30" },
-  { name: "feed_food_court", floor: 1, x: 62, y: 23.5, yaw: 0, pitch: 0, extra: "&monitor=1&cam=4&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  // the security office (floor 3, north end of W1 N): from the north hall through its doorway, the console from the
+  // player's side, and monitor feeds (?monitor=1&cam=n; the overlay is hidden by hud=off)
+  { name: "office_doorway", floor: 3, x: 24, y: 162.5, yaw: 200, pitch: -6, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=8" },
+  { name: "console", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: -12, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=8" },
+  { name: "console_flash", floor: 3, x: 21.3, y: 152.6, yaw: 190, pitch: -18, extra: "&flash=1&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  { name: "console_dark", floor: 3, x: 22.5, y: 156, yaw: 200, pitch: -8, extra: "&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  { name: "feed_lobby", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=1&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  { name: "feed_shadow", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=7&girl=off&watchers=off&shadow=off&guard=off&noise=off&shadowat=62,27" },
+  { name: "feed_food_court", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=4&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },
@@ -155,6 +159,12 @@ socket.onmessage = (m) => {
     pending.delete(msg.id);
   }
   if (msg.method === "Emulation.virtualTimeBudgetExpired" && msg.sessionId) expired.add(msg.sessionId);
+  // LOGS=1: the page's console warnings and errors, and uncaught exceptions (for finding why a view looks wrong)
+  if (process.env.LOGS && (msg.method === "Runtime.consoleAPICalled" || msg.method === "Runtime.exceptionThrown")) {
+    const p = (msg as { params?: { type?: string; args?: { value?: unknown; description?: string }[]; exceptionDetails?: { text?: string; exception?: { description?: string } } } }).params;
+    if (msg.method === "Runtime.exceptionThrown") console.log("  page exception:", p?.exceptionDetails?.exception?.description ?? p?.exceptionDetails?.text);
+    else if (p?.type === "error" || p?.type === "warning") console.log(`  page ${p.type}:`, (p.args ?? []).map((a) => a.value ?? a.description).join(" "));
+  }
 };
 function send(method: string, params: object = {}, session?: string): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
@@ -175,6 +185,7 @@ for (const v of VIEWS) {
   const { targetId } = await send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = (await send("Target.attachToTarget", { targetId, flatten: true })) as { sessionId: string };
   await send("Page.enable", {}, sessionId);
+  if (process.env.LOGS) await send("Runtime.enable", {}, sessionId);
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false }, sessionId);
   const navigating = send("Page.navigate", { url }, sessionId);
   await send("Emulation.setVirtualTimePolicy", { policy: "pauseIfNetworkFetchesPending", budget: BUDGET }, sessionId); // after navigating: set before, it runs out on the blank page

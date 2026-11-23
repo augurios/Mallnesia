@@ -173,6 +173,9 @@ Record each non-original asset here so licences are traceable.
 | Guard character (`public/models/guard.glb`): body, skin, hair, clothes | MPFB + MakeHuman system assets pack | 2026-11-08 | CC0 (MakeHuman assets and output) |
 | Guard animations (idle, talk, torch idle, walk) | Quaternius, Universal Animation Library (Standard), via OpenGameArt | 2026-11-08 | CC0 (License.txt in the pack) |
 | Guard cap ("SEGURIDAD") and chest badge | Our own, modeled by script (`scripts/guard/gear.py`); nothing fitting on Poly Haven or in MakeHuman | 2026-11-08 | Ours |
+| Security office desk (`public/models/security/desk.glb`) | Poly Haven, "Metal Office Desk" (`metal_office_desk`, https://polyhaven.com/a/metal_office_desk), 1k glTF via `scripts/security/import.mts` | 2026-11-22 | CC0 |
+| Security office monitors (`public/models/security/crt.glb`) | Poly Haven, "Television 02" (`television_02`, https://polyhaven.com/a/television_02), 1k glTF, textures 512 | 2026-11-22 | CC0 |
+| Security office chair (`public/models/security/chair.glb`) | Poly Haven, "Plastic Monobloc Chair 01" (`plastic_monobloc_chair_01`, https://polyhaven.com/a/plastic_monobloc_chair_01), 1k glTF, textures 512 | 2026-11-22 | CC0 |
 
 ## Kit piece detail standard (decided by Augusto, 2026-11-06; strengthened the same day)
 

@@ -4,8 +4,9 @@
 // Three.js, so scripts/test-security.mts runs the exact code the game runs.
 //
 // The feeds are rendered by the game's own camera moved to the CCTV position (night vision), not a second render, so
-// whatever is in the mall is on the feed. The console stands in the lobby for now: the security ROOM itself (walls, a
-// door) is a floor plan decision for Augusto; the console moves wherever the room ends up (`CONSOLE`).
+// whatever is in the mall is on the feed. The console stands in the guard's office on floor 3, at the north end of the
+// W1 N store block, against its south wall, its screens facing the open doorway on the north hall (decided by Augusto;
+// the room is `security_office` in docs/floorplans/build_floorplans.py).
 
 export interface Camera {
   id: string;
@@ -30,7 +31,7 @@ export const CAMERAS: Camera[] = [
 ];
 
 /** Where the console stands (plan meters), the way it faces, and the floor. The player works it from the `facing` side. */
-export const CONSOLE = { floor: 0, x: 62, y: 26, /** The way the screens face (plan heading, radians). */ facing: -Math.PI / 2, /** Footprint half sizes. */ hx: 0.95, hy: 0.45 };
+export const CONSOLE = { floor: 2, x: 21, y: 150.56, /** The way the screens face (plan heading, radians). */ facing: Math.PI / 2, /** Footprint half sizes (the Poly Haven desk: 2 x 0.95 m). */ hx: 1.0, hy: 0.48 };
 
 export const SECURITY = {
   /** Camera height above its floor (m), and how far it tilts down (radians). */
