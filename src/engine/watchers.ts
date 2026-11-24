@@ -267,3 +267,150 @@ export class Watchers {
     }
   }
 }
+
+/**
+ * Watchers on the security feeds. While the player sits at the monitors the ones around them hold still (the runtime
+ * stops updating them), so they do not pile up in the office. Instead the mall puts a couple on the feeds: each one
+ * stands in a random camera's view, staring into the lens, and freezes while that feed is on screen. Off screen it
+ * either creeps closer to its camera or goes to another one, so coming back to a feed may show it nearer, or gone.
+ */
+export const FEED = {
+  /** At most this many on the feeds (and never more than targetCount at this sanity). */
+  MAX: 2,
+  /** A new one every 3 to 8 s at most, while there are fewer than wanted. */
+  SPAWN_GAP: [3, 8] as [number, number],
+  /** Where it stands: this far from the camera (m), within this half-angle of where it looks (radians). */
+  NEAR: 6,
+  FAR: 20,
+  CONE: 0.45,
+  /** Off screen this long (s), it moves: to another camera (MOVE_CHANCE), or this much closer to its own. */
+  MOVE_GAP: [5, 12] as [number, number],
+  MOVE_CHANCE: 0.35,
+  STEP: [2, 4] as [number, number],
+  /** It never comes closer to the lens than this (m). */
+  CLOSEST: 3.5,
+};
+
+/** A camera as FeedWatchers needs it: a plan point over open floor, its floor, the plan heading it looks along (degrees). */
+export interface FeedCamera {
+  x: number;
+  y: number;
+  floor: number;
+  heading: number;
+}
+
+export interface FeedContext {
+  nav: NavGrid;
+  cameras: FeedCamera[];
+  /** The camera whose picture is on screen now (after the mall's lies). */
+  shown: number;
+  sanity: number;
+}
+
+export class FeedWatchers {
+  readonly list: Watcher[] = [];
+  /** The camera each one stands in front of, by watcher id. */
+  private cam = new Map<number, number>();
+  private away = new Map<number, number>();
+  /** Ids from far above the room watchers', so the view keeps them apart. */
+  private nextId = 100000;
+  private spawnTimer = 1.5;
+  private rand: () => number;
+  constructor(rand: () => number = Math.random) {
+    this.rand = rand;
+  }
+
+  /** Sanity drain per second: the ones on the feed on screen. */
+  get drain(): number {
+    return this.list.filter((w) => w.seen).length * WATCH.DRAIN;
+  }
+
+  /** The camera a watcher stands in front of. */
+  cameraOf(w: Watcher): number | undefined {
+    return this.cam.get(w.id);
+  }
+
+  clear() {
+    this.list.length = 0;
+    this.cam.clear();
+    this.away.clear();
+    this.spawnTimer = 1.5;
+  }
+
+  private between([a, b]: [number, number]) {
+    return a + this.rand() * (b - a);
+  }
+
+  /** A spot in camera `c`'s view, between `min` and `max` meters from it, that it can see; null if none. */
+  private spotFor(ctx: FeedContext, c: number, min: number, max: number): [number, number] | null {
+    const cam = ctx.cameras[c];
+    const look = (cam.heading * Math.PI) / 180;
+    for (let tries = 0; tries < 60; tries++) {
+      const a = look + (this.rand() * 2 - 1) * FEED.CONE;
+      const d = min + this.rand() * Math.max(0, max - min);
+      const x = cam.x + Math.cos(a) * d;
+      const y = cam.y + Math.sin(a) * d;
+      if (ctx.nav.walkable(cam.floor, x, y) && ctx.nav.sees(cam.floor, cam.x, cam.y, x, y)) return [x, y];
+    }
+    return null;
+  }
+
+  /** A random camera other than the one on screen, with nobody in front of it. */
+  private freeCamera(ctx: FeedContext): number | null {
+    const used = new Set(this.cam.values());
+    const free = ctx.cameras.map((_, i) => i).filter((i) => i !== ctx.shown && !used.has(i));
+    return free.length ? free[Math.floor(this.rand() * free.length)] : null;
+  }
+
+  private place(w: Watcher, ctx: FeedContext, c: number, at: [number, number]) {
+    const cam = ctx.cameras[c];
+    this.cam.set(w.id, c);
+    w.x = at[0];
+    w.y = at[1];
+    w.floor = cam.floor;
+    w.facing = Math.atan2(cam.y - at[1], cam.x - at[0]); // staring into the lens
+    this.away.set(w.id, this.between(FEED.MOVE_GAP));
+  }
+
+  update(dt: number, ctx: FeedContext) {
+    const want = Math.min(FEED.MAX, targetCount(ctx.sanity));
+    // too many (sanity recovered): the ones off screen go
+    for (let i = this.list.length - 1; i >= 0 && this.list.length > want; i--) {
+      const w = this.list[i];
+      if (this.cam.get(w.id) === ctx.shown) continue;
+      this.list.splice(i, 1);
+      this.cam.delete(w.id);
+      this.away.delete(w.id);
+    }
+    this.spawnTimer -= dt;
+    if (this.list.length < want && this.spawnTimer <= 0) {
+      this.spawnTimer = this.between(FEED.SPAWN_GAP);
+      const c = this.freeCamera(ctx);
+      const at = c === null ? null : this.spotFor(ctx, c, FEED.NEAR, FEED.FAR);
+      if (c !== null && at) {
+        const w: Watcher = { id: this.nextId++, x: 0, y: 0, floor: 0, facing: 0, look: LOOKS[Math.floor(this.rand() * LOOKS.length)], height: 0.94 + this.rand() * 0.14, frozen: false, seen: false, path: [], repath: 0 };
+        this.place(w, ctx, c, at);
+        this.list.push(w);
+      }
+    }
+    for (const w of this.list) {
+      const c = this.cam.get(w.id)!;
+      const onScreen = c === ctx.shown;
+      w.frozen = onScreen;
+      w.seen = onScreen;
+      if (onScreen) continue; // while its feed is on screen it does not move at all
+      const left = (this.away.get(w.id) ?? 0) - dt;
+      this.away.set(w.id, left);
+      if (left > 0) continue;
+      const cam = ctx.cameras[c];
+      const now = Math.hypot(w.x - cam.x, w.y - cam.y);
+      const other = this.rand() < FEED.MOVE_CHANCE ? this.freeCamera(ctx) : null;
+      const at =
+        other !== null
+          ? this.spotFor(ctx, other, FEED.NEAR, FEED.FAR)
+          : this.spotFor(ctx, c, Math.max(FEED.CLOSEST, now - FEED.STEP[1]), Math.max(FEED.CLOSEST, now - FEED.STEP[0]));
+      if (at) this.place(w, ctx, other ?? c, at);
+      else this.away.set(w.id, this.between(FEED.MOVE_GAP));
+    }
+  }
+}

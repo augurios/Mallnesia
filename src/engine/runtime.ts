@@ -38,7 +38,7 @@ import { CAMERAS, Monitoring, SECURITY, consoleInReach } from "./security";
 import { createSecurityView } from "./security-view";
 import { NOTES, noteInReach, type Note } from "./notes";
 import { createNotesView } from "./notes-view";
-import { Watchers, seatsFromProps } from "./watchers";
+import { FeedWatchers, Watchers, seatsFromProps } from "./watchers";
 import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
 import { createGirlView } from "./girl-view";
@@ -301,6 +301,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   // key Y adds one 20 m away now (Shift+Y one sitting on a chair or bench), ?watchersat=x,y,look places one (,sit: on the seat nearest x,y) (screenshots).
   const watchers = new Watchers();
   watchers.enabled = params.get("watchers") !== "off";
+  // while the player watches the security feeds the ones around them hold still, and a couple stand on the feeds instead
+  const feedWatchers = new FeedWatchers();
   const watchersView = createWatchersView();
   scene.add(watchersView.object);
   // The security console and its monitors (security.ts): E at the console looks through the mall's cameras (the game's own
@@ -315,6 +317,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const stopMonitoring = () => {
     if (!monitoring.active) return;
     monitoring.exit();
+    feedWatchers.clear(); // the mall rearranges itself: the next look at the feeds shows other ones
+    sanity.setDrain("feed", 0);
     monitorKey = "";
     options.onMonitor?.(null);
     if (radioWarned) options.onSubtitle?.(null);
@@ -1478,7 +1482,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (monitoring.active) {
       // looking through a CCTV camera: the camera moves to its mount, in night vision (more ambient, no flashlight)
       const cam = CAMERAS[monitoring.shown(sanity.level, now / 1000)];
-      camera.position.set(cam.x, cam.floor * FLOOR_HEIGHT + (cam.height ?? SECURITY.HEIGHT), -cam.y);
+      camera.position.set(cam.x, cam.floor * FLOOR_HEIGHT + SECURITY.HEIGHT, -cam.y);
       camera.rotation.set(-SECURITY.TILT, headingToYaw((cam.heading * Math.PI) / 180), 0);
       if (camera.fov !== SECURITY.FOV) {
         camera.fov = SECURITY.FOV;
@@ -1533,9 +1537,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         if (!guardScene || guardScene.done) options.onSubtitle?.(null);
       }
     } else girlVoice.update(0, 0, 0, 0);
-    // The watchers: they stand still while seen, creep closer when not, and drain sanity while in view.
+    // The watchers: they stand still while seen, creep closer when not, and drain sanity while in view. While the player
+    // watches the security feeds the ones around them hold still (nobody is looking, but they must not pile up in the
+    // office), and a couple stand on the feeds instead, staring into the lens (FeedWatchers).
     if (area === "mall" && nav) {
-      if (dt > 0 && !fail.locked) {
+      if (dt > 0 && !fail.locked && monitoring.active) {
+        sanity.setDrain("watchers", 0);
+        if (watchers.enabled) feedWatchers.update(dt, { nav, cameras: CAMERAS, shown: monitoring.shown(sanity.level, now / 1000), sanity: sanity.level });
+        sanity.setDrain("feed", feedWatchers.drain);
+      } else if (dt > 0 && !fail.locked) {
         frustum.setFromProjectionMatrix(projView);
         watchers.update(dt, {
           nav,
@@ -1543,12 +1553,11 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           py: -player.z,
           floor,
           sanity: sanity.level,
-          // the player's own eyes only: while they watch the feeds the camera is at a CCTV mount, so nobody is observed
-          observed: (x, y) => !monitoring.active && frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
+          observed: (x, y) => frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
         });
         sanity.setDrain("watchers", watchers.drain);
       }
-      watchersView.update(watchers.list, now / 1000);
+      watchersView.update(monitoring.active ? [...watchers.list, ...feedWatchers.list] : watchers.list, now / 1000);
     } else {
       sanity.setDrain("watchers", 0);
       watchersView.update([], now / 1000);

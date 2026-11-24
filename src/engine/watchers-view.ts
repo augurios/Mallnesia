@@ -23,7 +23,7 @@ const LOOKS: Record<WatcherLook, Look> = {
   guardlike: { top: 0x1d2430, legs: 0x1d2430, cap: true, hood: false }, // like the guard's uniform (guard-view.ts)
 };
 
-const POOL = 5;
+const POOL = 6; // up to four around the player and two on the security feeds (FeedWatchers)
 
 export interface WatchersView {
   object: THREE.Object3D;

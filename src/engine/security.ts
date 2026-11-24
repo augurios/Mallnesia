@@ -17,8 +17,6 @@ export interface Camera {
   y: number;
   /** Plan heading it looks along, degrees. */
   heading: number;
-  /** Mount height above its floor (m), where the ceiling is low (under 3.5 m: the halls' ceiling is at 3.5); else SECURITY.HEIGHT. */
-  height?: number;
 }
 
 /** Cameras at the places a guard would watch: the lobby, the atrium on each floor, the north hall, the food court, the office's own door. */
@@ -31,16 +29,17 @@ export const CAMERAS: Camera[] = [
   { id: "c6", label: "CAM 6 · ATRIO", floor: 2, x: 48, y: 100, heading: 90 },
   { id: "c7", label: "CAM 7 · COMIDAS", floor: 2, x: 70, y: 20, heading: 135 },
   // outside the guard's office: on the north hall's far wall, looking through the open doorway at the desk, so the one
-  // at the console is on this feed, and so is whatever comes down the hall to them (low: the hall's ceiling is at 3.5)
-  { id: "c8", label: "CAM 8 · SEGURIDAD", floor: 2, x: 25.5, y: 164.5, heading: 253, height: 3.0 },
+  // at the console is on this feed, and so is whatever comes down the hall to them
+  { id: "c8", label: "CAM 8 · SEGURIDAD", floor: 2, x: 25.5, y: 164.5, heading: 253 },
 ];
 
 /** Where the console stands (plan meters), the way it faces, and the floor. The player works it from the `facing` side. */
 export const CONSOLE = { floor: 2, x: 21, y: 150.56, /** The way the screens face (plan heading, radians). */ facing: Math.PI / 2, /** Footprint half sizes (the Poly Haven desk: 2 x 0.95 m). */ hx: 1.0, hy: 0.48 };
 
 export const SECURITY = {
-  /** Camera height above its floor (m), and how far it tilts down (radians). */
-  HEIGHT: 3.5,
+  /** Camera height above its floor (m), and how far it tilts down (radians). Under the ceiling (3.5 m, CEIL_H in
+   *  scripts/blockout/config.mts): a camera at the ceiling sees into the space between floors and the floor above. */
+  HEIGHT: 3.1,
   TILT: 0.2,
   FOV: 82,
   /** The player can use the console from this close (m from its centre), looking toward it. */
