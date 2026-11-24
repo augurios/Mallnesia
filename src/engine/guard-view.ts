@@ -125,6 +125,21 @@ export function createGuardView(fetchModel?: (url: string) => Promise<GuardGltf>
   root.add(holder);
   const light = new THREE.PointLight(0xffe2b0, 0, 9, 1.6);
   root.add(light);
+  // a soft glow at the flashlight's lens, so his light can be seen from far down a hall (additive, not fogged)
+  const glowCanvas = document.createElement("canvas");
+  glowCanvas.width = glowCanvas.height = 64;
+  const gg = glowCanvas.getContext("2d")!;
+  const grad = gg.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,240,200,1)");
+  grad.addColorStop(0.3, "rgba(255,225,170,0.45)");
+  grad.addColorStop(1, "rgba(255,210,150,0)");
+  gg.fillStyle = grad;
+  gg.fillRect(0, 0, 64, 64);
+  const glowTex = new THREE.CanvasTexture(glowCanvas);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true, opacity: 0.9 }));
+  glow.scale.set(0.9, 0.9, 1);
+  glow.visible = false;
+  root.add(glow);
   let current: GuardBody = createStandIn();
   holder.add(current.object);
   let disposed = false;
@@ -148,6 +163,7 @@ export function createGuardView(fetchModel?: (url: string) => Promise<GuardGltf>
     },
     update(x, y, floor, facing, visible, pose, seconds) {
       holder.visible = visible;
+      glow.visible = visible;
       light.intensity = visible ? 6 : 0; // never removed: only dimmed to nothing, so the shader count never changes
       if (!visible) return;
       holder.position.set(x, floor * FLOOR_HEIGHT, -y);
@@ -156,10 +172,13 @@ export function createGuardView(fetchModel?: (url: string) => Promise<GuardGltf>
       holder.updateMatrixWorld(true);
       current.lens.getWorldPosition(lensAt);
       light.position.copy(root.worldToLocal(lensAt));
+      glow.position.copy(light.position);
     },
     dispose() {
       disposed = true;
       current.dispose();
+      glowTex.dispose();
+      glow.material.dispose();
     },
   };
 }

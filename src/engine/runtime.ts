@@ -42,7 +42,8 @@ import { FeedWatchers, Watchers, seatsFromProps } from "./watchers";
 import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
 import { createGirlView } from "./girl-view";
-import { GuardScene, GUARD_SCENE, placeAhead } from "./guard-scene";
+import { Exploration, GuardRounds, ROUNDS, cueEffect } from "./guard-rounds";
+import { GuardScene, lineTime, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
 import { Hiding, HIDING, headingToYaw, spotsFromProps, yawToHeading } from "./hiding";
@@ -92,6 +93,8 @@ export interface RuntimeOptions {
   /** The note being read (title and lines of text), or null when it is closed. */
   onNote?: (note: { title: string; body: string[] } | null) => void;
   /** The security monitors: what the screen overlay shows (the selected camera's label, a clock, how much static), or null when closed. */
+  /** The game is won: the guard led the player out and the mall let them go. */
+  onEnding?: (ending: "guard") => void;
   onMonitor?: (view: { label: string; index: number; total: number; glitch: number; clock: string } | null) => void;
   /** Loading progress for the loading screen: 0 to 1, `ready` once everything is loaded and warmed up, `error` if the mall could not load. */
   /** The game lowered the graphics preset by itself because frames were slow. */
@@ -305,6 +308,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const feedWatchers = new FeedWatchers();
   const watchersView = createWatchersView();
   scene.add(watchersView.object);
+  // The guard's rounds and the guard ending (guard-rounds.ts): after the opening he is gone; once the player has scouted enough
+  // he returns and patrols; audio cues come first. Meeting him (within 3.6 m, in sight) starts the escort to the main doors and
+  // the ending. ?rounds=now brings him back at once, key B calls him near, ?roundsat=x,y,floor places him (screenshots).
+  const scouting = new Exploration();
+  const rounds = new GuardRounds();
+  const roundsForce = params.get("rounds") === "now";
+  let meet: { line: number; t: number } | null = null; // the dialogue of the meeting
+  let ended = false;
   // The security console and its monitors (security.ts): E at the console looks through the mall's cameras (the game's own
   // camera moves to the CCTV spot, in night vision); left and right change camera; E or Esc leaves. ?monitor=1 starts
   // looking through the feeds (?cam=<n> picks the camera), for screenshots.
@@ -403,6 +414,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let stripHeld = false;
   /** In the garage, standing under a working tube counts as light for sanity (like a lit area did). */
   const litByTube = (lay: GarageLayout, x: number, y: number) => lay.lights.some((l) => l.state === "on" && Math.hypot(l.x - x, l.y - y) < 3.5);
+  let roundsAtPending = params.has("roundsat");
   let watchersAtPending = params.has("watchersat");
   let girlAtPending = params.has("girlat");
   let ringTimer = 0;
@@ -1040,9 +1052,18 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   /** Runs while the screen is black after a fail. */
   const relocate = () => {
     if (fail.reason === "to_garage") {
+      scouting.visitedGarage();
       enterGarage();
       return;
     }
+    if (fail.reason === "escort") {
+      // the mall takes the player and the guard to the lobby: the way out is open to those who follow him
+      placePlayer(ROUNDS.LOBBY.floor, ROUNDS.LOBBY.x, ROUNDS.LOBBY.y, headingToYaw(Math.atan2(ROUNDS.EXIT.y - ROUNDS.LOBBY.y, ROUNDS.EXIT.x - ROUNDS.LOBBY.x)));
+      rounds.placeAtLobby();
+      rounds.beginEscort();
+      return;
+    }
+    rounds.reset(); // being caught or fainting sends him away again until the player has scouted enough
     leaveGarage(); // anything else brings the player back to the mall
     if (fail.reason === "to_mall") {
       // (debug key P) back through the opening the player came in by, just inside the mall, facing east
@@ -1077,6 +1098,17 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const onKeyDown = (e: KeyboardEvent) => {
     keys.add(e.code);
     if (e.code === "KeyN" && !e.repeat && locked) fireNoise(); // debug: a night noise now
+    if (e.code === "KeyB" && !e.repeat && locked && nav && area === "mall") {
+      // debug: the guard, near, on his rounds (10 to 16 m away, out of sight if possible)
+      rounds.reset();
+      const spot = nav.randomSpot(floor, player.x, -player.z, 10, 16, Math.random, (x, y) => unseen(x, y, floor)) ?? nav.randomSpot(floor, player.x, -player.z, 10, 16, Math.random);
+      if (spot && rounds.start({ nav, px: player.x, py: -player.z, floor, seenBy: () => false })) {
+        rounds.floor = floor;
+        rounds.x = spot[0];
+        rounds.y = spot[1];
+        progress.guard = 2;
+      }
+    }
     if (e.code === "KeyU" && !e.repeat && locked) summonGirl(); // debug: the girl in white now
     if (e.code === "KeyY" && !e.repeat && locked && nav && area === "mall") {
       // debug: a watcher, 20 m away out of sight if there is such a place, now; Shift+Y: one sitting, on a free seat out of sight
@@ -1121,6 +1153,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           reading = note;
           if (!progress.notesRead.includes(note.id)) {
             progress.notesRead.push(note.id);
+            scouting.noteRead();
             notesView.setRead(progress.notesRead);
           }
           velocity.set(0, 0);
@@ -1202,7 +1235,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const tick = () => {
     frame = requestAnimationFrame(tick);
     const now = performance.now();
-    const dt = locked || forceRun ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free (?forcerun=1, debug: runs without it, for scripted walks)
+    const dt = (locked || forceRun) && !ended ? Math.min((now - last) / 1000, MAX_DT) : 0; // paused while the pointer is free (?forcerun=1, debug: runs without it, for scripted walks) and once the game is won
     if (autoQuality && locked && governor.update((now - last) / 1000, true) === "drop") {
       const lower = QUALITY_LEVELS[QUALITY_LEVELS.indexOf(quality) - 1];
       if (lower) {
@@ -1246,7 +1279,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (hiding.active) flashOn = false;
     // The velocity eases toward what the keys ask for, so starting, stopping and turning a corner never jolt.
     const frozen = fail.locked || (guardScene?.controlLocked ?? false);
-    const stand = fail.locked || reading !== null || monitoring.active; // reading a note, watching the monitors, or going down: no walking
+    const stand = fail.locked || reading !== null || monitoring.active || meet !== null || ended; // reading a note, watching the monitors, meeting the guard, the ending, or going down: no walking
     const forward = stand || frozen ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = stand || frozen ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
     const moving = !pose && (forward !== 0 || strafe !== 0);
@@ -1302,6 +1335,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (charge === 0) flashOn = false;
     if (fail.update(dt) === "move") relocate();
     blackout.style.opacity = String(fail.fade);
+    if (roundsAtPending && nav && warmDone) {
+      roundsAtPending = false;
+      const at = (params.get("roundsat") ?? "").split(",").map(parseFloat);
+      if (at.length >= 2 && at.slice(0, 2).every(Number.isFinite) && rounds.start({ nav, px: 0, py: 0, floor: 9, seenBy: () => false })) {
+        rounds.x = at[0];
+        rounds.y = at[1];
+        rounds.floor = Number.isFinite(at[2]) ? at[2] - 1 : floor;
+        rounds.facing = Math.atan2(-player.z - at[1], player.x - at[0]);
+      }
+    }
     if (monitorStart && warmDone && nav) {
       monitorStart = false;
       monitoring.enter();
@@ -1561,6 +1604,72 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     } else {
       sanity.setDrain("watchers", 0);
       watchersView.update([], now / 1000);
+    }
+    // The guard's rounds: scouting, his return, cues, the meeting, the escort and the ending.
+    if (area === "mall" && nav && !ended) {
+      if (dt > 0 && !fail.locked) {
+        scouting.visit(floor, player.x, -player.z);
+        frustum.setFromProjectionMatrix(projView);
+        const seenBy = (x: number, y: number, f: number) => f === floor && frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, f * FLOOR_HEIGHT + 0.9, -y), 1.2)) && nav!.sees(floor, player.x, -player.z, x, y);
+        const ctx = { nav, px: player.x, py: -player.z, floor, seenBy };
+        const openingOver = opening !== "ready" && opening !== "playing" ? true : guardScene !== null && guardScene.done;
+        if (rounds.phase === "absent" && progress.guard < 3 && (roundsForce || (progress.guard >= 1 && openingOver && scouting.ready) || progress.guard === 2) && rounds.start(ctx)) {
+          progress.guard = 2;
+        }
+        for (const ev of rounds.update(dt, ctx)) {
+          if (ev.type === "cue") {
+            const lost = rounds.sinceReturn > ROUNDS.LOST_AFTER;
+            const fx = cueEffect(sanity.level, lost, Math.random(), Math.random());
+            if (fx.quiet || rounds.floor !== floor) continue;
+            const dx = rounds.x - player.x;
+            const dy = rounds.y + player.z;
+            const dist = Math.hypot(dx, dy);
+            if (dist > fx.range) continue;
+            let cx = rounds.x;
+            let cy = rounds.y;
+            if (fx.lie) {
+              // the mall points the sound the wrong way: the same distance, another direction
+              const turn = Math.PI * (0.6 + Math.random() * 0.8);
+              const a = Math.atan2(dy, dx) + turn;
+              cx = player.x + Math.cos(a) * dist;
+              cy = -player.z + Math.sin(a) * dist;
+            }
+            const wy = floor * FLOOR_HEIGHT + 1.1;
+            if (ev.cue === "keys") audio.keys(cx, wy, -cy, fx.gain);
+            else if (ev.cue === "radio") audio.radio(cx, wy, -cy, fx.gain);
+            else audio.step(cx, floor * FLOOR_HEIGHT + 0.1, -cy, fx.gain);
+          } else if (ev.type === "meet") {
+            meet = { line: 0, t: 0 };
+            velocity.set(0, 0);
+            options.onSubtitle?.(es.guardMeet[0]);
+          } else if (ev.type === "waiting") {
+            options.onSubtitle?.(es.guardWaiting);
+            setTimeout(() => options.onSubtitle?.(null), 2800);
+          } else if (ev.type === "arrived") {
+            ended = true;
+            options.onSubtitle?.(es.guardArrived);
+            progress.guard = 3;
+            setTimeout(() => {
+              options.onEnding?.("guard");
+              if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+            }, 2800);
+          }
+        }
+        if (meet) {
+          meet.t += dt;
+          if (meet.t >= lineTime(es.guardMeet[meet.line]) + 0.5) {
+            meet.line++;
+            meet.t = 0;
+            if (meet.line >= es.guardMeet.length) {
+              meet = null;
+              options.onSubtitle?.(null);
+              if (rounds.floor === ROUNDS.EXIT.floor) rounds.beginEscort();
+              else fail.trigger("escort"); // the mall takes them to the lobby behind a fade
+            } else options.onSubtitle?.(es.guardMeet[meet.line]);
+          }
+        }
+      }
+      guardView.update(rounds.x, rounds.y, rounds.floor, rounds.facing, rounds.present && rounds.floor === floor, rounds.walking ? "walk" : meet ? "talk" : "idle", now / 1000);
     }
     // The guard's opening scene (started at the top of the frame, so the player is frozen from the first one).
     if (area === "mall" && opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {

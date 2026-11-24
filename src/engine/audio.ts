@@ -28,6 +28,10 @@ export interface Audio {
   rattle(x: number, y: number, z: number): void;
   /** Starts the girl in white's voice: a child sobbing, with calls for her mother. Silent until `update` gives it a level above 0. */
   girl(): GirlSound;
+  /** The guard's cues, positional: a ring of keys, a radio crackle with a squelch of voice, a footstep. `gain` scales them. */
+  keys(x: number, y: number, z: number, gain: number): void;
+  radio(x: number, y: number, z: number, gain: number): void;
+  step(x: number, y: number, z: number, gain: number): void;
   /** A payphone ringing, far off: two short bursts of a bell tone. */
   ring(x: number, y: number, z: number): void;
   /** Something hard hitting the floor (a chair, a bin): `strength` 0 to 1 is how hard. */
@@ -270,6 +274,89 @@ export function createAudio(): Audio {
           nodes = null;
         },
       };
+    },
+    keys(x, y, z, gain) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      // a handful of tiny metal ticks at jittery times, each a short ringing high partial
+      for (let k = 0; k < 7; k++) {
+        const at = t + k * 0.06 + Math.random() * 0.04;
+        const osc = c.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = 2400 + Math.random() * 2600;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.linearRampToValueAtTime(0.09 * gain, at + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0005, at + 0.16);
+        osc.connect(g).connect(out);
+        osc.start(at);
+        osc.stop(at + 0.18);
+      }
+    },
+    radio(x, y, z, gain) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      // a click, a burst of band-limited static, a squelch of 'voice' (a wobbling tone) and a closing click
+      const src = c.createBufferSource();
+      src.buffer = noiseBuffer(c);
+      const band = c.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = 1800;
+      band.Q.value = 1.2;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16 * gain, t + 0.02);
+      g.gain.setValueAtTime(0.1 * gain, t + 0.7);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + 0.95);
+      src.connect(band).connect(g).connect(out);
+      src.start(t);
+      src.stop(t + 1);
+      const voice = c.createOscillator();
+      voice.type = "sawtooth";
+      voice.frequency.setValueAtTime(190, t + 0.1);
+      voice.frequency.linearRampToValueAtTime(240, t + 0.35);
+      voice.frequency.linearRampToValueAtTime(170, t + 0.65);
+      const vb = c.createBiquadFilter();
+      vb.type = "bandpass";
+      vb.frequency.value = 1100;
+      vb.Q.value = 3;
+      const vg = c.createGain();
+      vg.gain.setValueAtTime(0.0001, t + 0.1);
+      vg.gain.linearRampToValueAtTime(0.05 * gain, t + 0.2);
+      vg.gain.linearRampToValueAtTime(0.0001, t + 0.7);
+      voice.connect(vb).connect(vg).connect(out);
+      voice.start(t + 0.1);
+      voice.stop(t + 0.75);
+    },
+    step(x, y, z, gain) {
+      const c = ready();
+      if (!c) return;
+      const t = c.currentTime;
+      const out = panner(c, x, y, z);
+      const thump = c.createOscillator();
+      thump.frequency.setValueAtTime(95, t);
+      thump.frequency.exponentialRampToValueAtTime(48, t + 0.1);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.22 * gain, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      thump.connect(g).connect(out);
+      thump.start(t);
+      thump.stop(t + 0.16);
+      const tick = c.createBufferSource();
+      tick.buffer = noiseBuffer(c);
+      const hp = c.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 2200;
+      const tg = c.createGain();
+      tg.gain.setValueAtTime(0.07 * gain, t);
+      tg.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      tick.connect(hp).connect(tg).connect(out);
+      tick.start(t);
+      tick.stop(t + 0.06);
     },
     ring(x, y, z) {
       const c = ready();

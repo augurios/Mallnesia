@@ -306,6 +306,44 @@ body {
   opacity: 0.8;
 }
 
+.game-ending {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  background: #000;
+  color: #e8e2d0;
+  animation: ending-in 3s ease-out both;
+}
+
+.game-ending h1 {
+  font-weight: 400;
+  font-size: clamp(22px, 4vw, 38px);
+  letter-spacing: 0.04em;
+}
+
+.game-ending p {
+  color: #8a8575;
+}
+
+.game-ending button {
+  margin-top: 22px;
+  background: transparent;
+  color: #d8d2c0;
+  border: 1px solid #555;
+  padding: 8px 22px;
+  cursor: pointer;
+}
+
+@keyframes ending-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .game-note {
   position: absolute;
   left: 50%;

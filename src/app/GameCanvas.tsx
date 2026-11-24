@@ -18,6 +18,7 @@ export default function GameCanvas() {
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
   const [tip, setTip] = useState<"move" | "flashlight" | null>(null);
+  const [ended, setEnded] = useState<"guard" | null>(null);
   const [note, setNote] = useState<{ title: string; body: string[] } | null>(null);
   const [monitor, setMonitor] = useState<{ label: string; index: number; total: number; glitch: number; clock: string } | null>(null);
   // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
@@ -39,6 +40,7 @@ export default function GameCanvas() {
       onSubtitle: setSubtitle,
       onTip: setTip,
       onNote: setNote,
+      onEnding: setEnded,
       onMonitor: setMonitor,
       onLoad: setLoad,
       onQualityChange: (level) => {
@@ -151,6 +153,15 @@ export default function GameCanvas() {
       {locked && subtitle && <div className="game-subtitle">{subtitle}</div>}
       {locked && status?.prompt && <div className="game-prompt">{notice ?? es.prompts[status.prompt]}</div>}
       {locked && !status?.prompt && notice && <div className="game-prompt">{notice}</div>}
+      {ended && (
+        <div className="game-ending" role="dialog" aria-label={es.endingGuardTitle}>
+          <div>
+            <h1>{es.endingGuardTitle}</h1>
+            <p>{es.endingGuardText}</p>
+            <button onClick={() => window.location.reload()}>{es.restart}</button>
+          </div>
+        </div>
+      )}
       {(!load.ready || Number.isFinite(hold)) && (
         <div className="game-loading" role="status" aria-live="polite">
           <div>
@@ -171,7 +182,7 @@ export default function GameCanvas() {
           </div>
         </div>
       )}
-      {!locked && load.ready && (
+      {!locked && load.ready && !ended && (
         <div className="game-hint" onClick={() => runtimeRef.current?.requestLock()}>
           <div>
             <h1>{started ? es.paused : es.clickToPlay}</h1>
@@ -182,6 +193,7 @@ export default function GameCanvas() {
             {!started && <p>{es.debugShadow}</p>}
             {!started && <p>{es.debugFaint}</p>}
             {!started && <p>{es.debugGarage}</p>}
+            {!started && <p>{es.debugGuard}</p>}
             <div className="game-quality" onClick={(e) => e.stopPropagation()}>
               {started && <button onClick={saveGame}>{es.saveGame}</button>}
               <button disabled={savedTimes.manual === null} onClick={() => loadGame("manual")}>
