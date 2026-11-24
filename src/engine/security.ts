@@ -17,9 +17,11 @@ export interface Camera {
   y: number;
   /** Plan heading it looks along, degrees. */
   heading: number;
+  /** Mount height above its floor (m), where the ceiling is low (under 3.5 m: the halls' ceiling is at 3.5); else SECURITY.HEIGHT. */
+  height?: number;
 }
 
-/** Cameras at the places a guard would watch: the lobby, the atrium on each floor, the north hall, the food court. */
+/** Cameras at the places a guard would watch: the lobby, the atrium on each floor, the north hall, the food court, the office's own door. */
 export const CAMERAS: Camera[] = [
   { id: "c1", label: "CAM 1 · ENTRADA", floor: 0, x: 66, y: 24, heading: 30 },
   { id: "c2", label: "CAM 2 · ATRIO A", floor: 0, x: 60, y: 90, heading: 255 },
@@ -28,6 +30,9 @@ export const CAMERAS: Camera[] = [
   { id: "c5", label: "CAM 5 · ATRIO", floor: 1, x: 48, y: 98, heading: 90 },
   { id: "c6", label: "CAM 6 · ATRIO", floor: 2, x: 48, y: 100, heading: 90 },
   { id: "c7", label: "CAM 7 · COMIDAS", floor: 2, x: 70, y: 20, heading: 135 },
+  // outside the guard's office: on the north hall's far wall, looking through the open doorway at the desk, so the one
+  // at the console is on this feed, and so is whatever comes down the hall to them (low: the hall's ceiling is at 3.5)
+  { id: "c8", label: "CAM 8 · SEGURIDAD", floor: 2, x: 25.5, y: 164.5, heading: 253, height: 3.0 },
 ];
 
 /** Where the console stands (plan meters), the way it faces, and the floor. The player works it from the `facing` side. */

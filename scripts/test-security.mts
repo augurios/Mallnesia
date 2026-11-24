@@ -69,7 +69,17 @@ if (existsSync("public/models/nav.json")) {
     while (d < 80 && nav.sees(c.floor, c.x, c.y, c.x + Math.cos(a) * (d + 2), c.y + Math.sin(a) * (d + 2))) d += 2;
     return d;
   };
-  check("every camera looks down a long view (20 m or more)", CAMERAS.every((c) => reach(c) >= 20), CAMERAS.map((c) => `${c.id}:${reach(c)}`).join(" "));
+  // c8 watches the guard's office door from close by; every other camera looks down a long view
+  const office8 = CAMERAS.find((c) => c.id === "c8");
+  const wide = CAMERAS.filter((c) => c !== office8);
+  check("every camera but the office's looks down a long view (20 m or more)", wide.every((c) => reach(c) >= 20), wide.map((c) => `${c.id}:${reach(c)}`).join(" "));
+  check(
+    "the office camera sees the console through the doorway, and it is in the picture",
+    !!office8 &&
+      nav.sees(office8.floor, office8.x, office8.y, CONSOLE.x, CONSOLE.y + Math.sin(CONSOLE.facing) * (CONSOLE.hy + 0.2)) &&
+      Math.abs(Math.atan2(Math.sin(Math.atan2(CONSOLE.y - office8.y, CONSOLE.x - office8.x) - (office8.heading * Math.PI) / 180), Math.cos(Math.atan2(CONSOLE.y - office8.y, CONSOLE.x - office8.x) - (office8.heading * Math.PI) / 180))) < (SECURITY.FOV * Math.PI) / 360,
+  );
+  check("a camera hung lower than the rest stays under the halls' ceiling (3.5 m)", CAMERAS.every((c) => (c.height ?? SECURITY.HEIGHT) <= 3.5 && (c.height ?? SECURITY.HEIGHT) > 2.2));
   // the desk stands against the office wall: its footprint and the floor beside and in front of it must be open
   const fx = Math.cos(CONSOLE.facing);
   const fy = Math.sin(CONSOLE.facing);

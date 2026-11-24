@@ -106,6 +106,8 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "feed_lobby", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=1&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
   { name: "feed_shadow", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=7&girl=off&watchers=off&shadow=off&guard=off&noise=off&shadowat=62,27" },
   { name: "feed_food_court", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=4&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  { name: "feed_office", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=8&girl=off&watchers=off&shadow=off&guard=off&noise=off" },
+  { name: "feed_office_shadow", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=8&shadowat=21,161.5&girl=off&watchers=off&guard=off&noise=off" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

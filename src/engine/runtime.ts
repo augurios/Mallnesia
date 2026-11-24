@@ -1478,7 +1478,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (monitoring.active) {
       // looking through a CCTV camera: the camera moves to its mount, in night vision (more ambient, no flashlight)
       const cam = CAMERAS[monitoring.shown(sanity.level, now / 1000)];
-      camera.position.set(cam.x, cam.floor * FLOOR_HEIGHT + SECURITY.HEIGHT, -cam.y);
+      camera.position.set(cam.x, cam.floor * FLOOR_HEIGHT + (cam.height ?? SECURITY.HEIGHT), -cam.y);
       camera.rotation.set(-SECURITY.TILT, headingToYaw((cam.heading * Math.PI) / 180), 0);
       if (camera.fov !== SECURITY.FOV) {
         camera.fov = SECURITY.FOV;
