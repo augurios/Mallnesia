@@ -1503,14 +1503,16 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     // The girl in white: out of view, crying; seeing her costs sanity, more the closer the player is.
     if (area === "mall") {
       if (dt > 0 && !fail.locked) {
-        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready" || !girlView.ready; // not ready: her model is still on its way
+        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready" || monitoring.active || !girlView.ready; // not while the player watches the feeds; not ready: her model is still on its way
         if (girlDirector.update(dt, sanity.shift, busy) && !summonGirl()) girlDirector.soon(8); // nowhere to put her: try again soon
       }
       if (apparition) {
         const a = apparition;
         const distance = Math.hypot(a.spot.x - player.x, a.spot.y + player.z);
         const gy = floor * FLOOR_HEIGHT;
+        // the player's own eyes only: while they watch the feeds the camera is at a CCTV mount, and she is not on them
         const inView =
+          !monitoring.active &&
           a.opacity > 0.5 &&
           !!nav?.sees(floor, player.x, -player.z, a.spot.x, a.spot.y) &&
           frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(a.spot.x, gy + 0.7, -a.spot.y), 0.6));
@@ -1541,7 +1543,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           py: -player.z,
           floor,
           sanity: sanity.level,
-          observed: (x, y) => frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
+          // the player's own eyes only: while they watch the feeds the camera is at a CCTV mount, so nobody is observed
+          observed: (x, y) => !monitoring.active && frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
         });
         sanity.setDrain("watchers", watchers.drain);
       }
