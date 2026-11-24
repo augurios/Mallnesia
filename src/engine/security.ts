@@ -4,8 +4,9 @@
 // Three.js, so scripts/test-security.mts runs the exact code the game runs.
 //
 // The feeds are rendered by the game's own camera moved to the CCTV position (night vision), not a second render, so
-// whatever is in the mall is on the feed. The console stands in the lobby for now: the security ROOM itself (walls, a
-// door) is a floor plan decision for Augusto; the console moves wherever the room ends up (`CONSOLE`).
+// whatever is in the mall is on the feed. The console stands in the guard's office on floor 3, at the north end of the
+// W1 N store block, against its south wall, its screens facing the open doorway on the north hall (decided by Augusto;
+// the room is `security_office` in docs/floorplans/build_floorplans.py).
 
 export interface Camera {
   id: string;
@@ -18,7 +19,7 @@ export interface Camera {
   heading: number;
 }
 
-/** Cameras at the places a guard would watch: the lobby, the atrium on each floor, the north hall, the food court. */
+/** Cameras at the places a guard would watch: the lobby, the atrium on each floor, the north hall, the food court, the office's own door. */
 export const CAMERAS: Camera[] = [
   { id: "c1", label: "CAM 1 · ENTRADA", floor: 0, x: 66, y: 24, heading: 30 },
   { id: "c2", label: "CAM 2 · ATRIO A", floor: 0, x: 60, y: 90, heading: 255 },
@@ -27,14 +28,18 @@ export const CAMERAS: Camera[] = [
   { id: "c5", label: "CAM 5 · ATRIO", floor: 1, x: 48, y: 98, heading: 90 },
   { id: "c6", label: "CAM 6 · ATRIO", floor: 2, x: 48, y: 100, heading: 90 },
   { id: "c7", label: "CAM 7 · COMIDAS", floor: 2, x: 70, y: 20, heading: 135 },
+  // outside the guard's office: on the north hall's far wall, looking through the open doorway at the desk, so the one
+  // at the console is on this feed, and so is whatever comes down the hall to them
+  { id: "c8", label: "CAM 8 · SEGURIDAD", floor: 2, x: 25.5, y: 164.5, heading: 253 },
 ];
 
 /** Where the console stands (plan meters), the way it faces, and the floor. The player works it from the `facing` side. */
-export const CONSOLE = { floor: 0, x: 62, y: 26, /** The way the screens face (plan heading, radians). */ facing: -Math.PI / 2, /** Footprint half sizes. */ hx: 0.95, hy: 0.45 };
+export const CONSOLE = { floor: 2, x: 21, y: 150.56, /** The way the screens face (plan heading, radians). */ facing: Math.PI / 2, /** Footprint half sizes (the Poly Haven desk: 2 x 0.95 m). */ hx: 1.0, hy: 0.48 };
 
 export const SECURITY = {
-  /** Camera height above its floor (m), and how far it tilts down (radians). */
-  HEIGHT: 3.5,
+  /** Camera height above its floor (m), and how far it tilts down (radians). Under the ceiling (3.5 m, CEIL_H in
+   *  scripts/blockout/config.mts): a camera at the ceiling sees into the space between floors and the floor above. */
+  HEIGHT: 3.1,
   TILT: 0.2,
   FOV: 82,
   /** The player can use the console from this close (m from its centre), looking toward it. */

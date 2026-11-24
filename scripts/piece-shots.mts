@@ -1,7 +1,8 @@
 // Renders every kit piece, solid and as a wireframe, into shots/ (gitignored) with headless Chrome. For checking a
 // piece against its reference photo before calling it done: if the wireframe looks like boxes, it is not done
 // (docs/art_style_reference.md, "Kit piece detail standard").
-// Run: npm run pieces   (after npm run props). ONLY=bench_red,trash_bin renders just those pieces.
+// Run: npm run pieces   (after npm run props). ONLY=bench_red,trash_bin renders just those pieces. DIR=security renders
+// the imported models in public/models/security/ instead (ONLY=desk,crt,chair).
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -21,7 +22,7 @@ const server = createServer((req, res) => {
   if (url === "/materials.js") return void res.writeHead(200, { "content-type": "text/javascript" }).end(stripTypeScriptTypes(readFileSync(join(ROOT, "src/engine/materials.ts"), "utf8")));
   const path = url === "/" ? join(ROOT, "scripts/piece-viewer.html") : join(ROOT, url);
   // only the viewer, three.js and the kit files
-  const allowed = path === join(ROOT, "scripts/piece-viewer.html") || path.startsWith(join(ROOT, "node_modules/three")) || path.startsWith(join(ROOT, "public/models/kit"));
+  const allowed = path === join(ROOT, "scripts/piece-viewer.html") || path.startsWith(join(ROOT, "node_modules/three")) || path.startsWith(join(ROOT, "public/models/kit")) || path.startsWith(join(ROOT, "public/models/security"));
   if (!allowed || !existsSync(path) || statSync(path).isDirectory()) return void res.writeHead(404).end();
   res.writeHead(200, { "content-type": TYPES[extname(path)] ?? "application/octet-stream" }).end(readFileSync(path));
 });
@@ -29,14 +30,16 @@ await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
 const port = (server.address() as { port: number }).port;
 mkdirSync(SHOTS, { recursive: true });
 const only = process.env.ONLY?.split(",");
-for (const name of Object.keys(PIECES)) {
+const dir = process.env.DIR;
+const names = dir === "security" ? ["desk", "crt", "chair"] : Object.keys(PIECES);
+for (const name of names) {
   if (only && !only.includes(name)) continue;
   // solid, wireframe, from behind, a close-up in a flashlight beam (how the player meets it), and the far version
   // (the one drawn past the LOD distance: compare it with "solid" for shape, not for small detail)
   for (const [suffix, query] of [["solid", ""], ["wire", "&wire=1"], ["solid_back", "&az=215"], ["close", "&lamp=1&zoom=0.45&ty=0.75&az=50"], ["far", "&far=1"], ["far_wire", "&far=1&wire=1"]] as const) {
-    const file = `${SHOTS}/kit_${name}_${suffix}.png`;
+    const file = `${SHOTS}/${dir ?? "kit"}_${name}_${suffix}.png`;
     const code = await new Promise<number | null>((done) => {
-      const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1000,800", "--virtual-time-budget=8000", `--screenshot=${file}`, `http://127.0.0.1:${port}/?m=${name}${query}`], { stdio: "ignore" });
+      const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1000,800", "--virtual-time-budget=8000", `--screenshot=${file}`, `http://127.0.0.1:${port}/?m=${name}${dir ? `&d=${dir}` : ""}${query}`], { stdio: "ignore" });
       const timer = setTimeout(() => chrome.kill(), 60_000);
       chrome.on("exit", (c) => {
         clearTimeout(timer);

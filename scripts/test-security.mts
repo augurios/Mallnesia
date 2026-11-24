@@ -58,6 +58,7 @@ check("calm: a feed never lies", Array.from({ length: 2000 }, (_, t) => new Moni
   check("not from another floor", !consoleInReach(px, py, CONSOLE.floor + 1, Math.atan2(CONSOLE.y - py, CONSOLE.x - px)));
 }
 check("camera ids and labels are unique", new Set(CAMERAS.map((c) => c.id)).size === CAMERAS.length && new Set(CAMERAS.map((c) => c.label)).size === CAMERAS.length);
+check("the cameras hang under the ceiling (3.5 m), clear of the near plane, so a feed never sees between floors", SECURITY.HEIGHT <= 3.5 - 0.3 && SECURITY.HEIGHT > 2.2);
 check("cameras cover all three floors", new Set(CAMERAS.map((c) => c.floor)).size === 3);
 
 if (existsSync("public/models/nav.json")) {
@@ -69,12 +70,36 @@ if (existsSync("public/models/nav.json")) {
     while (d < 80 && nav.sees(c.floor, c.x, c.y, c.x + Math.cos(a) * (d + 2), c.y + Math.sin(a) * (d + 2))) d += 2;
     return d;
   };
-  check("every camera looks down a long view (20 m or more)", CAMERAS.every((c) => reach(c) >= 20), CAMERAS.map((c) => `${c.id}:${reach(c)}`).join(" "));
+  // c8 watches the guard's office door from close by; every other camera looks down a long view
+  const office8 = CAMERAS.find((c) => c.id === "c8");
+  const wide = CAMERAS.filter((c) => c !== office8);
+  check("every camera but the office's looks down a long view (20 m or more)", wide.every((c) => reach(c) >= 20), wide.map((c) => `${c.id}:${reach(c)}`).join(" "));
+  check(
+    "the office camera sees the console through the doorway, and it is in the picture",
+    !!office8 &&
+      nav.sees(office8.floor, office8.x, office8.y, CONSOLE.x, CONSOLE.y + Math.sin(CONSOLE.facing) * (CONSOLE.hy + 0.2)) &&
+      Math.abs(Math.atan2(Math.sin(Math.atan2(CONSOLE.y - office8.y, CONSOLE.x - office8.x) - (office8.heading * Math.PI) / 180), Math.cos(Math.atan2(CONSOLE.y - office8.y, CONSOLE.x - office8.x) - (office8.heading * Math.PI) / 180))) < (SECURITY.FOV * Math.PI) / 360,
+  );
+  // the desk stands against the office wall: its footprint and the floor beside and in front of it must be open
+  const fx = Math.cos(CONSOLE.facing);
+  const fy = Math.sin(CONSOLE.facing);
   let free = true;
-  for (let dx = -CONSOLE.hx - 0.3; dx <= CONSOLE.hx + 0.3; dx += 0.25) for (let dy = -CONSOLE.hy - 0.3; dy <= CONSOLE.hy + 0.3; dy += 0.25) if (!nav.walkable(CONSOLE.floor, CONSOLE.x + dx, CONSOLE.y + dy)) free = false;
-  check("the console and its surroundings are on open floor", free);
+  for (let along = -CONSOLE.hx - 0.3; along <= CONSOLE.hx + 0.3; along += 0.25)
+    for (let out = -CONSOLE.hy + 0.05; out <= CONSOLE.hy + 0.3; out += 0.25)
+      if (!nav.walkable(CONSOLE.floor, CONSOLE.x + fx * out - fy * along, CONSOLE.y + fy * out + fx * along)) free = false;
+  check("the console and the floor around its front are open", free);
   check("the player's spot in front of it is open", nav.walkable(CONSOLE.floor, CONSOLE.x + Math.cos(CONSOLE.facing) * 1.4, CONSOLE.y + Math.sin(CONSOLE.facing) * 1.4));
 }
+
+// the console stands inside the guard's office on floor 3 (docs/floorplans, security_office)
+const plan = JSON.parse(readFileSync(`docs/floorplans/floor${CONSOLE.floor + 1}_plan.json`, "utf8")) as { boxes: { id: string; x0: number; x1: number; y0: number; y1: number }[] };
+const office = plan.boxes.find((b) => b.id === "security_office");
+const inOffice = (x: number, y: number) => !!office && x > office.x0 && x < office.x1 && y > office.y0 && y < office.y1;
+check(
+  "the console is inside the security office, all four corners",
+  [-1, 1].every((a) => [-1, 1].every((b) => inOffice(CONSOLE.x + Math.cos(CONSOLE.facing) * CONSOLE.hy * b - Math.sin(CONSOLE.facing) * CONSOLE.hx * a, CONSOLE.y + Math.sin(CONSOLE.facing) * CONSOLE.hy * b + Math.cos(CONSOLE.facing) * CONSOLE.hx * a))),
+);
+check("the office has its doorway on the north hall", plan.boxes.some((b) => b.id === "security_office_door" && office && b.y0 === office.y1 && b.y1 === 159));
 
 console.log(failed ? `\n${failed} FAILED` : "\nall good");
 process.exit(failed ? 1 : 0);

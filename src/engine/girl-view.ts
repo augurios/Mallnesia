@@ -1,18 +1,287 @@
 import * as THREE from "three";
 import { FLOOR_HEIGHT } from "./walk";
 
-// How the girl in white looks: a child-sized figure (about 1.3 m) in a long pale dress, head a little bowed under
-// long dark hair, arms hanging. A few primitives, unlit and cold, so she is a pale shape in the dark that fades in
-// and out (opacity). Placeholder shape for Augusto to judge by playing. Feet at y = 0, facing local +x.
+// How the girl in white looks. The real model (public/models/girl.glb, built by scripts/girl/build.sh: an MPFB child,
+// CC0, in a ragged, dirty first communion dress, veil and wreath modeled by script, loose messy hair grown over her in
+// her crying pose, with a "cry" clip authored over Quaternius' idle, CC0) is fetched by `load`, which the runtime calls
+// once the game is ready (she is not needed for minutes, so her download does not slow the loading screen); `ready` says
+// when she can be shown. If the model fails, a stand-in made of a few primitives is drawn. Feet at y = 0, facing local +x.
+//
+// She is a ghost: a little see-through even when fully there, glowing faintly cold from within and more at her edges,
+// with a soft aura round her and a dim cold light on what is near her. All of it breathes slowly and swells with each
+// sob, and all of it fades with her (opacity).
+//
+// See-through without seeing her insides: every mesh is drawn twice. First a depth-only copy (an unlit basic material),
+// then the colored mesh, blended, only where it is the nearest surface (depth test "less or equal" against the copy).
+// So the wall behind her shows through, but her far side, her body under the dress and the hair behind her head never do.
+
+export const GIRL_URL = "./models/girl.glb";
+/** Sobs per second in the cry clip (scripts/girl/cry.py: 6 in 8 s); the crying sound pulses at the same rate. */
+export const GIRL_SOB_HZ = 0.75;
+/** How much of her is there when she is fully there: 1 is solid. */
+const SPECTRAL = 0.7;
+/** Her own cold light: from within (the dress more than her skin and hair) and at her edges (a rim seen edge-on). */
+const GLOW = {
+  color: new THREE.Color(0.86, 0.9, 1.0),
+  dress: 0.13,
+  skin: 0.045,
+  rimColor: new THREE.Color(0.55, 0.68, 1.0),
+  rim: { dress: 0.5, skin: 0.32, hair: 0.1 },
+  rimPower: 2.4,
+};
+/** The soft aura round her (an additive glow behind her, seen round her outline) and the dim light she casts. */
+const AURA = { color: new THREE.Color(0.6, 0.72, 1.0), opacity: 0.11, width: 1.3, height: 1.9, centre: 0.7 };
+const LIGHT = { color: 0xa9bcff, intensity: 0.45, distance: 3.5, height: 0.8 };
+/** The cut-out threshold of the pieces that cut nothing out (they still test, so all of her shares one shader). */
+const ALPHA_FLOOR = 0.002;
 
 export interface GirlView {
   object: THREE.Object3D;
+  /** Her dim cold light. Always in the scene (dimmed to nothing when she is gone, so the shader count never changes). */
+  light: THREE.PointLight;
+  /** True once she can be shown: the real model is in and prepared (or it failed to load, and the stand-in stays). */
+  readonly ready: boolean;
+  /**
+   * Fetches the real model, once (she is not needed until well into the game, so it is not part of the loading
+   * screen). `prepare` gets it ready before it replaces the stand-in: compiles its shaders, uploads its textures.
+   */
+  load(prepare?: (model: THREE.Object3D) => Promise<void>): Promise<void>;
   /** Places her and sets how much of her is there (0 hides her). `facing` is the plan heading. */
   update(x: number, y: number, floor: number, facing: number, opacity: number, seconds: number): void;
   dispose(): void;
 }
 
-export function createGirlView(): GirlView {
+/** A loaded glTF, as GLTFLoader returns it (only what is used here). */
+export interface GirlGltf {
+  scene: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+}
+
+/** One way of drawing her: the stand-in or the real model. */
+interface GirlBody {
+  object: THREE.Object3D;
+  /** `opacity` is how much of her is there; `glow` scales her light (it breathes). */
+  setLook(opacity: number, glow: number): void;
+  animate(seconds: number): void;
+  dispose(): void;
+}
+
+/** Her glow breathes slowly and swells a little with each sob: about 0.8 to 1.2. */
+function girlGlowPulse(seconds: number): number {
+  const sob = Math.max(0, Math.sin(seconds * GIRL_SOB_HZ * 2 * Math.PI)) ** 3;
+  return 0.92 + 0.1 * Math.sin(seconds * 0.9) + 0.05 * Math.sin(seconds * 2.3 + 1.3) + 0.12 * sob;
+}
+
+export function createGirlView(fetchModel?: (url: string) => Promise<GirlGltf>): GirlView {
+  const root = new THREE.Group();
+  root.visible = false;
+  const holder = new THREE.Group(); // the body, swapped when the model arrives
+  root.add(holder);
+  let current: GirlBody = createStandIn();
+  holder.add(current.object);
+  const aura = createAura();
+  root.add(aura.sprite);
+  const light = new THREE.PointLight(LIGHT.color, 0, LIGHT.distance, 2);
+  let disposed = false;
+  let ready = !fetchModel; // with nothing to fetch, the stand-in is all there is
+  let loading: Promise<void> | null = null;
+  return {
+    object: root,
+    light,
+    get ready() {
+      return ready;
+    },
+    load(prepare) {
+      loading ??= (async () => {
+        try {
+          if (!fetchModel) return;
+          const gltf = await fetchModel(GIRL_URL);
+          if (disposed) return;
+          const real = createModelBody(gltf);
+          await prepare?.(real.object);
+          if (disposed) {
+            real.dispose();
+            return;
+          }
+          holder.remove(current.object);
+          current.dispose();
+          current = real;
+          holder.add(real.object);
+        } catch (err) {
+          console.warn("girl model failed to load; using the stand-in", err);
+        } finally {
+          ready = true;
+        }
+      })();
+      return loading;
+    },
+    update(x, y, floor, facing, opacity, seconds) {
+      root.visible = opacity > 0.003;
+      if (!root.visible) {
+        light.intensity = 0;
+        return;
+      }
+      const glow = girlGlowPulse(seconds);
+      const shimmer = 1 + 0.035 * Math.sin(seconds * 2.1) + 0.025 * Math.sin(seconds * 5.3 + 0.7); // never quite steady
+      root.position.set(x, floor * FLOOR_HEIGHT, -y);
+      root.rotation.y = facing;
+      current.setLook(Math.min(1, opacity * SPECTRAL * shimmer), glow);
+      current.animate(seconds);
+      aura.set(opacity * glow);
+      light.position.set(x, floor * FLOOR_HEIGHT + LIGHT.height, -y);
+      light.intensity = LIGHT.intensity * opacity * glow;
+    },
+    dispose() {
+      disposed = true;
+      current.dispose();
+      aura.dispose();
+      light.dispose();
+    },
+  };
+}
+
+/** The aura: a soft oval of cold light, drawn additively behind her (her body hides its middle) and through nothing solid. */
+function createAura() {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const dx = (i + 0.5) / size - 0.5;
+      const dy = (j + 0.5) / size - 0.5;
+      const r = Math.min(1, Math.sqrt(dx * dx + dy * dy) * 2);
+      const a = Math.exp(-r * r * 3.2) * (1 - r * r);
+      const k = (j * size + i) * 4;
+      data[k] = data[k + 1] = data[k + 2] = 255;
+      data[k + 3] = Math.round(a * 255);
+    }
+  }
+  const map = new THREE.DataTexture(data, size, size);
+  map.magFilter = map.minFilter = THREE.LinearFilter;
+  map.needsUpdate = true;
+  const material = new THREE.SpriteMaterial({
+    map,
+    color: AURA.color,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0,
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(AURA.width, AURA.height, 1);
+  sprite.position.y = AURA.centre;
+  sprite.renderOrder = 4; // after her (see createModelBody)
+  return {
+    sprite,
+    set(amount: number) {
+      material.opacity = AURA.opacity * amount;
+    },
+    dispose() {
+      map.dispose();
+      material.dispose();
+    },
+  };
+}
+
+type RimMaterial = THREE.MeshStandardMaterial & { userData: { base: number; glow: number; rim: { value: number } } };
+
+function createModelBody(gltf: GirlGltf): GirlBody {
+  const model = gltf.scene;
+  model.rotation.y = Math.PI / 2; // the model faces +z; she faces local +x
+  const object = new THREE.Group();
+  object.add(model);
+  const rimColor = { value: GLOW.rimColor.clone() };
+  // One program for all her pieces, and one for all their depth copies: every piece gets a texture (a white texel where
+  // it has none), a cut-out threshold (a tiny one where nothing is cut out), both sides in one pass, and the same
+  // shader edits. Each extra variant is one more program to compile while the game loads.
+  const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  white.needsUpdate = true;
+  const mats: RimMaterial[] = [];
+  const depthMats = new Map<THREE.Material, THREE.MeshBasicMaterial>();
+  const meshes: THREE.Mesh[] = [];
+  model.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+  });
+  for (const mesh of meshes) {
+    mesh.frustumCulled = false; // skinned: the bind-pose bounds do not follow the animation
+    const m = mesh.material as RimMaterial;
+    const veil = m.transparent; // the tulle is blended already: drawn last, with no depth copy
+    if (!mats.includes(m)) {
+      mats.push(m);
+      m.userData.base = veil ? m.opacity : 1;
+      const body = /skin|hair|eyebrow|eyelash|eyes/.test(m.name);
+      m.userData.glow = body ? GLOW.skin : GLOW.dress;
+      m.map ??= white;
+      m.emissive = GLOW.color.clone();
+      m.emissiveMap = m.map;
+      const cut = m.alphaTest; // the loader's threshold for the cut-outs (lace, rags, hair), 0 for the rest
+      if (!veil) {
+        // the depth copy: no colour and no lighting, only the shape, with the cut-outs at their own threshold
+        depthMats.set(m, new THREE.MeshBasicMaterial({ map: m.map, alphaTest: cut || ALPHA_FLOOR, colorWrite: false, transparent: true, side: THREE.DoubleSide, forceSinglePass: true })); // transparent: drawn with the see-through things, after everything solid
+      }
+      m.alphaTest = /hair|eyebrow|eyelash/.test(m.name) ? 0.12 : cut || ALPHA_FLOOR; // the colored pass lets hair fray softly below the depth copy's threshold
+      m.side = THREE.DoubleSide; // the depth copies keep only the nearest surface, so the far sides never show
+      m.forceSinglePass = true;
+      m.transparent = true;
+      m.depthWrite = false;
+      m.userData.rim = { value: /hair|eyebrow|eyelash/.test(m.name) ? GLOW.rim.hair : body ? GLOW.rim.skin : GLOW.rim.dress };
+      m.onBeforeCompile = (shader) => {
+        shader.uniforms.uRimColor = rimColor;
+        shader.uniforms.uRim = m.userData.rim;
+        shader.fragmentShader = shader.fragmentShader
+          .replace("#include <common>", "#include <common>\nuniform vec3 uRimColor;\nuniform float uRim;")
+          // the cut-out threshold follows her opacity, so the cut-outs keep their shape while she fades in and out
+          .replace("#include <alphatest_fragment>", "#ifdef USE_ALPHATEST\nif ( diffuseColor.a < alphaTest * opacity ) discard;\n#endif")
+          .replace(
+            "#include <emissivemap_fragment>",
+            `#include <emissivemap_fragment>
+            totalEmissiveRadiance += uRimColor * uRim * pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), ${GLOW.rimPower.toFixed(2)});`,
+          );
+      };
+      m.customProgramCacheKey = () => "girl-rim";
+      m.needsUpdate = true;
+    }
+    mesh.renderOrder = veil ? 3 : 2;
+    const depthMat = depthMats.get(m);
+    if (depthMat && mesh.parent) {
+      const copy = mesh.clone(false) as THREE.Mesh; // a skinned copy shares the skeleton, so it moves with her
+      copy.material = depthMat;
+      copy.renderOrder = 1;
+      mesh.parent.add(copy);
+    }
+  }
+  const mixer = new THREE.AnimationMixer(model);
+  const cry = gltf.animations.find((a) => a.name === "cry") ?? gltf.animations.find((a) => a.name === "idle");
+  if (cry) mixer.clipAction(cry).play();
+  let last = -1;
+  return {
+    object,
+    setLook(opacity, glow) {
+      for (const m of mats) {
+        m.opacity = m.userData.base * opacity;
+        m.emissiveIntensity = m.userData.glow * glow;
+      }
+      rimColor.value.copy(GLOW.rimColor).multiplyScalar(glow);
+    },
+    animate(seconds) {
+      const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, seconds - last));
+      last = seconds;
+      mixer.update(dt);
+    },
+    dispose() {
+      mixer.stopAllAction();
+      for (const mesh of meshes) mesh.geometry.dispose();
+      for (const m of mats) {
+        m.map?.dispose();
+        m.dispose();
+      }
+      for (const m of depthMats.values()) m.dispose();
+      white.dispose();
+    },
+  };
+}
+
+/** The stand-in: a child-sized figure (about 1.3 m) in a long pale dress, head a little bowed, arms hanging. */
+function createStandIn(): GirlBody {
   const mats: THREE.MeshBasicMaterial[] = [];
   const mat = (color: number, base: number) => {
     const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
@@ -20,16 +289,15 @@ export function createGirlView(): GirlView {
     mats.push(m);
     return m;
   };
-  const dress = mat(0xc4cad6, 0.85);
-  const skin = mat(0xaeb4bf, 0.85);
-  const hair = mat(0x07080b, 0.95);
+  const dress = mat(0xc4cad6, 1);
+  const skin = mat(0xaeb4bf, 1);
+  const hair = mat(0x07080b, 1);
   const geos: THREE.BufferGeometry[] = [];
   const g = <T extends THREE.BufferGeometry>(geo: T) => {
     geos.push(geo);
     return geo;
   };
   const root = new THREE.Group();
-  root.visible = false;
   const body = new THREE.Group();
   root.add(body);
 
@@ -47,7 +315,7 @@ export function createGirlView(): GirlView {
   const gown = new THREE.Mesh(g(new THREE.LatheGeometry(profile, 14)), dress);
   gown.scale.set(0.8, 1, 1);
   body.add(gown);
-  // the head hangs forward a little; the hair falls from the crown down the back to the waist
+  // the head hangs forward a little; the hair falls loose from the crown, over the shoulders to the waist
   const head = new THREE.Mesh(g(new THREE.SphereGeometry(0.1, 12, 10)), skin);
   head.scale.set(0.92, 1.1, 0.92);
   head.position.set(0.05, 1.22, 0);
@@ -70,13 +338,11 @@ export function createGirlView(): GirlView {
 
   return {
     object: root,
-    update(x, y, floor, facing, opacity, seconds) {
-      root.visible = opacity > 0.003;
-      if (!root.visible) return;
-      root.position.set(x, floor * FLOOR_HEIGHT, -y);
-      root.rotation.y = facing;
-      body.rotation.z = 0.04 * Math.sin(seconds * 0.7); // never quite still
+    setLook(opacity) {
       for (const m of mats) m.opacity = opacity * (m.userData.base as number);
+    },
+    animate(seconds) {
+      body.rotation.z = 0.04 * Math.sin(seconds * 0.7); // never quite still
     },
     dispose() {
       geos.forEach((geo) => geo.dispose());

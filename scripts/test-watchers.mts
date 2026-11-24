@@ -2,7 +2,8 @@
 // on the real mall. Run: npm run test:watchers   (the mall check needs npm run assets)
 import { existsSync, readFileSync } from "node:fs";
 import { NavGrid, type NavData } from "../src/engine/nav.ts";
-import { WATCH, Watchers, targetCount, type WatchContext } from "../src/engine/watchers.ts";
+import { FEED, FeedWatchers, WATCH, Watchers, seatsFromProps, targetCount, type FeedContext, type WatchContext } from "../src/engine/watchers.ts";
+import { CAMERAS } from "../src/engine/security.ts";
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail = "") => {
@@ -115,6 +116,97 @@ if (existsSync("public/models/nav.json")) {
   const after = w.list.map((x) => Math.hypot(x.x - c.px, x.y - c.py));
   check("and they close in, never within the stop distance", after.every((d) => d >= WATCH.STOP_DISTANCE - 0.1) && Math.min(...after) < Math.min(...before), `${Math.min(...before).toFixed(0)} -> ${Math.min(...after).toFixed(1)} m`);
   check("still on walkable floor after walking", w.list.every((x) => real.walkable(1, x.x, x.y)));
+}
+
+{
+  // seats from the props: a table set's four chairs face its middle; a bench's three places face away from its wall
+  const seats = seatsFromProps({ table_set: [10, 5, -20, 0.3], bench_red: [30, 0, -5, Math.PI / 2] }, 5);
+  const chairs = seats.filter((s) => s.floor === 1);
+  check("a table set gives four seats, on its floor", chairs.length === 4 && chairs.every((s) => Math.abs(s.height - 0.45) < 1e-9));
+  check("each chair faces the table", chairs.every((s) => Math.cos(s.heading - Math.atan2(20 - s.y, 10 - s.x)) > 0.9), chairs.map((s) => `${s.x.toFixed(2)},${s.y.toFixed(2)}`).join(" "));
+  check("all within a meter of the table's middle", chairs.every((s) => Math.hypot(s.x - 10, s.y - 20) < 1));
+  const bench = seats.filter((s) => s.floor === 0);
+  // bench yaw PI/2 turns its +x (facing) to world -z, plan +y
+  check("a bench gives three seats facing out", bench.length === 3 && bench.every((s) => Math.abs(Math.sin(s.heading) - 1) < 1e-6), bench.map((s) => s.heading.toFixed(2)).join(" "));
+
+  // seated: never walks; changes seats only while unobserved, toward the player, never closer than HOP_MIN
+  const row = Array.from({ length: 12 }, (_, k) => ({ x: 14.5 + k * 4, y: 20.5, floor: 0, heading: Math.PI, height: 0.45 }));
+  const w = new Watchers(seeded(4));
+  w.seats = row;
+  const sitter = w.sit(row[row.length - 1]);
+  const at0 = [sitter.x, sitter.y];
+  for (let t = 0; t < 20; t += 1 / 30) w.update(1 / 30, ctx({ sanity: 1, observed: () => true }));
+  check("seated and watched: it never moves", sitter.x === at0[0] && sitter.y === at0[1] && sitter.frozen);
+  check("its head turns toward the player, its body stays with the seat", sitter.facing === Math.PI && Math.abs(sitter.headTurn ?? 1) < 1e-6);
+  const visits = new Set<number>();
+  let minD = Infinity;
+  for (let t = 0; t < 60; t += 1 / 30) {
+    const before = sitter.x;
+    w.update(1 / 30, ctx({ sanity: 1 }));
+    if (sitter.x !== before) visits.add(sitter.x);
+    minD = Math.min(minD, Math.hypot(sitter.x - 10.5, sitter.y - 20.5));
+  }
+  check("unwatched: it changes seats, several times in a minute", visits.size >= 4, `${visits.size} seats`);
+  check("always on a seat", row.some((s) => s === sitter.seat && s.x === sitter.x));
+  check("and never closer than the hop minimum", minD >= WATCH.HOP_MIN - 1e-6, `${minD.toFixed(1)} m`);
+  check("it ends up nearer the player than it started", Math.hypot(sitter.x - 10.5, 0) < Math.hypot(at0[0] - 10.5, 0) - 10, `${(at0[0] - 10.5).toFixed(0)} -> ${(sitter.x - 10.5).toFixed(0)} m`);
+  const two = new Watchers(seeded(5));
+  two.seats = row.slice(0, 3);
+  const a1 = two.sit(row[1]);
+  const a2 = two.sit(row[2]);
+  for (let t = 0; t < 30; t += 1 / 30) two.update(1 / 30, ctx({ sanity: 1 }));
+  check("two never share a seat", a1.seat !== a2.seat);
+  // natural spawns: with seats around, some of them sit
+  const many = new Watchers(seeded(6));
+  many.seats = Array.from({ length: 40 }, (_, k) => ({ x: 30.5 + (k % 10) * 4, y: 6.5 + Math.floor(k / 10) * 9, floor: 0, heading: 0, height: 0.45 }));
+  let seated = 0;
+  let standing = 0;
+  for (let run = 0; run < 30; run++) {
+    many.clear();
+    for (let t = 0; t < 30 && many.list.length === 0; t += 0.1) many.update(0.1, ctx({ sanity: 0.7 }));
+    if (many.list[0]?.seat) seated++;
+    else if (many.list[0]) standing++;
+  }
+  check("some new ones sit, most stand", seated >= 4 && standing >= seated, `${seated} sat, ${standing} stood`);
+}
+
+// the security feeds: a couple on random cameras, never piled up, frozen while their feed is on screen
+if (existsSync("public/models/nav.json")) {
+  const real = NavGrid.fromData(JSON.parse(readFileSync("public/models/nav.json", "utf8")) as NavData);
+  const f = new FeedWatchers(seeded(21));
+  const c: FeedContext = { nav: real, cameras: CAMERAS, shown: 0, sanity: 0 };
+  let most = 0;
+  const camsUsed = new Set<number>();
+  let inView = true;
+  for (let t = 0; t < 240; t += 0.1) {
+    c.shown = Math.floor(t / 7) % CAMERAS.length; // the player flicks through the cameras
+    f.update(0.1, c);
+    most = Math.max(most, f.list.length);
+    for (const w of f.list) {
+      const ci = f.cameraOf(w)!;
+      camsUsed.add(ci);
+      const cam = CAMERAS[ci];
+      const off = Math.abs(Math.atan2(Math.sin(Math.atan2(w.y - cam.y, w.x - cam.x) - (cam.heading * Math.PI) / 180), Math.cos(Math.atan2(w.y - cam.y, w.x - cam.x) - (cam.heading * Math.PI) / 180)));
+      if (w.floor !== cam.floor || !real.walkable(w.floor, w.x, w.y) || !real.sees(cam.floor, cam.x, cam.y, w.x, w.y) || off > FEED.CONE + 1e-6 || Math.hypot(w.x - cam.x, w.y - cam.y) < FEED.CLOSEST - 0.01) inView = false;
+    }
+  }
+  check("feeds: at low sanity a couple appear, never more than two", most >= 1 && most <= FEED.MAX, `${most}`);
+  check("feeds: each stands in its camera's view, on open floor, not too close to the lens", inView);
+  check("feeds: they turn up on different cameras over time", camsUsed.size >= 3, `${camsUsed.size} cameras`);
+  check("feeds: two never share a camera", new Set(f.list.map((w) => f.cameraOf(w))).size === f.list.length);
+  // frozen while its feed is on screen
+  const w0 = f.list[0];
+  if (w0) {
+    c.shown = f.cameraOf(w0)!;
+    const at = [w0.x, w0.y];
+    for (let t = 0; t < 60; t += 0.1) f.update(0.1, c);
+    check("feeds: on screen it never moves, and it costs sanity", w0.x === at[0] && w0.y === at[1] && w0.frozen && f.drain >= WATCH.DRAIN - 1e-12);
+  }
+  const calm = new FeedWatchers(seeded(3));
+  for (let t = 0; t < 60; t += 0.1) calm.update(0.1, { ...c, sanity: 1 });
+  check("feeds: none when calm", calm.list.length === 0);
+  f.clear();
+  check("feeds: cleared when the player leaves the console", f.list.length === 0);
 }
 
 console.log(failed ? `\n${failed} FAILED` : "\nall good");

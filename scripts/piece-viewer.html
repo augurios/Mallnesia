@@ -3,7 +3,8 @@
   <body style="margin:0;background:#30343a">
     <!-- Used by scripts/piece-shots.mts: shows one kit piece with the game's surface styling, solid or as a wireframe.
          ?m=<name>&wire=1&az=<degrees>&zoom=<1 = whole piece>&ty=<0..1, height looked at>&lamp=1 (dark, lit by a flashlight)
-         &far=1 (the far version: the "_far" nodes instead of the near ones) -->
+         &far=1 (the far version: the "_far" nodes instead of the near ones)
+         &d=security (an imported model from public/models/security/, shown with its own textures) -->
     <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
     <script type="module">
       import * as THREE from "three";
@@ -25,7 +26,8 @@
         sun.position.set(2, 3, 4);
         s.add(sun);
       } else s.environmentIntensity = 0.15;
-      const g = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`/public/models/kit/${q.get("m")}.glb`);
+      const g = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`/public/models/${q.get("d") || "kit"}/${q.get("m")}.glb`);
+      const imported = !!q.get("d");
       g.scene.traverse((o) => {
         if (!o.isMesh) return;
         if (o.material.name === "barrier") o.visible = false; // the collider
@@ -33,7 +35,7 @@
         else if (q.get("wire")) o.material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
         else o.material.side = THREE.DoubleSide;
       });
-      if (!q.get("wire")) styleBlockout(g.scene, true);
+      if (!q.get("wire") && !imported) styleBlockout(g.scene, true);
       s.add(g.scene);
       const b = new THREE.Box3().setFromObject(g.scene);
       const c = b.getCenter(new THREE.Vector3());

@@ -17,6 +17,7 @@ export default function GameCanvas() {
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
+  const [tip, setTip] = useState<"move" | "flashlight" | null>(null);
   const [note, setNote] = useState<{ title: string; body: string[] } | null>(null);
   const [monitor, setMonitor] = useState<{ label: string; index: number; total: number; glitch: number; clock: string } | null>(null);
   // Loading (the runtime reports it). ?loading=<0 to 1> holds the screen at that progress, for screenshots and design.
@@ -36,6 +37,7 @@ export default function GameCanvas() {
       },
       onStatus: setStatus,
       onSubtitle: setSubtitle,
+      onTip: setTip,
       onNote: setNote,
       onMonitor: setMonitor,
       onLoad: setLoad,
@@ -95,11 +97,34 @@ export default function GameCanvas() {
         </div>
       )}
       {status && (
-        <div className="game-flashlight" aria-label={es.flashlight}>
-          <div
-            className={status.flashlightOn ? "game-flashlight-fill on" : "game-flashlight-fill"}
-            style={{ width: `${Math.round(status.charge * 100)}%` }}
-          />
+        <div className="game-vitals">
+          <label className={status.sanity < 0.3 ? "critical" : undefined}>
+            {es.sanity}
+            <meter min={0} max={100} low={30} optimum={100} value={Math.round(status.sanity * 100)} />
+            <span>{Math.ceil(status.sanity * 100)}%</span>
+          </label>
+          <label className={status.exhausted ? "critical" : undefined}>
+            {es.stamina}
+            <meter min={0} max={100} low={30} optimum={100} value={Math.round(status.stamina * 100)} />
+          </label>
+          <label className={status.flashlightOn ? "lit" : undefined}>
+            {es.flashlight}
+            <meter min={0} max={100} low={15} optimum={100} value={Math.round(status.charge * 100)} />
+          </label>
+        </div>
+      )}
+      {locked && tip && <div className="game-tip">{es.tips[tip]}</div>}
+      {locked && monitor && (
+        <div className="game-monitor" style={{ ["--glitch" as string]: monitor.glitch }} aria-label={monitor.label}>
+          <div className="game-monitor-top">
+            <span>
+              <i className="game-monitor-rec" /> {monitor.label}
+            </span>
+            <span>{monitor.clock}</span>
+          </div>
+          <div className="game-monitor-bottom">
+            {monitor.index + 1} / {monitor.total} · {es.monitorHelp}
+          </div>
         </div>
       )}
       {locked && monitor && (

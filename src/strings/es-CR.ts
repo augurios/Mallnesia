@@ -9,12 +9,17 @@ export const es = {
   debugDoors: "O: forzar la puerta más cercana, K: azotarla (provisional)",
   debugSanity: "Z / X: bajar / subir la cordura (provisional)",
   prompts: { interact: "Presiona E para interactuar", hide: "Presiona E para esconderte", leave: "Presiona E para salir", read: "Presiona E para leer", close: "Presiona E para cerrar", monitor: "Presiona E para ver las cámaras" },
+  // Controls hints after the guard's opening: the movement ones once he has spoken, the flashlight one once he is gone.
+  tips: { move: "WASD para moverse · Ratón para mirar · Shift para correr", flashlight: "F para linterna" },
   doorLocked: "No cede",
   checkpoint: "Punto de control",
-  // The guard's opening (he is a real, ordinary worker). Words for Augusto to review.
-  guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Termino mi ronda y vuelvo. Mejor que ya no lo encuentre aquí."],
-  garageDone: "La línea se corta. Estás otra vez en el piso de los parqueos.",
-  debugGarage: "P: entrar o salir del parqueo (provisional); ?garageseed=random cambia el parqueo",
+  // The guard's opening (he is a real, ordinary worker). Genre neutral: usted and "le", never lo/la or señor/señora. Words for Augusto to review.
+  guardOpening: ["Disculpe, ya cerramos.", "El mall cerró hace rato; no puede estar aquí.", "Voy a hacer mi ronda, Mejor que ya no le encuentre aquí."],
+  // The girl in white calling for her parents (words for Augusto to review).
+  girlCalls: ["¿Mami?", "¿Papi? ¿Dónde estás?", "Mami, tengo miedo...", "No me dejen sola...", "¿Mami? ¿Me oyes?"],
+  rampArrive: "Otro nivel. Lejos, algo suena donde entra la luz.",
+  garageDone: "La línea se corta. Atrás, por donde entraste, algo se abrió.",
+  debugGarage: "P: entrar o salir del parqueo (provisional); ?garageseed=random cambia el parqueo; ?area=ramp entra por una rampa",
   // The notes. DRAFT WORDS for Augusto to rewrite: they follow the content guidelines (a fictional mall, no real names or
   // crimes) and hint each exit's rule. Keyed by the ids in src/engine/notes.ts.
   notes: {
@@ -43,6 +48,8 @@ export const es = {
   savedAt: "Guardada",
   floor: "Piso",
   flashlight: "Linterna",
+  stamina: "Aguante",
+  sanity: "Cordura",
   paused: "Pausa",
   resume: "Continuar",
   quality: "Calidad gráfica",
