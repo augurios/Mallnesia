@@ -114,6 +114,8 @@ export interface WatchContext {
   py: number;
   floor: number;
   sanity: number;
+  /** At least this many, whatever the sanity (the escort calls them: escort.ts). */
+  want?: number;
   /** Whether the player can see a watcher standing at the plan point right now (in view, in line of sight). */
   observed(x: number, y: number): boolean;
 }
@@ -182,7 +184,7 @@ export class Watchers {
       this.list.length = 0;
       return;
     }
-    const want = targetCount(ctx.sanity);
+    const want = Math.max(targetCount(ctx.sanity), ctx.want ?? 0);
     // changing floor takes them away: the mall rearranges itself
     for (let i = this.list.length - 1; i >= 0; i--) if (this.list[i].floor !== ctx.floor) this.list.splice(i, 1);
     // too many (sanity recovered), or too far: the unseen ones go

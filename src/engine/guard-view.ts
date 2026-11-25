@@ -125,7 +125,7 @@ export function createGuardView(fetchModel?: (url: string) => Promise<GuardGltf>
   root.add(holder);
   const light = new THREE.PointLight(0xffe2b0, 0, 9, 1.6);
   root.add(light);
-  // a soft glow at the flashlight's lens, so his light can be seen from far down a hall (additive, not fogged)
+  // a soft glow at the flashlight's lens, so his light can be seen from far down a hall (additive, not fogged);
   const glowCanvas = document.createElement("canvas");
   glowCanvas.width = glowCanvas.height = 64;
   const gg = glowCanvas.getContext("2d")!;
@@ -136,8 +136,9 @@ export function createGuardView(fetchModel?: (url: string) => Promise<GuardGltf>
   gg.fillStyle = grad;
   gg.fillRect(0, 0, 64, 64);
   const glowTex = new THREE.CanvasTexture(glowCanvas);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true, opacity: 0.9 }));
-  glow.scale.set(0.9, 0.9, 1);
+  // a fixed size on screen (no size attenuation): a point of light far down a hall, small against him up close
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true, opacity: 0.75, sizeAttenuation: false }));
+  glow.scale.set(0.045, 0.045, 1);
   glow.visible = false;
   root.add(glow);
   let current: GuardBody = createStandIn();

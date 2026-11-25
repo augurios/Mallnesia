@@ -127,6 +127,10 @@ There are two ways to win. Either one ends the game.
 ### Finding the guard
 
 - He escorts the player out; the player just follows, with no puzzle.
+- **To the nearest exit (decided):** the shortest walk from where they meet, among the main entrance, the side exit (floor 1) and the north exit at the end of floor 2's narrow hall. He really walks there, up or down the stairs; no fade.
+- **The mall fights to keep the player (decided):** during the walk the legends manifest, harder as the exit nears: the watchers gather, the girl in white waits on the way ahead, the shadow hunts (his flashlight gives the player away, so they must break off and hide), night noises, falling objects, flickering lights, and the radio's "mire atrás". See `src/engine/escort.ts`.
+- **He sees nothing (decided):** he is an ordinary worker and the mall shows each visitor something different; he stays calm, a bit impatient, when the player stops.
+- **Losing him (decided):** fall too far behind for too long, faint, or be caught by the shadow, and the mall takes him; he returns to his rounds elsewhere later and has to be found again.
 - It is the easier, social ending, and it depends on luck, timing, and good scouting.
 - **Ending tone:** the mall lets the player go.
 

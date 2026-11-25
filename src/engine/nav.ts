@@ -2,16 +2,39 @@
 // scripts/test-shadow.mts runs the exact code the game runs. Built by scripts/build-nav.mts (public/models/nav.json),
 // 1 m cells, one pair of planes per floor. Plan coordinates throughout (meters, x east, y north).
 //
-// Stairs are not on the map: the shadow stays on one floor (see shadow.ts).
+// Stairs are not on the map: the shadow stays on one floor (see shadow.ts). The guard uses them: `stairs` are links
+// between floors (one per flight pair, built by scripts/build-nav.mts) and `findRoute` plans a walk across floors.
 
 export interface NavData {
   cell: number;
   nx: number;
   ny: number;
   floors: { walk: string; opaque: string }[];
+  stairs?: StairLink[];
 }
 
 export type Pt = [number, number];
+
+/** One stair between `floor` and the floor above: plan points with heights (m) above `floor`, from a hall cell at its
+ * foot to one at its top. */
+export interface StairLink {
+  id: string;
+  floor: number;
+  pts: [number, number, number][];
+}
+
+/** A point of a walk across floors: plan x, y, and the height in meters above the ground floor. */
+export type RoutePt = [number, number, number];
+
+const pathLength = (x: number, y: number, pts: Pt[]) => {
+  let len = 0;
+  for (const [px, py] of pts) {
+    len += Math.hypot(px - x, py - y);
+    x = px;
+    y = py;
+  }
+  return len;
+};
 
 const decode = (b64: string, count: number): Uint8Array => {
   const bin = atob(b64);
@@ -36,6 +59,8 @@ export class NavGrid {
   private stamp: Uint32Array;
   private closed: Uint32Array;
   private run = 0;
+  /** The stairs between floors (empty when the data has none). */
+  stairs: StairLink[] = [];
 
   constructor(nx: number, ny: number, cell: number, floors: { walk: Uint8Array; opaque: Uint8Array }[]) {
     this.nx = nx;
@@ -51,7 +76,68 @@ export class NavGrid {
 
   static fromData(data: NavData): NavGrid {
     const n = data.nx * data.ny;
-    return new NavGrid(data.nx, data.ny, data.cell, data.floors.map((f) => ({ walk: decode(f.walk, n), opaque: decode(f.opaque, n) })));
+    const nav = new NavGrid(data.nx, data.ny, data.cell, data.floors.map((f) => ({ walk: decode(f.walk, n), opaque: decode(f.opaque, n) })));
+    nav.stairs = data.stairs ?? [];
+    return nav;
+  }
+
+  /**
+   * The shortest walk from a point on one floor to a point on another (or the same) floor, taking the stairs: every
+   * choice of stair for each floor crossed is tried. `floorHeight` turns floors into heights. Null if there is no way.
+   */
+  findRoute(f0: number, x0: number, y0: number, f1: number, x1: number, y1: number, floorHeight: number): { pts: RoutePt[]; length: number } | null {
+    const step = f1 > f0 ? 1 : -1;
+    // the stair choices for each floor crossed, in walking order
+    const crossings: { link: StairLink; up: boolean }[][] = [];
+    for (let f = f0; f !== f1; f += step) {
+      const lower = step > 0 ? f : f - 1;
+      crossings.push(this.stairs.filter((s) => s.floor === lower).map((link) => ({ link, up: step > 0 })));
+      if (!crossings[crossings.length - 1].length) return null;
+    }
+    const legs = new Map<string, { pts: Pt[]; length: number } | null>();
+    const leg = (f: number, ax: number, ay: number, bx: number, by: number) => {
+      const key = `${f}:${ax},${ay}:${bx},${by}`;
+      if (!legs.has(key)) {
+        const pts = this.findPath(f, ax, ay, bx, by);
+        legs.set(key, pts ? { pts, length: pathLength(ax, ay, pts) } : null);
+      }
+      return legs.get(key)!;
+    };
+    let best: { pts: RoutePt[]; length: number } | null = null;
+    const choose = (k: number, picked: { link: StairLink; up: boolean }[]) => {
+      if (k < crossings.length) {
+        for (const c of crossings[k]) choose(k + 1, [...picked, c]);
+        return;
+      }
+      const pts: RoutePt[] = [];
+      let length = 0;
+      let f = f0;
+      let x = x0;
+      let y = y0;
+      for (const { link, up } of picked) {
+        const walk = up ? link.pts : [...link.pts].reverse();
+        const l = leg(f, x, y, walk[0][0], walk[0][1]);
+        if (!l) return;
+        length += l.length;
+        for (const [px, py] of l.pts) pts.push([px, py, f * floorHeight]);
+        for (let i = 1; i < walk.length; i++) {
+          const [ax, ay, ah] = walk[i - 1];
+          const [bx, by, bh] = walk[i];
+          length += Math.hypot(bx - ax, by - ay, bh - ah);
+          pts.push([bx, by, link.floor * floorHeight + bh]);
+        }
+        f += up ? 1 : -1;
+        [x, y] = [walk[walk.length - 1][0], walk[walk.length - 1][1]];
+        if (best && length >= best.length) return;
+      }
+      const l = leg(f, x, y, x1, y1);
+      if (!l) return;
+      length += l.length;
+      for (const [px, py] of l.pts) pts.push([px, py, f * floorHeight]);
+      if (!best || length < best.length) best = { pts, length };
+    };
+    choose(0, []);
+    return best;
   }
 
   /** Closes a rectangle (plan meters) on every floor: nobody walks there and sight does not enter (the parking strip, dressed as the garage). */

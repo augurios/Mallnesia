@@ -13,6 +13,7 @@
     "test:walk": "npm run assets --silent && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-walk.mts",
     "test:shadow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-shadow.mts",
     "test:rounds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-rounds.mts",
+    "test:escort": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-escort.mts",
     "test:security": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-security.mts",
     "test:notes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-notes.mts",
     "test:watchers": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-watchers.mts",

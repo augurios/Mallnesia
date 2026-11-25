@@ -110,6 +110,8 @@ const VIEWS: { name: string; floor: number; x: number; y: number; yaw: number; p
   { name: "feed_office_shadow", floor: 3, x: 21, y: 152.4, yaw: 180, pitch: 0, extra: "&monitor=1&cam=8&shadowat=21,161.5&girl=off&watchers=off&guard=off&noise=off" },
   // the guard on his rounds, 11 m down the hall with his flashlight (?roundsat=x,y,floor)
   { name: "guard_rounds", floor: 1, x: 72, y: 20, yaw: 0, pitch: 0, extra: "&roundsat=72,32,1&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=1.5" },
+  // the guard met on floor 2 (placed 2.5 m ahead, so the meeting starts by itself); headless runs too few frames for the walk
+  { name: "guard_meet", floor: 2, x: 48, y: 100, yaw: 0, pitch: 0, extra: "&roundsat=48,102.5,2&forcerun=1&girl=off&watchers=off&shadow=off&guard=off&noise=off&ambient=1.5" },
   { name: "atrium_floor2", floor: 2, x: 48, y: 100, yaw: 270, pitch: 0 },
   // lit up (ambient) to judge shapes, not the night look
   { name: "bridge_from_floor3", floor: 3, x: 48.5, y: 126, yaw: 320, pitch: -28, extra: "&ambient=30&fov=80" },

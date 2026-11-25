@@ -36,7 +36,8 @@ export const es = {
   monitorHelp: "← → o A D: cambiar de cámara · E o Esc: salir",
   // The guard when he finds the player, and the ending. DRAFT WORDS for Augusto to review.
   guardMeet: ["¡Ahí está! Qué susto, ya me tenía preocupado.", "Usted no debería estar aquí a esta hora. Venga, yo lo saco.", "Sígame y no se me quede atrás."],
-  guardWaiting: "¿Viene? No me gusta quedarme quieto aquí.",
+  // He sees none of what the mall shows the player on the way out: only someone who keeps stopping. Calm, a bit impatient.
+  guardWaiting: ["¿Viene? No me gusta quedarme quieto aquí.", "¿Qué le pasa? Sígame, es por aquí.", "No se me quede atrás.", "Calma, aquí no hay nadie más. Venga.", "Ya casi llegamos, no se detenga."],
   guardArrived: "Ya llegamos. Salga, y no vuelva de noche.",
   endingGuardTitle: "El centro comercial te deja ir.",
   endingGuardText: "Esta vez.",

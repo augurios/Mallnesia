@@ -6,12 +6,13 @@
 //            half a meter of room to every wall), not a stair zone, and no kit piece within reach of it;
 //   opaque - it blocks sight: any of its grid cells is a wall block or outside. Voids (the atrium upstairs), glass
 //            and low props do not block sight.
-// Stairs are not walkable here on purpose: the shadow stays on one floor and the mall moves it between floors.
+// Stairs are not walkable here on purpose: the shadow stays on one floor and the mall moves it between floors. The
+// guard does use them: `stairs` lists each flight as a link between two floors (see below).
 import { readFileSync, writeFileSync } from "node:fs";
 import { NX, NY, CELL, WALK, SOLIDC, EMPTY } from "./blockout/config.mts";
 import { floors, at, kindAt } from "./blockout/grid.mts";
 import { paintGrid } from "./blockout/paint.mts";
-import { isZone } from "./blockout/towers.mts";
+import { isZone, TOWERS, ST, towerPt } from "./blockout/towers.mts";
 import { PIECES } from "./kit/pieces.mts";
 
 const NAV_CELL = 1;
@@ -64,6 +65,53 @@ for (const [name, flat] of Object.entries(props.instances)) {
   }
 }
 
+// Stair links, for the guard (who walks people out, up and down the stairs; the shadow still stays on one floor).
+// Each tower carries one flight pair per floor: up the west lane to the round landing, back down the east lane to the
+// hall end of the floor above. A link is that walk as plan points with heights above the lower floor, from a hall cell
+// just outside the stair on the lower floor to one just outside it on the upper floor.
+const FLOOR_H = 5;
+const snap = (fi: number, x: number, y: number): [number, number] | null => {
+  for (let r = 0; r <= 3; r++)
+    for (let dj = -r; dj <= r; dj++)
+      for (let di = -r; di <= r; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+        const I = Math.floor(x / NAV_CELL) + di;
+        const J = Math.floor(y / NAV_CELL) + dj;
+        if (I >= 0 && J >= 0 && I < NNX && J < NNY && walk[fi]?.[J * NNX + I]) return [(I + 0.5) * NAV_CELL, (J + 0.5) * NAV_CELL];
+      }
+  return null;
+};
+const stairs: { id: string; floor: number; pts: [number, number, number][] }[] = [];
+for (const t of TOWERS)
+  for (let fi = 0; fi + 1 < floors.length; fi++) {
+    const lane0 = ST.lane / 2;
+    const lane1 = ST.lane * 1.5;
+    const turn = ST.depth + 0.8; // on the round landing
+    const frame: [number, number, number][] = [
+      [-1, lane0, 0],
+      [ST.strip, lane0, 0],
+      [ST.depth, lane0, FLOOR_H / 2],
+      [turn, lane0, FLOOR_H / 2],
+      [turn, lane1, FLOOR_H / 2],
+      [ST.depth, lane1, FLOOR_H / 2],
+      [ST.strip, lane1, FLOOR_H],
+      [-1, lane1, FLOOR_H],
+    ];
+    const pts = frame.map(([u, v, h]): [number, number, number] => {
+      const p = towerPt(t, u, v, h);
+      return [p[0], -p[2], h];
+    });
+    const a = snap(fi, pts[0][0], pts[0][1]);
+    const b = snap(fi + 1, pts[pts.length - 1][0], pts[pts.length - 1][1]);
+    if (!a || !b) {
+      console.warn(`nav: stair ${t.id} floor ${fi + 1}->${fi + 2}: no open floor at its ${a ? "top" : "foot"}; left out`);
+      continue;
+    }
+    pts.unshift([a[0], a[1], 0]);
+    pts.push([b[0], b[1], FLOOR_H]);
+    stairs.push({ id: `${t.id}_${fi + 1}`, floor: fi, pts: pts.map((p) => p.map((n) => Math.round(n * 100) / 100) as [number, number, number]) });
+  }
+
 const pack = (a: Uint8Array) => {
   const out = Buffer.alloc(Math.ceil(a.length / 8));
   for (let i = 0; i < a.length; i++) if (a[i]) out[i >> 3] |= 1 << (i & 7);
@@ -75,7 +123,8 @@ const json = JSON.stringify({
   nx: NNX,
   ny: NNY,
   floors: floors.map((_, fi) => ({ walk: pack(walk[fi]), opaque: pack(opaque[fi]) })),
+  stairs,
 });
 writeFileSync("public/models/nav.json", json);
 const count = (a: Uint8Array) => a.reduce((s, v) => s + v, 0);
-console.log(`nav.json: ${(json.length / 1024).toFixed(1)} KB; walkable cells per floor ${walk.map(count).join(", ")}; ${blocked} blocked by kit pieces`);
+console.log(`nav.json: ${(json.length / 1024).toFixed(1)} KB; walkable cells per floor ${walk.map(count).join(", ")}; ${blocked} blocked by kit pieces; ${stairs.length} stair links`);

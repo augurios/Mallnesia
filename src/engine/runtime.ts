@@ -43,6 +43,7 @@ import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
 import { createGirlView } from "./girl-view";
 import { Exploration, GuardRounds, ROUNDS, cueEffect } from "./guard-rounds";
+import { EscortDirector, escortWatchers, type EscortBeat } from "./escort";
 import { GuardScene, lineTime, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
@@ -138,6 +139,9 @@ const FLASH_DRAIN = 1 / 120; // charge per second while on: 2 minutes of light
 const FLASH_RECHARGE = 1 / 90; // charge per second while off: 90 seconds to refill
 const FLASH_MIN_ON = 0.1; // can't switch on below this
 const FLASH_DIM_BELOW = 0.2; // the beam fades out under this charge
+const ESCORT_LIGHT = 6; // meters: this close to the guard on the way out, the player is in his flashlight's light
+const ESCORT_FLICKER = 1.6; // seconds the lights stutter, each time
+const GIRL_AHEAD = [9, 18]; // meters along his walk ahead where the girl in white waits, off to one side
 const TIP_TIME = 14000; // how long the flashlight tip stays up if the player does not use it (ms)
 const LOCK_TURN = 4; // how fast the camera turns to the guard during the opening (1/s)
 const CAMERA_FOLLOW = 18; // how fast the eye follows the feet over steps (1/s)
@@ -316,6 +320,19 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const roundsForce = params.get("rounds") === "now";
   let meet: { line: number; t: number } | null = null; // the dialogue of the meeting
   let ended = false;
+  // The escort: the legends that come while he walks the player out (escort.ts), and his calm lines when they lag.
+  const escortDirector = new EscortDirector();
+  let waitingLine = 0;
+  let escortFlicker = 0; // seconds left of the player's light and the night's glow stuttering
+  let subtitleToken = 0;
+  /** A subtitle for `ms`, cleared after unless another has replaced it. */
+  const say = (text: string, ms: number) => {
+    const k = ++subtitleToken;
+    options.onSubtitle?.(text);
+    setTimeout(() => {
+      if (k === subtitleToken) options.onSubtitle?.(null);
+    }, ms);
+  };
   // The security console and its monitors (security.ts): E at the console looks through the mall's cameras (the game's own
   // camera moves to the CCTV spot, in night vision); left and right change camera; E or Esc leaves. ?monitor=1 starts
   // looking through the feeds (?cam=<n> picks the camera), for screenshots.
@@ -723,7 +740,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const keys = new Set<string>();
   let locked = false;
   let charge = 1;
-  const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: flashOn && charge > 0, hidden: hiding.hidden });
+  /** Near the guard on the way out, the player stands in his flashlight's light: the shadow sees them as if their own were on. */
+  const inGuardLight = () => rounds.phase === "escort" && Math.hypot(rounds.x - player.x, rounds.y + player.z, rounds.z - player.y) < ESCORT_LIGHT;
+  const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: (flashOn && charge > 0) || inGuardLight(), hidden: hiding.hidden });
   /**
    * The girl is gone at once (she has left, the player fainted or loaded a save, the mall was left): her model, her
    * light, her voice and her drain. Without the model and light, the view would stay drawn where she last stood.
@@ -1021,6 +1040,64 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     sanity.setDrain("garage", 0);
   };
 
+  /**
+   * On the way out the mall puts her on the walk ahead: 9 to 18 m along it, 1.8 to 3 m off to one side, where the player
+   * cannot see her yet, so they have to pass her. Falls back to her usual places.
+   */
+  const summonGirlAhead = (): boolean => {
+    if (!nav || apparition || area !== "mall" || !girlView.ready) return false;
+    const route = rounds.routeAhead;
+    let along = Math.hypot(route[0]?.[0] - player.x, route[0]?.[1] + player.z) || 0;
+    for (let i = 1; i < route.length && along < GIRL_AHEAD[1]; i++) {
+      const [ax, ay, az] = route[i - 1];
+      const [bx, by] = route[i];
+      const seg = Math.hypot(bx - ax, by - ay);
+      along += seg;
+      if (along < GIRL_AHEAD[0] || seg < 0.5 || Math.abs(az - floor * FLOOR_HEIGHT) > 0.1) continue;
+      for (let k = 0; k < 6; k++) {
+        const t = Math.random();
+        const side = (Math.random() < 0.5 ? -1 : 1) * (1.8 + Math.random() * 1.2);
+        const x = ax + (bx - ax) * t + (-(by - ay) / seg) * side;
+        const y = ay + (by - ay) * t + ((bx - ax) / seg) * side;
+        if (!nav.walkable(floor, x, y) || !unseen(x, y, floor)) continue;
+        apparition = new Apparition("corridor", { x, y, facing: Math.atan2(-player.z - y, player.x - x) });
+        return true;
+      }
+    }
+    return summonGirl();
+  };
+  /** Makes one of the escort's beats happen (escort.ts). False if it could not, this time. */
+  const escortBeat = (beat: EscortBeat): boolean => {
+    if (!nav) return false;
+    switch (beat) {
+      case "noise":
+        // a chair or a bin where there are some; otherwise something scraping, unseen
+        if (fireNoise()) return true;
+      // falls through
+      case "fall": {
+        const spot = nav.randomSpot(floor, player.x, -player.z, 7, 20, Math.random, (x, y) => unseen(x, y, floor));
+        if (!spot) return false;
+        if (beat === "fall") audio.clatter(spot[0], floor * FLOOR_HEIGHT + 0.4, -spot[1], 0.6 + Math.random() * 0.4);
+        else audio.scrape(spot[0], floor * FLOOR_HEIGHT + 0.2, -spot[1], 0.8 + Math.random() * 0.8);
+        return true;
+      }
+      case "flicker":
+        escortFlicker = ESCORT_FLICKER;
+        return true;
+      case "warning":
+        // his radio, which he does not seem to hear
+        audio.radio(rounds.x, rounds.z + 1.1, -rounds.y, 1);
+        say(es.radioBehind, 3200);
+        return true;
+      case "shadow":
+        if (!shadow) return false;
+        if (shadow.state !== "absent") return true; // already here
+        return shadow.spawn(playerSense(), true);
+      case "girl":
+        return summonGirlAhead();
+    }
+  };
+
   /** She appears now, out of the player's view (behind or beside them, or ahead but hidden behind something). False if there is nowhere to put her. */
   const summonGirl = (): boolean => {
     if (!nav || apparition || area !== "mall") return false;
@@ -1056,14 +1133,9 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       enterGarage();
       return;
     }
-    if (fail.reason === "escort") {
-      // the mall takes the player and the guard to the lobby: the way out is open to those who follow him
-      placePlayer(ROUNDS.LOBBY.floor, ROUNDS.LOBBY.x, ROUNDS.LOBBY.y, headingToYaw(Math.atan2(ROUNDS.EXIT.y - ROUNDS.LOBBY.y, ROUNDS.EXIT.x - ROUNDS.LOBBY.x)));
-      rounds.placeAtLobby();
-      rounds.beginEscort();
-      return;
-    }
-    rounds.reset(); // being caught or fainting sends him away again until the player has scouted enough
+    // being caught or fainting loses him: the mall takes him, and he is back on his rounds later, elsewhere
+    rounds.reset(rounds.phase === "absent" ? rounds.away : ROUNDS.TAKEN_DELAY[0]);
+    escortFlicker = 0;
     leaveGarage(); // anything else brings the player back to the mall
     if (fail.reason === "to_mall") {
       // (debug key P) back through the opening the player came in by, just inside the mall, facing east
@@ -1106,6 +1178,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         rounds.floor = floor;
         rounds.x = spot[0];
         rounds.y = spot[1];
+        rounds.z = floor * FLOOR_HEIGHT;
         progress.guard = 2;
       }
     }
@@ -1342,6 +1415,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         rounds.x = at[0];
         rounds.y = at[1];
         rounds.floor = Number.isFinite(at[2]) ? at[2] - 1 : floor;
+        rounds.z = rounds.floor * FLOOR_HEIGHT;
         rounds.facing = Math.atan2(-player.z - at[1], player.x - at[0]);
       }
     }
@@ -1506,6 +1580,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       }
     }
     torch.intensity = flashOn && !monitoring.active ? FLASH_INTENSITY * Math.min(1, charge / FLASH_DIM_BELOW) : 0;
+    // The mall's flicker on the way out (escort.ts): the player's light and the glow from outside stutter; his does not.
+    let flicker = 1;
+    if (escortFlicker > 0) {
+      escortFlicker -= dt;
+      flicker = Math.sin(now * 0.031) + Math.sin(now * 0.0117) > 0.3 ? 0.08 : 1;
+      torch.intensity *= flicker;
+    }
 
     eyeY = Number.isNaN(eyeY) ? player.y : eyeY + (player.y - eyeY) * (1 - Math.exp(-CAMERA_FOLLOW * dt));
     // Camera effects: a small head bob that fades with speed, and a slight widening while running.
@@ -1532,7 +1613,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         camera.updateProjectionMatrix();
       }
     }
-    hemi.intensity = monitoring.active ? hemiBase * 3.5 : hemiBase;
+    hemi.intensity = monitoring.active ? hemiBase * 3.5 : hemiBase * (flicker < 1 ? 0.4 : 1);
     const fovTarget = view.motion && running && velocity.lengthSq() > WALK_SPEED * WALK_SPEED ? baseFov + RUN_FOV - FOV : baseFov;
     if (!monitoring.active && Math.abs(camera.fov - fovTarget) > 0.01) {
       camera.fov += (fovTarget - camera.fov) * (1 - Math.exp(-FOV_EASE * dt));
@@ -1596,6 +1677,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           py: -player.z,
           floor,
           sanity: sanity.level,
+          want: rounds.phase === "escort" ? escortWatchers(rounds.progress) : 0, // they gather on the way out
           observed: (x, y) => frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
         });
         sanity.setDrain("watchers", watchers.drain);
@@ -1605,13 +1687,14 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       sanity.setDrain("watchers", 0);
       watchersView.update([], now / 1000);
     }
-    // The guard's rounds: scouting, his return, cues, the meeting, the escort and the ending.
+    // The guard's rounds: scouting, his return, cues, the meeting, the escort (with the mall fighting to keep the
+    // player: escort.ts) and the ending.
     if (area === "mall" && nav && !ended) {
       if (dt > 0 && !fail.locked) {
         scouting.visit(floor, player.x, -player.z);
         frustum.setFromProjectionMatrix(projView);
         const seenBy = (x: number, y: number, f: number) => f === floor && frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, f * FLOOR_HEIGHT + 0.9, -y), 1.2)) && nav!.sees(floor, player.x, -player.z, x, y);
-        const ctx = { nav, px: player.x, py: -player.z, floor, seenBy };
+        const ctx = { nav, px: player.x, py: -player.z, floor, pz: player.y, seenBy };
         const openingOver = opening !== "ready" && opening !== "playing" ? true : guardScene !== null && guardScene.done;
         if (rounds.phase === "absent" && progress.guard < 3 && (roundsForce || (progress.guard >= 1 && openingOver && scouting.ready) || progress.guard === 2) && rounds.start(ctx)) {
           progress.guard = 2;
@@ -1620,7 +1703,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           if (ev.type === "cue") {
             const lost = rounds.sinceReturn > ROUNDS.LOST_AFTER;
             const fx = cueEffect(sanity.level, lost, Math.random(), Math.random());
-            if (fx.quiet || rounds.floor !== floor) continue;
+            if (fx.quiet || Math.abs(rounds.z - player.y) > FLOOR_HEIGHT - 1) continue;
             const dx = rounds.x - player.x;
             const dy = rounds.y + player.z;
             const dist = Math.hypot(dx, dy);
@@ -1634,21 +1717,27 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
               cx = player.x + Math.cos(a) * dist;
               cy = -player.z + Math.sin(a) * dist;
             }
-            const wy = floor * FLOOR_HEIGHT + 1.1;
+            const wy = rounds.z + 1.1;
             if (ev.cue === "keys") audio.keys(cx, wy, -cy, fx.gain);
             else if (ev.cue === "radio") audio.radio(cx, wy, -cy, fx.gain);
-            else audio.step(cx, floor * FLOOR_HEIGHT + 0.1, -cy, fx.gain);
+            else audio.step(cx, rounds.z + 0.1, -cy, fx.gain);
           } else if (ev.type === "meet") {
             meet = { line: 0, t: 0 };
             velocity.set(0, 0);
             options.onSubtitle?.(es.guardMeet[0]);
           } else if (ev.type === "waiting") {
-            options.onSubtitle?.(es.guardWaiting);
-            setTimeout(() => options.onSubtitle?.(null), 2800);
+            // he sees none of what the mall shows the player: only someone dawdling
+            say(es.guardWaiting[waitingLine++ % es.guardWaiting.length], 2800);
+          } else if (ev.type === "taken") {
+            // the mall has taken him: a last crackle of his radio, far off, and he is back on his rounds later, elsewhere
+            audio.radio(rounds.x, rounds.z + 1.1, -rounds.y, 0.4);
+            escortFlicker = 0;
           } else if (ev.type === "arrived") {
             ended = true;
-            options.onSubtitle?.(es.guardArrived);
+            say(es.guardArrived, 2800);
             progress.guard = 3;
+            shadow?.vanish(9999);
+            dismissGirl();
             setTimeout(() => {
               options.onEnding?.("guard");
               if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
@@ -1663,13 +1752,15 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
             if (meet.line >= es.guardMeet.length) {
               meet = null;
               options.onSubtitle?.(null);
-              if (rounds.floor === ROUNDS.EXIT.floor) rounds.beginEscort();
-              else fail.trigger("escort"); // the mall takes them to the lobby behind a fade
+              // to the nearest exit, walked, up or down the stairs
+              if (rounds.beginEscort(nav)) escortDirector.reset();
+              else rounds.reset(); // nowhere to take them (should not happen): he goes back to his rounds
             } else options.onSubtitle?.(es.guardMeet[meet.line]);
           }
         }
+        if (rounds.phase === "escort") escortDirector.update(dt, rounds.progress, escortBeat);
       }
-      guardView.update(rounds.x, rounds.y, rounds.floor, rounds.facing, rounds.present && rounds.floor === floor, rounds.walking ? "walk" : meet ? "talk" : "idle", now / 1000);
+      guardView.update(rounds.x, rounds.y, rounds.z / FLOOR_HEIGHT, rounds.facing, rounds.present && (rounds.phase === "escort" || rounds.floor === floor), rounds.walking ? "walk" : meet ? "talk" : "idle", now / 1000);
     }
     // The guard's opening scene (started at the top of the frame, so the player is frozen from the first one).
     if (area === "mall" && opening === "ready" && (locked || guardParam === "now") && nav && progress.guard === 0) {

@@ -1,7 +1,7 @@
 // Guard rounds test: scouting, patrol, cues, meeting and escort (src/engine/guard-rounds.ts), on the real mall.
 // Run: npm run test:rounds   (needs npm run assets)
 import { existsSync, readFileSync } from "node:fs";
-import { CHECKPOINTS, Exploration, GuardRounds, ROUNDS, cueEffect, type RoundsContext } from "../src/engine/guard-rounds.ts";
+import { CHECKPOINTS, EXITS, Exploration, GuardRounds, ROUNDS, cueEffect, type RoundsContext } from "../src/engine/guard-rounds.ts";
 import { NavGrid, type NavData } from "../src/engine/nav.ts";
 
 let failed = 0;
@@ -54,8 +54,11 @@ const seeded = (seed: number) => () => {
 if (existsSync("public/models/nav.json")) {
   const nav = NavGrid.fromData(JSON.parse(readFileSync("public/models/nav.json", "utf8")) as NavData);
   check("every checkpoint is on open floor", CHECKPOINTS.every((c) => nav.walkable(c.floor, c.x, c.y)), CHECKPOINTS.filter((c) => !nav.walkable(c.floor, c.x, c.y)).map((c) => c.id).join(","));
-  check("the exit and the lobby spot are on open floor", nav.walkable(ROUNDS.EXIT.floor, ROUNDS.EXIT.x, ROUNDS.EXIT.y) && nav.walkable(ROUNDS.LOBBY.floor, ROUNDS.LOBBY.x, ROUNDS.LOBBY.y));
-  check("there is a way from the lobby to the main doors", nav.findPath(0, ROUNDS.LOBBY.x + 1.5, ROUNDS.LOBBY.y + 1.5, ROUNDS.EXIT.x, ROUNDS.EXIT.y) !== null);
+  check("every exit is on open floor (or next to it)", EXITS.every((e) => nav.nearestWalkable(e.floor, e.x, e.y, 2) !== null), EXITS.filter((e) => !nav.nearestWalkable(e.floor, e.x, e.y, 2)).map((e) => e.id).join(","));
+  check("the stairs are in the nav data: three towers, two flights each", nav.stairs.length === 6, `${nav.stairs.length}`);
+  check("every checkpoint has a walk to an exit", CHECKPOINTS.every((c) => EXITS.some((e) => nav.findRoute(c.floor, c.x, c.y, e.floor, e.x, e.y, ROUNDS.FLOOR_H) !== null)));
+  const down = nav.findRoute(2, 70, 20, 0, 74.5, 8.8, ROUNDS.FLOOR_H);
+  check("from floor 3 to the main doors: down the stairs, one continuous walk", !!down && down.pts[down.pts.length - 1][2] === 0 && down.pts.some((p) => p[2] > 0 && p[2] < 10 && p[2] % 5 !== 0), down ? `${down.length.toFixed(0)} m` : "no route");
   const sameFloor = CHECKPOINTS.filter((c) => c.floor === 1);
   const linked = sameFloor.every((a) => sameFloor.every((b) => nav.findPath(1, a.x, a.y, b.x, b.y) !== null));
   check("the checkpoints on one floor are connected", linked);
@@ -111,43 +114,69 @@ if (existsSync("public/models/nav.json")) {
   check("the order of the rounds is not the same lap after lap", orders.length >= 2 && new Set(orders).size >= 2, `${orders.length} laps, ${new Set(orders).size} different`);
 
   // meeting and escort
-  const h = new GuardRounds(seeded(3));
-  h.start({ nav, px: 100, py: 150, floor: 2, seenBy: () => false });
-  h.floor = 0;
-  h.x = 72.5;
-  h.y = 28.5;
-  h.target = CHECKPOINTS[3];
-  const near = (): RoundsContext => ({ nav, px: 72.5, py: 26.5, floor: 0, seenBy: () => true });
-  const ev = h.update(0.1, near());
-  check("within 3.6 m and in sight: he meets the player", h.phase === "meeting" && ev.some((e) => e.type === "meet"));
-  h.beginEscort();
-  check("the escort begins", h.phase === "escort");
-  // the player follows a couple of meters behind
-  let px = 72.5;
-  let py = 26.5;
-  let arrived = false;
-  for (let t = 0; t < 400 && !arrived; t += 1 / 10) {
-    const ctx: RoundsContext = { nav, px, py, floor: 0, seenBy: () => true };
-    const out = h.update(1 / 10, ctx);
-    if (out.some((e) => e.type === "arrived")) arrived = true;
-    const d = Math.hypot(h.x - px, h.y - py);
-    if (d > 2.5) {
-      px += ((h.x - px) / d) * 1.6 * 0.1;
-      py += ((h.y - py) / d) * 1.6 * 0.1;
+  /** A guard met at (x, y) on `floor`, in the escort. */
+  const met = (seed: number, floor: number, x: number, y: number) => {
+    const h = new GuardRounds(seeded(seed));
+    h.start({ nav, px: 100, py: 150, floor: 2, seenBy: () => false });
+    h.floor = floor;
+    h.z = floor * ROUNDS.FLOOR_H;
+    h.x = x;
+    h.y = y;
+    const ev = h.update(0.1, { nav, px: x, py: y - 2, floor, seenBy: () => true });
+    return { h, ev, exit: h.beginEscort(nav) };
+  };
+  /** A player who follows his trail a couple of meters behind, up and down the stairs. True if he gets them out. */
+  const follow = (h: GuardRounds, seconds: number) => {
+    const trail: [number, number, number][] = [[h.x, h.y - 2, h.z]];
+    let [px, py, pz] = trail[0];
+    let maxProgress = 0;
+    let monotone = true;
+    for (let t = 0; t < seconds; t += 1 / 10) {
+      const floor = Math.max(0, Math.floor((pz + 0.6) / ROUNDS.FLOOR_H));
+      const out = h.update(1 / 10, { nav, px, py, floor, pz, seenBy: () => true });
+      if (h.progress + 1e-6 < maxProgress) monotone = false;
+      maxProgress = Math.max(maxProgress, h.progress);
+      if (out.some((e) => e.type === "arrived")) return { arrived: true, monotone, t };
+      trail.push([h.x, h.y, h.z]);
+      // walk toward the oldest trail point that is still more than 2.5 m from him
+      while (trail.length > 1 && Math.hypot(trail[0][0] - px, trail[0][1] - py, trail[0][2] - pz) < 0.3) trail.shift();
+      if (Math.hypot(h.x - px, h.y - py, h.z - pz) > 2.5) {
+        const [tx, ty, tz] = trail[0];
+        const d = Math.hypot(tx - px, ty - py, tz - pz) || 1;
+        const step = Math.min(d, 1.7 * 0.1);
+        px += ((tx - px) / d) * step;
+        py += ((ty - py) / d) * step;
+        pz += ((tz - pz) / d) * step;
+      }
     }
-  }
-  check("a player who follows is led to the main doors", arrived && h.phase === "done");
-  const w = new GuardRounds(seeded(4));
-  w.start({ nav, px: 100, py: 150, floor: 2, seenBy: () => false });
-  w.floor = 0;
-  w.x = 72.5;
-  w.y = 28.5;
-  w.update(0.1, near());
-  w.beginEscort();
+    return { arrived: false, monotone, t: seconds };
+  };
+  const lobby = met(3, 0, 72.5, 28.5);
+  check("within 3.6 m and in sight: he meets the player", lobby.ev.some((e) => e.type === "meet"));
+  check("met in the lobby: the escort begins, to the main entrance", lobby.h.phase === "escort" && lobby.exit?.id === "main", lobby.exit?.id ?? "none");
+  const a = follow(lobby.h, 300);
+  check("a player who follows is led out", a.arrived && lobby.h.phase === "done" && lobby.h.progress === 1, `${a.t.toFixed(0)} s`);
+  check("the walk's progress only grows", a.monotone);
+  check("met near the side exit: that is where he goes", met(5, 0, 36, 46).exit?.id === "side", met(5, 0, 36, 46).exit?.id ?? "none");
+  check("met at floor 2's north end: the north exit", met(6, 1, 51, 185).exit?.id === "north", met(6, 1, 51, 185).exit?.id ?? "none");
+  const upstairs = met(8, 2, 70, 20);
+  check("met on floor 3: he heads for an exit downstairs", upstairs.exit !== null && upstairs.exit.floor < 2, upstairs.exit?.id ?? "none");
+  const b = follow(upstairs.h, 600);
+  check("from floor 3, a player who follows him down the stairs is led out", b.arrived, `${b.t.toFixed(0)} s, ${upstairs.h.remaining.toFixed(0)} m left`);
+
+  const w = met(4, 0, 72.5, 28.5).h;
   const before = [w.x, w.y];
   let called = 0;
-  for (let t = 0; t < 30; t += 1 / 10) if (w.update(1 / 10, { nav, px: 72.5, py: 12.5, floor: 0, seenBy: () => true }).some((e) => e.type === "waiting")) called++;
+  for (let t = 0; t < 30; t += 1 / 10) if (w.update(1 / 10, { nav, px: 72.5, py: 12.5, floor: 2, seenBy: () => true }).some((e) => e.type === "waiting")) called++;
   check("a player who falls behind: he stops and calls", called >= 1 && Math.hypot(w.x - before[0], w.y - before[1]) < 8, `${called} calls`);
+  let taken = false;
+  for (let t = 0; t < ROUNDS.LOSE_AFTER + 5 && !taken; t += 1 / 10) taken = w.update(1 / 10, { nav, px: 72.5, py: 12.5, floor: 2, seenBy: () => true }).some((e) => e.type === "taken");
+  check("while the player can see him, the mall does not take him", !taken && w.phase === "escort");
+  taken = w.update(0.1, { nav, px: 72.5, py: 12.5, floor: 2, seenBy: () => false }).some((e) => e.type === "taken");
+  check("behind too long and out of sight: the mall takes him", taken && w.phase === "absent" && !w.present);
+  check("he is not back on his rounds at once", !w.start({ nav, px: 100, py: 150, floor: 2, seenBy: () => false }));
+  for (let t = 0; t < ROUNDS.TAKEN_DELAY[1] + 1; t += 1) w.update(1, far());
+  check("after a while he is back on his rounds, to be found again", w.start({ nav, px: 100, py: 150, floor: 2, seenBy: () => false }) && w.phase === "patrolling");
 }
 
 console.log(failed ? `\n${failed} FAILED` : "\nall good");
