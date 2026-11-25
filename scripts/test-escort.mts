@@ -1,5 +1,6 @@
 // Escort test: the legends during the walk out with the guard (src/engine/escort.ts). Run: npm run test:escort
 import { ESCORT, EscortDirector, escortWatchers, type EscortBeat } from "../src/engine/escort.ts";
+import { Sanity, DARK_DRAIN } from "../src/engine/sanity.ts";
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail = "") => {
@@ -41,5 +42,27 @@ const later = walk(180, (b) => (b === "girl" ? ++tries > 5 : true));
 check("a beat with nowhere to go is tried again", later.girl.length === 1 && tries === 6);
 
 check("the watchers gather as the door nears", escortWatchers(0) === 0 && escortWatchers(0.35) === 2 && escortWatchers(0.95) === 4);
+
+// Sanity on the walk: as the runtime does it (no recovery, the steady drain, a jolt per beat), without the legends'
+// own drains, which depend on what the player looks at. A two-minute walk, with the light on and then off.
+const walkSanity = (light: number) => {
+  const s = new Sanity();
+  s.recovers = false;
+  s.setDrain("escort", ESCORT.DRAIN);
+  const d = new EscortDirector(seeded(4));
+  for (let t = 0; t < 120; t += 0.1) {
+    d.update(0.1, t / 120, (b) => {
+      s.drain(ESCORT.JOLT[b]);
+      return true;
+    });
+    s.update(0.1, light);
+  }
+  return s.level;
+};
+const lit = walkSanity(1);
+const dark = walkSanity(0);
+check("with the light on the walk still costs sanity", lit < 0.85, lit.toFixed(2));
+check("in the dark it costs more than the dark alone", 1 - dark > DARK_DRAIN * 114 + 0.05, dark.toFixed(2));
+check("the walk alone never empties it (the legends must do that)", dark > 0.3, dark.toFixed(2));
 console.log(failed ? `\n${failed} FAILED` : "\nall good");
 process.exit(failed ? 1 : 0);

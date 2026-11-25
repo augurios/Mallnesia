@@ -51,6 +51,9 @@ export function stillLook(look: SanityLook): SanityLook {
 
 export class Sanity {
   level = 1;
+  /** False while nothing brings it back, not the light and not the short rest in the dark (the walk out with the guard:
+   *  the mall presses on). The dark and every source still drain. */
+  recovers = true;
   private dark = 0; // seconds of darkness so far
   private sources = new Map<string, number>();
   private shown = 0; // smoothed effect amount
@@ -61,8 +64,8 @@ export class Sanity {
     if (dt <= 0) return;
     const lit = Math.min(1, Math.max(0, light));
     this.dark = lit > 0.5 ? 0 : this.dark + dt;
-    let rate = lit * LIGHT_RECOVER;
-    if (lit <= 0.5) rate = this.dark > DARK_GRACE ? -DARK_DRAIN : REST_RECOVER;
+    let rate = this.recovers ? lit * LIGHT_RECOVER : 0;
+    if (lit <= 0.5) rate = this.dark > DARK_GRACE ? -DARK_DRAIN : this.recovers ? REST_RECOVER : 0;
     for (const r of this.sources.values()) rate -= r;
     this.set(this.level + rate * dt);
     // The effect follows the level with a delay, so a scare reads as a wave and a recovery as relief.

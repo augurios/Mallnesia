@@ -43,7 +43,7 @@ import { createWatchersView } from "./watchers-view";
 import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
 import { createGirlView } from "./girl-view";
 import { Exploration, GuardRounds, ROUNDS, cueEffect } from "./guard-rounds";
-import { EscortDirector, escortWatchers, type EscortBeat } from "./escort";
+import { ESCORT, EscortDirector, escortWatchers, type EscortBeat } from "./escort";
 import { GuardScene, lineTime, GUARD_SCENE, placeAhead } from "./guard-scene";
 import { createGuardView } from "./guard-view";
 import { Fail, FAIL, pickWakeSpot } from "./fail";
@@ -741,6 +741,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   let locked = false;
   let charge = 1;
   /** Near the guard on the way out, the player stands in his flashlight's light: the shadow sees them as if their own were on. */
+  /** The legends hit harder on the walk out with the guard (escort.ts). */
+  const legendScale = () => (rounds.phase === "escort" ? ESCORT.LEGEND_DRAIN : 1);
   const inGuardLight = () => rounds.phase === "escort" && Math.hypot(rounds.x - player.x, rounds.y + player.z, rounds.z - player.y) < ESCORT_LIGHT;
   const playerSense = (): PlayerSense => ({ x: player.x, y: -player.z, floor, speed: Math.hypot(velocity.x, velocity.y), flashlightOn: (flashOn && charge > 0) || inGuardLight(), hidden: hiding.hidden });
   /**
@@ -1066,8 +1068,13 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     }
     return summonGirl();
   };
-  /** Makes one of the escort's beats happen (escort.ts). False if it could not, this time. */
+  /** Makes one of the escort's beats happen (escort.ts), and takes its bit of sanity. False if it could not, this time. */
   const escortBeat = (beat: EscortBeat): boolean => {
+    const ok = makeEscortBeat(beat);
+    if (ok) sanity.drain(ESCORT.JOLT[beat]);
+    return ok;
+  };
+  const makeEscortBeat = (beat: EscortBeat): boolean => {
     if (!nav) return false;
     switch (beat) {
       case "noise":
@@ -1541,17 +1548,21 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       for (const ev of shadow.update(dt, sense)) {
         if (ev === "noticed") {
           audio.sting();
-          sanity.drain(0.05);
+          sanity.drain(0.05 * legendScale());
         }
         if (ev === "caught" && fail.trigger("caught")) options.onNotice?.("caught");
       }
       // Seeing it drains sanity, more while it hunts. The player's heading in plan coordinates is (-sin yaw, cos yaw).
       const seen = shadow.visibleTo(sense, -Math.sin(yaw), Math.cos(yaw));
-      sanity.setDrain("shadow", seen ? (shadow.hunting ? 0.03 : 0.012) : 0);
+      sanity.setDrain("shadow", seen ? (shadow.hunting ? 0.03 : 0.012) * legendScale() : 0);
       const level = shadow.state === "absent" ? 0 : Math.max(0, 1 - shadow.distanceTo(sense) / 45) * shadow.fade;
       shadowSound.update(shadow.x, floor * FLOOR_HEIGHT + 1.2, -shadow.y, level, shadow.hunting);
     }
     if (shadow && area === "mall") shadowView.update(shadow, now / 1000, camera);
+    // On the walk out with the guard nothing brings sanity back and a steady dread drains it (escort.ts).
+    const escorting = rounds.phase === "escort";
+    sanity.recovers = !escorting;
+    sanity.setDrain("escort", escorting ? ESCORT.DRAIN : 0);
     sanity.update(dt, flashOn || (area === "garage" && garage ? litByTube(garage.layout, player.x, -player.z) : false) ? 1 : 0);
     if (sanity.level <= 0 && dt > 0) fail.trigger("faint"); // out of sanity anywhere: faint (ignored while a fail is already under way)
     doors.tempo = sanity.shift;
@@ -1644,8 +1655,8 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           a.opacity > 0.5 &&
           !!nav?.sees(floor, player.x, -player.z, a.spot.x, a.spot.y) &&
           frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(a.spot.x, gy + 0.7, -a.spot.y), 0.6));
-        if (dt > 0 && a.update(dt, distance, inView)) sanity.drain(GIRL.FIRST_SIGHT);
-        sanity.setDrain("girl", inView ? girlDrain(distance) : 0);
+        if (dt > 0 && a.update(dt, distance, inView)) sanity.drain(GIRL.FIRST_SIGHT * legendScale());
+        sanity.setDrain("girl", inView ? girlDrain(distance) * legendScale() : 0);
         if (dt > 0 && inView && distance < GIRL.TOUCH_DIST) sanity.set(0); // right next to her: everything goes at once (then the faint below)
         if (dt > 0 && a.takeCall()) {
           girlVoice.call();
@@ -1680,7 +1691,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           want: rounds.phase === "escort" ? escortWatchers(rounds.progress) : 0, // they gather on the way out
           observed: (x, y) => frustum.intersectsSphere(guardSphere.set(guardPoint.set(x, floor * FLOOR_HEIGHT + 0.9, -y), 0.9)) && nav!.sees(floor, player.x, -player.z, x, y),
         });
-        sanity.setDrain("watchers", watchers.drain);
+        sanity.setDrain("watchers", watchers.drain * legendScale());
       }
       watchersView.update(monitoring.active ? [...watchers.list, ...feedWatchers.list] : watchers.list, now / 1000);
     } else {

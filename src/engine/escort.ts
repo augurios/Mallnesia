@@ -4,6 +4,10 @@
 // flickering (11), the watchers gathering (14), the radio's "mire atrás" and then the shadow (12), and the girl in white
 // on the way ahead (13). The guard sees none of it. This file only says what happens when, from how far along the walk
 // is; the runtime makes each beat happen. No DOM and no Three.js, so scripts/test-escort.mts runs the exact code.
+//
+// Sanity goes faster on the way out: the light no longer brings it back and a steady dread drains it (`DRAIN`),
+// each beat takes a little at once (`JOLT`), and the legends' own drains (the shadow, the girl, the watchers) hit
+// harder (`LEGEND_DRAIN`).
 
 export const ESCORT = {
   /** Seconds between night noises (a chair, a bin) at the start of the walk and at the door. */
@@ -26,6 +30,12 @@ export const ESCORT = {
     { from: 0.55, count: 3 },
     { from: 0.78, count: 4 },
   ],
+  /** Sanity per second lost on the walk on top of the dark's own drain (and with the light on, which no longer restores it). */
+  DRAIN: 1 / 1000,
+  /** How much harder the legends' own sanity drains hit on the walk (the shadow, the girl, the watchers): a multiplier. */
+  LEGEND_DRAIN: 1.5,
+  /** Sanity taken at once by each beat as it happens. The shadow and the girl take theirs by being seen. */
+  JOLT: { noise: 0.0015, fall: 0.004, flicker: 0.004, warning: 0.008, shadow: 0, girl: 0 } as Record<"noise" | "fall" | "flicker" | "warning" | "shadow" | "girl", number>,
   /** A beat that could not happen (nowhere to put it) is tried again this soon (s). */
   RETRY: 3,
   /** Every gap is jittered by up to this share either way. */

@@ -74,6 +74,15 @@ const run = (s: Sanity, seconds: number, light: number) => {
   check("no camera motion: moving tiers off, color tiers stay", still.wobble === 0 && still.shake === 0 && still.tunnel === 0 && still.ghost === 0 && still.aberration === 1 && still.drain > 0);
 }
 
+{
+  const s = new Sanity();
+  s.set(0.5);
+  s.recovers = false;
+  run(s, 60, 1);
+  check("while it does not recover, the light brings nothing back", s.level === 0.5, s.level.toFixed(3));
+  run(s, 4, 0);
+  check("nor does the short rest in the dark", s.level === 0.5, s.level.toFixed(3));
+}
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);
