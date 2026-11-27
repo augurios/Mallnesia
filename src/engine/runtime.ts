@@ -40,7 +40,7 @@ import { NOTES, noteInReach, type Note } from "./notes";
 import { createNotesView } from "./notes-view";
 import { FeedWatchers, Watchers, seatsFromProps } from "./watchers";
 import { createWatchersView } from "./watchers-view";
-import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain } from "./girl";
+import { Apparition, GIRL, GirlDirector, chooseGirlSpot, girlDrain, type GirlSpot } from "./girl";
 import { createGirlView } from "./girl-view";
 import { Exploration, GuardRounds, ROUNDS, cueEffect } from "./guard-rounds";
 import { ESCORT, EscortDirector, escortWatchers, type EscortBeat } from "./escort";
@@ -370,6 +370,12 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
   const girlVoice = audio.girl();
   scene.add(girlView.object, girlView.light); // her light stays in the scene (dimmed to nothing), so shaders never recompile
   let apparition: Apparition | null = null;
+  let girlFloor = 0; // the floor she stands on: fixed when she appears (the player may take the stairs while she is there)
+  /** She appears at `spot` on the player's floor. */
+  const showGirl = (spot: GirlSpot): Apparition => {
+    girlFloor = floor;
+    return (apparition = new Apparition("corridor", spot));
+  };
   let girlSubtitleUntil = 0;
   const guardView = createGuardView((url) =>
     new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url, (e) => {
@@ -1062,7 +1068,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
         const x = ax + (bx - ax) * t + (-(by - ay) / seg) * side;
         const y = ay + (by - ay) * t + ((bx - ax) / seg) * side;
         if (!nav.walkable(floor, x, y) || !unseen(x, y, floor)) continue;
-        apparition = new Apparition("corridor", { x, y, facing: Math.atan2(-player.z - y, player.x - x) });
+        showGirl({ x, y, facing: Math.atan2(-player.z - y, player.x - x) });
         return true;
       }
     }
@@ -1110,7 +1116,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     if (!nav || apparition || area !== "mall") return false;
     const spot = chooseGirlSpot(nav, floor, player.x, -player.z, yawToHeading(yaw), Math.random);
     if (!spot) return false;
-    apparition = new Apparition("corridor", spot);
+    showGirl(spot);
     return true;
   };
 
@@ -1448,8 +1454,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
       girlAtPending = false;
       const at = (params.get("girlat") ?? "").split(",").map(parseFloat);
       if (at.length === 2 && at.every(Number.isFinite)) {
-        apparition = new Apparition("corridor", { x: at[0], y: at[1], facing: Math.atan2(-player.z - at[1], player.x - at[0]) });
-        apparition.update(1, 0, false); // fully faded in (screenshots, where time stands still)
+        showGirl({ x: at[0], y: at[1], facing: Math.atan2(-player.z - at[1], player.x - at[0]) }).update(1, 0, false); // fully faded in (screenshots, where time stands still)
       }
     }
     if (startInGarage && garage && warmDone) {
@@ -1642,17 +1647,19 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
     // The girl in white: out of view, crying; seeing her costs sanity, more the closer the player is.
     if (area === "mall") {
       if (dt > 0 && !fail.locked) {
-        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready" || monitoring.active || !girlView.ready; // not while the player watches the feeds; not ready: her model is still on its way
+        const busy = apparition !== null || (guardScene !== null && !guardScene.done) || (shadow?.hunting ?? false) || opening === "ready" || monitoring.active || !girlView.ready || rounds.phase === "escort"; // on the walk out she comes only as the escort's beat, ahead (escort.ts); not while the player watches the feeds; not ready: her model is still on its way
         if (girlDirector.update(dt, sanity.shift, busy) && !summonGirl()) girlDirector.soon(8); // nowhere to put her: try again soon
       }
       if (apparition) {
         const a = apparition;
-        const distance = Math.hypot(a.spot.x - player.x, a.spot.y + player.z);
-        const gy = floor * FLOOR_HEIGHT;
+        const gy = girlFloor * FLOOR_HEIGHT;
+        const distance = Math.hypot(a.spot.x - player.x, a.spot.y + player.z, gy - player.y); // counting height: from the stairs she is farther
         // the player's own eyes only: while they watch the feeds the camera is at a CCTV mount, and she is not on them
         const inView =
           !monitoring.active &&
           a.opacity > 0.5 &&
+          girlFloor === floor && // sight lines are per floor
+
           !!nav?.sees(floor, player.x, -player.z, a.spot.x, a.spot.y) &&
           frustum.setFromProjectionMatrix(projView).intersectsSphere(guardSphere.set(guardPoint.set(a.spot.x, gy + 0.7, -a.spot.y), 0.6));
         if (dt > 0 && a.update(dt, distance, inView)) sanity.drain(GIRL.FIRST_SIGHT * legendScale());
@@ -1664,7 +1671,7 @@ export function createRuntime(root: HTMLElement, options: RuntimeOptions = {}): 
           girlSubtitleUntil = now + 3000;
         }
         girlVoice.update(a.spot.x, gy + 1.0, -a.spot.y, a.opacity);
-        girlView.update(a.spot.x, a.spot.y, floor, a.spot.facing, a.opacity, now / 1000);
+        girlView.update(a.spot.x, a.spot.y, girlFloor, a.spot.facing, a.opacity, now / 1000);
         if (a.done) dismissGirl();
       } else girlVoice.update(0, 0, 0, 0);
       if (girlSubtitleUntil > 0 && now > girlSubtitleUntil) {
